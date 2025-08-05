@@ -106,7 +106,7 @@ TODO
 
 #### Important Note for Updatable Components
 
-The `UpdateFunc` in the `components.Updatable` now receives `dt float64`, `world *ecs.World`, and `entityID ecs.EntityID` as parameters. This allows your entity's logic to interact directly with the ECS world and its own components.
+The `UpdateFunc` in the `components.Updatable` receives `dt float64`, `world *ecs.World`, and `entityID ecs.EntityID` as parameters. This allows your entity's logic to interact directly with the ECS world and its own components.
 
 ### Slow Motion and Cooldowns
 
