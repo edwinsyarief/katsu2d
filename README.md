@@ -1,6 +1,6 @@
 # Katsu2D (カツ2D)
 
-Unleash your game ideas with this high-performance game engine built in Go, leveraging the power of Ebitengine. This engine features a fast and unique Entity Component System (ECS) architecture, an optimized batching renderer with support for position, rotation, and scaling, and a simplified API designed for both power and ease of use.
+Unleash your game ideas with this high-performance game framework built in Go, leveraging the power of Ebitengine. This framework features a fast and unique Entity Component System (ECS) architecture, an optimized batching renderer with support for position, rotation, and scaling, and a simplified API designed for both power and ease of use.
 
 ## 🚧 WORK IN PROGRESS 🚧
 
@@ -150,11 +150,11 @@ The name **Katsu2D** draws a playful and fitting analogy to the beloved Japanese
 
 Just as a great katsu is known for its:
 
-- **Crispy, High-Performance Exterior:** The engine aims for **blazing fast performance** and a **sharp, responsive feel** in your 2D games, much like the satisfying crunch of a well-fried panko crust.
+- **Crispy, High-Performance Exterior:** The framework aims for **blazing fast performance** and a **sharp, responsive feel** in your 2D games, much like the satisfying crunch of a well-fried panko crust.
 - **Tender, Robust Interior:** Beneath the surface, Katsu2D offers a **robust and reliable ECS core**, providing a solid foundation for complex game logic and interactions, akin to the tender, flavorful meat within.
 - **Simple, Satisfying Experience:** The goal is to provide a **streamlined and enjoyable development experience**, allowing you to focus on the creative aspects of your game without getting bogged down in boilerplate, just as a perfectly prepared katsu offers a simple yet deeply satisfying meal.
 
-Combined with "2D" to clearly define its domain, **Katsu2D** signifies an engine designed to help you create games that are both **performant and a pleasure to build and play**.
+Combined with "2D" to clearly define its domain, **Katsu2D** signifies a framework designed to help you create games that are both **performant and a pleasure to build and play**.
 
 ## License
 
