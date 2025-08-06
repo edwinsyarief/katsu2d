@@ -1,4 +1,4 @@
-# Katsu2D
+# Katsu2D (カツ2D)
 
 Unleash your game ideas with this high-performance game engine built in Go, leveraging the power of Ebitengine. This engine features a fast and unique Entity Component System (ECS) architecture, an optimized batching renderer with support for position, rotation, and scaling, and a simplified API designed for both power and ease of use.
 
@@ -146,7 +146,7 @@ TODO
 
 ## Why Katsu2D?
 
-The name **Katsu2D** draws a playful and fitting analogy to the beloved Japanese dish, often a perfectly breaded and fried cutlet.
+The name **Katsu2D** draws a playful and fitting analogy to the beloved Japanese dish (カツ), often a perfectly breaded and fried cutlet.
 
 Just as a great katsu is known for its:
 
