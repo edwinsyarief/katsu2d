@@ -112,9 +112,6 @@ func NewEngine(opts ...Option) *Engine {
 	// Initialize the underlying ECS world and scene manager
 	world := ecs.NewWorld()
 	sceneManager := scene.NewManager()
-	defaultScene := scene.NewDefaultScene()
-	sceneManager.AddScene("default", defaultScene)
-	sceneManager.SwitchScene("default")
 
 	engine := &Engine{
 		world:           world,
@@ -140,6 +137,11 @@ func (self *Engine) RunGame() error {
 
 // World returns the ECS World.
 func (self *Engine) World() *ecs.World {
+	return self.world
+}
+
+func (self *Engine) NewWorld() *ecs.World {
+	self.world = ecs.NewWorld()
 	return self.world
 }
 

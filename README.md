@@ -82,6 +82,38 @@ func main() {
 		Color:     color.RGBA{R: 255, G: 0, B: 0, A: 255}, // Red
 	})
 
+	// Create an updatable entity with a batched drawable (blue square)
+	// This entity will now visibly rotate and scale, demonstrating the new batcher's capabilities.
+	entity2 := game.World().CreateEntity()
+	t2 := katsu2d.TPos(300, 300)
+	world.AddComponent(entity2, t2)
+	world.AddComponent(entity2, &components.Updatable{
+		UpdateFunc: func(dt float64, w *ecs.World, eID ecs.EntityID) {
+			// Simple rotation effect
+			if component, exists := w.GetComponent(eID, constants.ComponentTransform); exists {
+				if transform, ok := component.(*components.Transform); ok {
+					transform.Rotate(dt)
+					if transform.Rotation() > 2*math.Pi {
+						transform.Rotate(-2 * math.Pi)
+					}
+					// Simple scaling effect
+					transform.SetScale(
+						katsu2d.V(
+							1.0+float64(math.Sin(float64(transform.Rotation())*2.0))*0.5,
+							1.0+float64(math.Sin(float64(transform.Rotation())*2.0))*0.5,
+						),
+					)
+				}
+			}
+		},
+	})
+	world.AddComponent(entity2, &components.DrawableBatch{
+		TextureID: 0,
+		Width:     32,
+		Height:    32,
+		Color:     color.RGBA{R: 0, G: 0, B: 255, A: 255}, // Blue
+	})
+
 	if err := game.RunGame(); err != nil {
 		panic(err)
 	}
@@ -106,7 +138,7 @@ TODO
 
 #### Important Note for Updatable Components
 
-The `UpdateFunc` in the `components.Updatable` now receives `dt float64`, `world *ecs.World`, and `entityID ecs.EntityID` as parameters. This allows your entity's logic to interact directly with the ECS world and its own components.
+The `UpdateFunc` in the `components.Updatable` receives `dt float64`, `world *ecs.World`, and `entityID ecs.EntityID` as parameters. This allows your entity's logic to interact directly with the ECS world and its own components.
 
 ### Slow Motion and Cooldowns
 
@@ -114,12 +146,15 @@ TODO
 
 ## Why Katsu2D?
 
-The name Katsu2D is chosen to reflect the core philosophy and aspirations of this game engine.
+The name **Katsu2D** draws a playful and fitting analogy to the beloved Japanese dish, often a perfectly breaded and fried cutlet.
 
-- **"Katsu" (勝つ):** In Japanese, "Katsu" means "to win" or "to be victorious." This conveys the engine's goal of helping developers succeed in creating high-performance 2D games. It also evokes a sense of speed and efficiency, which are central to the engine's design, particularly its optimized batching renderer and ECS architecture.
-- **"2D":** This clearly indicates the engine's focus on two-dimensional game development, making its purpose immediately clear to potential users.
+Just as a great katsu is known for its:
 
-Together, **Katsu2D** aims to be a concise and memorable name that signifies a **victorious and efficient platform for 2D game creation**.
+- **Crispy, High-Performance Exterior:** The engine aims for **blazing fast performance** and a **sharp, responsive feel** in your 2D games, much like the satisfying crunch of a well-fried panko crust.
+- **Tender, Robust Interior:** Beneath the surface, Katsu2D offers a **robust and reliable ECS core**, providing a solid foundation for complex game logic and interactions, akin to the tender, flavorful meat within.
+- **Simple, Satisfying Experience:** The goal is to provide a **streamlined and enjoyable development experience**, allowing you to focus on the creative aspects of your game without getting bogged down in boilerplate, just as a perfectly prepared katsu offers a simple yet deeply satisfying meal.
+
+Combined with "2D" to clearly define its domain, **Katsu2D** signifies an engine designed to help you create games that are both **performant and a pleasure to build and play**.
 
 ## License
 
