@@ -9,6 +9,7 @@ const (
 	ComponentUpdatable
 	ComponentTag
 	ComponentCooldown
+	ComponentCustom
 )
 
 // ECS constants
