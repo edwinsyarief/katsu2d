@@ -62,21 +62,23 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			self.renderer.Begin(textureToUse)
 		}
 
-		// Draw the quad with rotation and scaling
-		pos := transform.Position()
-		scale := transform.Scale()
-		rotation := transform.Rotation()
-
-		self.renderer.DrawTransformedQuad(
-			pos.X,
-			pos.Y,
-			drawable.Width,
-			drawable.Height,
-			scale.X,
-			scale.Y,
-			rotation,
-			drawable.Color,
-		)
+		if drawable.TextureID <= 0 {
+			// Draw a colored quad if no texture is specified
+			self.renderer.DrawTransformedQuad(
+				transform,
+				drawable.Width,
+				drawable.Height,
+				drawable.Color,
+			)
+		} else {
+			self.renderer.DrawTexturedQuad(
+				transform,
+				drawable.Width,
+				drawable.Height,
+				0, 0, drawable.Width, drawable.Height,
+				drawable.Color,
+			)
+		}
 
 		// End the batch to render the single quad.
 		self.renderer.End(screen)

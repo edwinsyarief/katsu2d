@@ -78,8 +78,8 @@ func (self *VertexBuffer) GetIndices() []uint16 {
 }
 
 // IsFull checks if the buffer is at capacity.
-func (self *VertexBuffer) IsFull() bool {
-	return len(self.vertices) >= self.capacity
+func (self *VertexBuffer) IsFull(additionalVertices int) bool {
+	return len(self.vertices)+additionalVertices >= self.capacity
 }
 
 // IsEmpty checks if the buffer is empty.

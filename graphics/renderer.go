@@ -2,6 +2,7 @@ package graphics
 
 import (
 	"image/color"
+	"katsu2d/components"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -29,13 +30,13 @@ func (self *Renderer) DrawQuad(x, y, w, h float64, col color.RGBA) {
 }
 
 // DrawTransformedQuad adds a non-textured quad with rotation and scaling.
-func (self *Renderer) DrawTransformedQuad(x, y, w, h, scaleX, scaleY, rotation float64, col color.RGBA) {
-	self.batcher.AddTransformedQuad(x, y, w, h, scaleX, scaleY, rotation, 0, 0, 1, 1, float64(col.R)/255.0, float64(col.G)/255.0, float64(col.B)/255.0, float64(col.A)/255.0)
+func (self *Renderer) DrawTransformedQuad(transform *components.Transform, w, h float64, col color.RGBA) {
+	self.batcher.AddTransformedQuad(transform, w, h, 0, 0, 1, 1, float64(col.R)/255.0, float64(col.G)/255.0, float64(col.B)/255.0, float64(col.A)/255.0)
 }
 
 // DrawTexturedQuad adds a textured quad to the batcher.
-func (self *Renderer) DrawTexturedQuad(x, y, w, h float64, u1, v1, u2, v2 float64, col color.RGBA) {
-	self.batcher.AddQuad(x, y, w, h, u1, v1, u2, v2, float64(col.R)/255.0, float64(col.G)/255.0, float64(col.B)/255.0, float64(col.A)/255.0)
+func (self *Renderer) DrawTexturedQuad(transform *components.Transform, w, h, u1, v1, u2, v2 float64, col color.RGBA) {
+	self.batcher.AddTransformedQuad(transform, w, h, u1, v1, u2, v2, float64(col.R)/255.0, float64(col.G)/255.0, float64(col.B)/255.0, float64(col.A)/255.0)
 }
 
 // End flushes the current batch to the screen.

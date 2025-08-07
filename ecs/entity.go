@@ -42,15 +42,20 @@ func (self EntityID) IsValid() bool {
 
 // EntityManager manages the lifecycle of entities and their components.
 type EntityManager struct {
+	// A new slice to store entity IDs in the order they were created.
+	// This is the key to preserving a stable iteration order.
+	entityOrder []EntityID
+
 	entities     map[EntityID]bool
 	components   map[EntityID]map[int]Component
-	signatures   map[EntityID]Signature // New bitmask signatures map for performance
+	signatures   map[EntityID]Signature
 	deadEntities []EntityID
 }
 
 // NewEntityManager creates a new EntityManager instance.
 func NewEntityManager() *EntityManager {
 	return &EntityManager{
+		entityOrder:  make([]EntityID, 0),
 		entities:     make(map[EntityID]bool),
 		components:   make(map[EntityID]map[int]Component),
 		signatures:   make(map[EntityID]Signature),
@@ -64,6 +69,10 @@ func (self *EntityManager) CreateEntity() EntityID {
 	self.entities[id] = true
 	self.components[id] = make(map[int]Component)
 	self.signatures[id] = 0 // Initialize signature to zero
+
+	// Add the new entity ID to our ordered slice.
+	self.entityOrder = append(self.entityOrder, id)
+
 	return id
 }
 
@@ -74,6 +83,14 @@ func (self *EntityManager) DestroyEntity(id EntityID) {
 		delete(self.components, id)
 		delete(self.signatures, id) // Also remove the signature
 		self.deadEntities = append(self.deadEntities, id)
+
+		// Remove the entity from our ordered slice to preserve consistency.
+		for i, entityID := range self.entityOrder {
+			if entityID == id {
+				self.entityOrder = append(self.entityOrder[:i], self.entityOrder[i+1:]...)
+				break
+			}
+		}
 	}
 }
 
@@ -117,7 +134,7 @@ func (self *EntityManager) HasComponent(entityID EntityID, typeID int) bool {
 }
 
 // GetEntitiesWithComponents finds all entities that have all specified component types.
-// This refactored implementation uses bitmasks for a high-performance query.
+// This refactored implementation now iterates over the ordered slice to preserve order.
 func (self *EntityManager) GetEntitiesWithComponents(typeIDs ...int) []EntityID {
 	var result []EntityID
 	var targetSignature Signature
@@ -127,10 +144,13 @@ func (self *EntityManager) GetEntitiesWithComponents(typeIDs ...int) []EntityID 
 		targetSignature.Set(typeID)
 	}
 
-	// Iterate through entity signatures and use a bitwise check
-	for entityID, signature := range self.signatures {
-		if signature&targetSignature == targetSignature {
-			result = append(result, entityID)
+	// Iterate through the ordered list of entity IDs
+	for _, entityID := range self.entityOrder {
+		// Check if the entity is valid (has a signature) and matches the target signature
+		if signature, exists := self.signatures[entityID]; exists {
+			if signature&targetSignature == targetSignature {
+				result = append(result, entityID)
+			}
 		}
 	}
 

@@ -4,8 +4,10 @@ import (
 	"image/color"
 	"katsu2d"
 
+	"katsu2d/components"
 	"katsu2d/constants"
 
+	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -40,7 +42,7 @@ func (self *Batcher) Begin(texture *ebiten.Image) {
 // AddQuad adds a simple quad to the current batch.
 func (self *Batcher) AddQuad(x, y, w, h float64, u1, v1, u2, v2 float64, r, g, b, a float64) {
 	// Check if buffer needs flushing
-	if self.buffer.IsFull() {
+	if self.buffer.IsFull(4) {
 		return
 	}
 	self.buffer.AddQuad(x, y, w, h, u1, v1, u2, v2, r, g, b, a)
@@ -49,35 +51,45 @@ func (self *Batcher) AddQuad(x, y, w, h float64, u1, v1, u2, v2 float64, r, g, b
 // AddTransformedQuad adds a quad with scaling and rotation to the current batch.
 // The u1, v1, u2, v2 represent normalized texture coordinates (0.0 to 1.0).
 func (self *Batcher) AddTransformedQuad(
-	x, y, w, h, scaleX, scaleY, rotation float64,
+	transform *components.Transform,
+	width, height float64,
 	u1, v1, u2, v2 float64,
 	r, g, b, a float64,
 ) {
-	if self.buffer.IsFull() {
+	if self.buffer.IsFull(4) {
 		return
 	}
 
-	// Calculate half width and height
-	halfW := (w * scaleX) / 2
-	halfH := (h * scaleY) / 2
+	t := transform.GetTransform()
+	if t.GetInitialParentTransform() != nil {
+		t = t.GetInitialParentTransform()
+	}
 
-	// Define the local vertices of the quad
-	p1 := katsu2d.V(-halfW, -halfH)
-	p2 := katsu2d.V(halfW, -halfH)
-	p3 := katsu2d.V(halfW, halfH)
-	p4 := katsu2d.V(-halfW, halfH)
+	realPos := katsu2d.V2(0).Apply(t.Matrix())
+	if !t.Origin().IsZero() {
+		realPos = realPos.Sub(t.Origin())
+	}
 
-	// Apply rotation to each local vertex
-	p1 = p1.Rotate(rotation)
-	p2 = p2.Rotate(rotation)
-	p3 = p3.Rotate(rotation)
-	p4 = p4.Rotate(rotation)
+	srcProjMinX := realPos.X
+	srcProjMinY := realPos.Y
+	srcProjMaxX := srcProjMinX + width*t.Scale().X
+	srcProjMaxY := srcProjMinY + height*t.Scale().Y
 
-	// Translate the rotated vertices to the world position
-	p1 = p1.Add(katsu2d.V(x, y))
-	p2 = p2.Add(katsu2d.V(x, y))
-	p3 = p3.Add(katsu2d.V(x, y))
-	p4 = p4.Add(katsu2d.V(x, y))
+	left, right := float32(srcProjMinX), float32(srcProjMaxX)
+	top, bottom := float32(srcProjMinY), float32(srcProjMaxY)
+
+	p1 := ebimath.V(float64(left), float64(top))
+	p2 := ebimath.V(float64(right), float64(top))
+	p3 := ebimath.V(float64(right), float64(bottom))
+	p4 := ebimath.V(float64(left), float64(bottom))
+
+	if t.Rotation() != 0 {
+		srcOffset := ebimath.V(srcProjMinX, srcProjMinY)
+		p1 = p1.RotateAround(srcOffset, t.Rotation())
+		p2 = p2.RotateAround(srcOffset, t.Rotation())
+		p3 = p3.RotateAround(srcOffset, t.Rotation())
+		p4 = p4.RotateAround(srcOffset, t.Rotation())
+	}
 
 	baseIndex := uint16(len(self.buffer.vertices))
 
@@ -117,8 +129,8 @@ func (self *Batcher) Flush(screen *ebiten.Image) {
 	ebitenVertices := make([]ebiten.Vertex, len(vertices))
 	for i, v := range vertices {
 		ebitenVertices[i] = v.ToEbitenVertex()
-		ebitenVertices[i].SrcX = float32(v.U) * float32(self.currentTexture.Bounds().Dx())
-		ebitenVertices[i].SrcY = float32(v.V) * float32(self.currentTexture.Bounds().Dy())
+		ebitenVertices[i].SrcX = float32(v.U)
+		ebitenVertices[i].SrcY = float32(v.V)
 	}
 
 	// Draw using Ebitengine's DrawTriangles
@@ -135,8 +147,8 @@ func (self *Batcher) End(screen *ebiten.Image) {
 }
 
 // IsFull checks if the buffer is full.
-func (self *Batcher) IsFull() bool {
-	return self.buffer.IsFull()
+func (self *Batcher) IsFull(additionalVertices int) bool {
+	return self.buffer.IsFull(additionalVertices)
 }
 
 // IsEmpty checks if the buffer is empty.

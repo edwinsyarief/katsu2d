@@ -72,32 +72,41 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			currentTextureID = drawable.TextureID
 		}
 
-		// Draw the quad with rotation and scaling
-		pos := transform.Position()
-		scale := transform.Scale()
-		rotation := transform.Rotation()
+		// Check if the buffer is full before adding a new quad.
+		if self.renderer.GetBatcher().IsFull(4) {
+			currentTexture := self.textures[currentTextureID]
+			// Flush the current batch and start a new one with the same texture.
+			self.renderer.End(screen)
+			self.renderer.Begin(currentTexture)
+		}
 
-		// Calculate the normalized texture coordinates from the source rectangle
-		u1 := drawable.SrcX
-		v1 := drawable.SrcY
-		u2 := drawable.SrcX + drawable.SrcW
-		v2 := drawable.SrcY + drawable.SrcH
-
-		// Add the transformed quad to the batch
-		self.renderer.GetBatcher().AddTransformedQuad(
-			pos.X,
-			pos.Y,
-			drawable.Width,
-			drawable.Height,
-			scale.X,
-			scale.Y,
-			rotation,
-			u1, v1, u2, v2,
-			float64(drawable.Color.R)/255.0,
-			float64(drawable.Color.G)/255.0,
-			float64(drawable.Color.B)/255.0,
-			float64(drawable.Color.A)/255.0,
-		)
+		if drawable.TextureID <= 0 {
+			// Draw a colored quad if no texture is specified
+			self.renderer.GetBatcher().AddTransformedQuad(
+				transform,
+				drawable.Width,
+				drawable.Height,
+				0, 0, 1, 1,
+				float64(drawable.Color.R)/255.0,
+				float64(drawable.Color.G)/255.0,
+				float64(drawable.Color.B)/255.0,
+				float64(drawable.Color.A)/255.0,
+			)
+		} else {
+			// Add the transformed quad to the batch
+			self.renderer.GetBatcher().AddTransformedQuad(
+				transform,
+				drawable.Width,
+				drawable.Height,
+				drawable.SrcX, drawable.SrcY,
+				drawable.SrcX+drawable.SrcW,
+				drawable.SrcY+drawable.SrcH,
+				float64(drawable.Color.R)/255.0,
+				float64(drawable.Color.G)/255.0,
+				float64(drawable.Color.B)/255.0,
+				float64(drawable.Color.A)/255.0,
+			)
+		}
 	}
 
 	// End the batch for the individual draw calls.
