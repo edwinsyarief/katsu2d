@@ -35,7 +35,6 @@ go get github.com/edwinsyarief/katsu2d
 ### Usage example
 
 ```go
-
 import (
 	"katsu2d"
 	"katsu2d/components"
@@ -66,8 +65,7 @@ func main() {
 
 	// Register systems
 	game.World().AddSystem(systems.NewUpdateSystem())
-	game.World().AddSystem(systems.NewBatchSystem())
-	game.World().AddSystem(systems.NewRenderSystem())
+	game.World().AddSystem(systems.NewBatchSystem(nil))
 
 	// Create a batched sprite entity (red square)
 	// This entity will now be rendered with the new batcher, but with no rotation.

@@ -8,7 +8,6 @@ import (
 type World struct {
 	entityManager *EntityManager
 	systemManager *SystemManager
-	registry      *ComponentRegistry
 }
 
 // NewWorld creates a new World instance.
@@ -16,7 +15,6 @@ func NewWorld() *World {
 	return &World{
 		entityManager: NewEntityManager(),
 		systemManager: NewSystemManager(),
-		registry:      NewComponentRegistry(),
 	}
 }
 
@@ -75,9 +73,4 @@ func (self *World) Update(timeScale float64) error {
 // Draw runs the draw logic for all systems in the world.
 func (self *World) Draw(screen *ebiten.Image) {
 	self.systemManager.Draw(self, screen)
-}
-
-// Registry returns the component registry.
-func (self *World) Registry() *ComponentRegistry {
-	return self.registry
 }

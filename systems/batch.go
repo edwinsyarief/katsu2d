@@ -13,19 +13,21 @@ import (
 type BatchSystem struct {
 	priority int
 	renderer *graphics.Renderer
+	textures map[int]*ebiten.Image // A map to hold all textures by their ID
 }
 
 // NewBatchSystem creates a new BatchSystem instance.
-func NewBatchSystem() *BatchSystem {
+// It now takes a map of textures so it can access the images by ID.
+func NewBatchSystem(textures map[int]*ebiten.Image) *BatchSystem {
 	return &BatchSystem{
 		priority: 2,
 		renderer: graphics.NewRenderer(),
+		textures: textures,
 	}
 }
 
 // Update is not implemented for the batch system.
 func (self *BatchSystem) Update(world *ecs.World, timeScale float64) error {
-	// Batch system updates during draw
 	return nil
 }
 
@@ -37,9 +39,10 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		return
 	}
 
-	// Begin batching
-	self.renderer.Begin(nil) // Using white pixel texture for color
-
+	// This is a more efficient approach: group entities by texture.
+	// You should sort entities by TextureID to minimize batch flushes,
+	// but for now, we'll simply flush the batch when the texture changes.
+	currentTextureID := -1
 	for _, entityID := range entities {
 		drawableComp, hasDrawable := world.GetComponent(entityID, constants.ComponentDrawableBatch)
 		transformComp, hasTransform := world.GetComponent(entityID, constants.ComponentTransform)
@@ -53,11 +56,35 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			continue
 		}
 
+		// Check if the texture ID has changed
+		if drawable.TextureID != currentTextureID {
+			// Flush the previous batch (if one exists)
+			if currentTextureID != -1 {
+				self.renderer.End(screen)
+			}
+			// Begin a new batch with the new texture
+			if self.textures == nil {
+				self.renderer.Begin(nil)
+			} else {
+				textureToUse := self.textures[drawable.TextureID]
+				self.renderer.Begin(textureToUse)
+			}
+			currentTextureID = drawable.TextureID
+		}
+
 		// Draw the quad with rotation and scaling
 		pos := transform.Position()
 		scale := transform.Scale()
 		rotation := transform.Rotation()
-		self.renderer.DrawTransformedQuad(
+
+		// Calculate the normalized texture coordinates from the source rectangle
+		u1 := drawable.SrcX
+		v1 := drawable.SrcY
+		u2 := drawable.SrcX + drawable.SrcW
+		v2 := drawable.SrcY + drawable.SrcH
+
+		// Add the transformed quad to the batch
+		self.renderer.GetBatcher().AddTransformedQuad(
 			pos.X,
 			pos.Y,
 			drawable.Width,
@@ -65,12 +92,18 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			scale.X,
 			scale.Y,
 			rotation,
-			drawable.Color,
+			u1, v1, u2, v2,
+			float64(drawable.Color.R)/255.0,
+			float64(drawable.Color.G)/255.0,
+			float64(drawable.Color.B)/255.0,
+			float64(drawable.Color.A)/255.0,
 		)
 	}
 
-	// End batching and flush
-	self.renderer.End(screen)
+	// End the batch for the individual draw calls.
+	if currentTextureID != -1 {
+		self.renderer.End(screen)
+	}
 }
 
 // GetPriority returns the system's priority.

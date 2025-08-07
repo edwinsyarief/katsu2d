@@ -2,10 +2,9 @@ package graphics
 
 import (
 	"image/color"
+	"katsu2d"
 
 	"katsu2d/constants"
-
-	ebimath "github.com/edwinsyarief/ebi-math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -48,7 +47,7 @@ func (self *Batcher) AddQuad(x, y, w, h float64, u1, v1, u2, v2 float64, r, g, b
 }
 
 // AddTransformedQuad adds a quad with scaling and rotation to the current batch.
-// This is the new, more robust function.
+// The u1, v1, u2, v2 represent normalized texture coordinates (0.0 to 1.0).
 func (self *Batcher) AddTransformedQuad(
 	x, y, w, h, scaleX, scaleY, rotation float64,
 	u1, v1, u2, v2 float64,
@@ -63,10 +62,10 @@ func (self *Batcher) AddTransformedQuad(
 	halfH := (h * scaleY) / 2
 
 	// Define the local vertices of the quad
-	p1 := ebimath.V(-halfW, -halfH)
-	p2 := ebimath.V(halfW, -halfH)
-	p3 := ebimath.V(halfW, halfH)
-	p4 := ebimath.V(-halfW, halfH)
+	p1 := katsu2d.V(-halfW, -halfH)
+	p2 := katsu2d.V(halfW, -halfH)
+	p3 := katsu2d.V(halfW, halfH)
+	p4 := katsu2d.V(-halfW, halfH)
 
 	// Apply rotation to each local vertex
 	p1 = p1.Rotate(rotation)
@@ -75,20 +74,23 @@ func (self *Batcher) AddTransformedQuad(
 	p4 = p4.Rotate(rotation)
 
 	// Translate the rotated vertices to the world position
-	worldPos := ebimath.V(x, y)
-	p1 = p1.Add(worldPos)
-	p2 = p2.Add(worldPos)
-	p3 = p3.Add(worldPos)
-	p4 = p4.Add(worldPos)
+	p1 = p1.Add(katsu2d.V(x, y))
+	p2 = p2.Add(katsu2d.V(x, y))
+	p3 = p3.Add(katsu2d.V(x, y))
+	p4 = p4.Add(katsu2d.V(x, y))
 
 	baseIndex := uint16(len(self.buffer.vertices))
 
 	// Add 4 transformed vertices to the buffer
 	self.buffer.vertices = append(self.buffer.vertices,
-		Vertex{X: p1.X, Y: p1.Y, U: u1, V: v1, R: r, G: g, B: b, A: a}, // Top-left
-		Vertex{X: p2.X, Y: p2.Y, U: u2, V: v1, R: r, G: g, B: b, A: a}, // Top-right
-		Vertex{X: p3.X, Y: p3.Y, U: u2, V: v2, R: r, G: g, B: b, A: a}, // Bottom-right
-		Vertex{X: p4.X, Y: p4.Y, U: u1, V: v2, R: r, G: g, B: b, A: a}, // Bottom-left
+		// Top-left
+		Vertex{X: p1.X, Y: p1.Y, U: u1, V: v1, R: r, G: g, B: b, A: a},
+		// Top-right
+		Vertex{X: p2.X, Y: p2.Y, U: u2, V: v1, R: r, G: g, B: b, A: a},
+		// Bottom-right
+		Vertex{X: p3.X, Y: p3.Y, U: u2, V: v2, R: r, G: g, B: b, A: a},
+		// Bottom-left
+		Vertex{X: p4.X, Y: p4.Y, U: u1, V: v2, R: r, G: g, B: b, A: a},
 	)
 
 	// Add 6 indices for 2 triangles (quad)

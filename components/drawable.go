@@ -11,8 +11,6 @@ type Drawable struct {
 	TextureID     int
 	Width, Height float64
 	Color         color.RGBA
-	// Source rectangle in the texture atlas
-	SrcX, SrcY, SrcW, SrcH float64
 }
 
 // GetTypeID returns the component type ID.

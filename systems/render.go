@@ -13,13 +13,16 @@ import (
 type RenderSystem struct {
 	priority int
 	renderer *graphics.Renderer
+	textures map[int]*ebiten.Image // A map to hold all textures by their ID
 }
 
 // NewRenderSystem creates a new RenderSystem instance.
-func NewRenderSystem() *RenderSystem {
+// It now takes a map of textures so it can access the images by ID.
+func NewRenderSystem(textures map[int]*ebiten.Image) *RenderSystem {
 	return &RenderSystem{
 		priority: 3,
 		renderer: graphics.NewRenderer(),
+		textures: textures,
 	}
 }
 
@@ -36,9 +39,6 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		return
 	}
 
-	// Begin a new batch for each texture, if needed. For this simple case, we use nil.
-	self.renderer.Begin(nil)
-
 	for _, entityID := range entities {
 		drawableComp, hasDrawable := world.GetComponent(entityID, constants.ComponentDrawable)
 		transformComp, hasTransform := world.GetComponent(entityID, constants.ComponentTransform)
@@ -52,10 +52,21 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			continue
 		}
 
+		// Get the correct texture from the map using the component's TextureID
+		if self.textures == nil {
+			self.renderer.Begin(nil)
+		} else {
+			textureToUse := self.textures[drawable.TextureID]
+			// Begin and end the batch for a single draw call. This is inefficient but necessary
+			// for a non-batched render system that uses the batcher.
+			self.renderer.Begin(textureToUse)
+		}
+
 		// Draw the quad with rotation and scaling
 		pos := transform.Position()
 		scale := transform.Scale()
 		rotation := transform.Rotation()
+
 		self.renderer.DrawTransformedQuad(
 			pos.X,
 			pos.Y,
@@ -66,10 +77,10 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			rotation,
 			drawable.Color,
 		)
-	}
 
-	// End the batch for the individual draw calls.
-	self.renderer.End(screen)
+		// End the batch to render the single quad.
+		self.renderer.End(screen)
+	}
 }
 
 // GetPriority returns the system's priority.
