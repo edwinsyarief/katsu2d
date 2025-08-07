@@ -39,6 +39,7 @@ import (
 	"katsu2d"
 	"katsu2d/components"
 	"katsu2d/constants"
+	"katsu2d/ecs"
 	"katsu2d/scene"
 	"katsu2d/systems"
 	
