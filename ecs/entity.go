@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"iter"
 	"sync/atomic"
 
 	"katsu2d/constants"
@@ -133,28 +134,46 @@ func (self *EntityManager) HasComponent(entityID EntityID, typeID int) bool {
 	return false
 }
 
-// GetEntitiesWithComponents finds all entities that have all specified component types.
-// This refactored implementation now iterates over the ordered slice to preserve order.
-func (self *EntityManager) GetEntitiesWithComponents(typeIDs ...int) []EntityID {
-	var result []EntityID
+// GetEntitiesWithComponents finds all entities that have all specified component types,
+// returning an iter.Seq for memory efficiency.
+func (self *EntityManager) GetEntitiesWithComponents(typeIDs ...int) iter.Seq[EntityID] {
 	var targetSignature Signature
-
-	// Build the target signature from the requested component IDs
 	for _, typeID := range typeIDs {
 		targetSignature.Set(typeID)
 	}
 
-	// Iterate through the ordered list of entity IDs
-	for _, entityID := range self.entityOrder {
-		// Check if the entity is valid (has a signature) and matches the target signature
-		if signature, exists := self.signatures[entityID]; exists {
-			if signature&targetSignature == targetSignature {
-				result = append(result, entityID)
+	return func(yield func(EntityID) bool) {
+		for _, entityID := range self.entityOrder {
+			if signature, exists := self.signatures[entityID]; exists {
+				if signature&targetSignature == targetSignature {
+					if !yield(entityID) {
+						return
+					}
+				}
 			}
 		}
 	}
+}
 
-	return result
+// GetEntitiesWithAnyComponent finds all entities that have at least one of the
+// specified component types, returning an iter.Seq.
+func (self *EntityManager) GetEntitiesWithAnyComponent(typeIDs ...int) iter.Seq[EntityID] {
+	var targetSignature Signature
+	for _, typeID := range typeIDs {
+		targetSignature.Set(typeID)
+	}
+
+	return func(yield func(EntityID) bool) {
+		for _, entityID := range self.entityOrder {
+			if signature, exists := self.signatures[entityID]; exists {
+				if signature&targetSignature != 0 {
+					if !yield(entityID) {
+						return
+					}
+				}
+			}
+		}
+	}
 }
 
 // CleanupDeadEntities clears the list of entities to be destroyed.

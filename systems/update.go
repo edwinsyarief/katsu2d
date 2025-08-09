@@ -23,8 +23,7 @@ func NewUpdateSystem() *UpdateSystem {
 // Update runs the update function for each updatable entity.
 func (self *UpdateSystem) Update(world *ecs.World, timeScale float64) error {
 	// Get all entities with Updatable component
-	entities := world.GetEntitiesWithComponents(constants.ComponentUpdatable)
-	for _, entityID := range entities {
+	for entityID := range world.GetEntitiesWithComponents(constants.ComponentUpdatable) {
 		if component, exists := world.GetComponent(entityID, constants.ComponentUpdatable); exists {
 			if updatable, ok := component.(*components.Updatable); ok && updatable.UpdateFunc != nil {
 				// We now use the timeScale to control the speed of updates.

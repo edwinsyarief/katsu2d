@@ -205,8 +205,7 @@ func (self *Engine) ToggleSlowMotion() {
 
 // FindEntityByTag finds an entity by its tag.
 func (self *Engine) FindEntityByTag(tag string) (ecs.EntityID, bool) {
-	entities := self.world.GetEntitiesWithComponents(constants.ComponentTag)
-	for _, entityID := range entities {
+	for entityID := range self.world.GetEntitiesWithComponents(constants.ComponentTag) {
 		if comp, exists := self.world.GetComponent(entityID, constants.ComponentTag); exists {
 			if tagComp, ok := comp.(*components.Tag); ok && tagComp.Name == tag {
 				return entityID, true

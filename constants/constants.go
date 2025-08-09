@@ -9,6 +9,7 @@ const (
 	ComponentUpdatable
 	ComponentTag
 	ComponentCooldown
+	ComponentOrderIndex
 	ComponentCustom
 )
 
@@ -18,9 +19,4 @@ const (
 	MaxVertices     = 65534                 // For batched rendering
 	MaxIndices      = (MaxVertices / 4) * 6 // 6 indices per quad
 	InvalidEntityID = 0
-)
-
-// Scene constants
-const (
-	DefaultSceneName = "default"
 )

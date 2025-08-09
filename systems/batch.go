@@ -34,17 +34,10 @@ func (self *BatchSystem) Update(world *ecs.World, timeScale float64) error {
 
 // Draw draws all batched entities.
 func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
-	// Get all entities with DrawableBatch and Transform components
-	entities := world.GetEntitiesWithComponents(constants.ComponentDrawableBatch, constants.ComponentTransform)
-	if len(entities) == 0 {
-		return
-	}
-
-	// This is a more efficient approach: group entities by texture.
-	// You should sort entities by TextureID to minimize batch flushes,
-	// but for now, we'll simply flush the batch when the texture changes.
 	currentTextureID := -1
-	for _, entityID := range entities {
+
+	// Get all entities with DrawableBatch and Transform components
+	for entityID := range world.GetEntitiesWithComponents(constants.ComponentDrawableBatch, constants.ComponentTransform) {
 		drawableComp, hasDrawable := world.GetComponent(entityID, constants.ComponentDrawableBatch)
 		transformComp, hasTransform := world.GetComponent(entityID, constants.ComponentTransform)
 		if !hasDrawable || !hasTransform {
@@ -58,14 +51,14 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		}
 
 		t := transform.GetTransform()
-		if transform.GetInitialParentTransform() != nil {
+		/* if transform.GetInitialParentTransform() != nil {
 			t = transform.GetInitialParentTransform()
-		}
+		} */
 
 		realPos := ebimath.V2(0).Apply(t.Matrix())
-		if !transform.Origin().IsZero() {
+		/* if !transform.Origin().IsZero() {
 			realPos = realPos.Sub(transform.Origin())
-		}
+		} */
 
 		// Check if the texture ID has changed
 		if drawable.TextureID != currentTextureID {

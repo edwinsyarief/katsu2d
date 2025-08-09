@@ -1,6 +1,9 @@
 package ecs
 
 import (
+	"iter"
+	"slices"
+
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -48,9 +51,30 @@ func (self *World) HasComponent(entityID EntityID, typeID int) bool {
 	return self.entityManager.HasComponent(entityID, typeID)
 }
 
-// GetEntitiesWithComponents finds all entities that have a set of components.
-func (self *World) GetEntitiesWithComponents(typeIDs ...int) []EntityID {
+// GetEntitiesWithComponents finds all entities that have all specified component types,
+// returning an iter.Seq for memory efficiency.
+func (self *World) GetEntitiesWithComponents(typeIDs ...int) iter.Seq[EntityID] {
 	return self.entityManager.GetEntitiesWithComponents(typeIDs...)
+}
+
+// GetEntitiesWithAnyComponent finds all entities that have at least one of the
+// specified component types, returning an iter.Seq.
+func (self *World) GetEntitiesWithAnyComponent(typeIDs ...int) iter.Seq[EntityID] {
+	return self.entityManager.GetEntitiesWithAnyComponent(typeIDs...)
+}
+
+// GetEntitiesCustomSortedByComponent retrieves entities that have the specified components
+// and sorts them based on a specific component using a provided comparison function.
+// This is a high-performance solution for controlling rendering order,
+// for example, using a Z-depth component.
+func (self *World) GetEntitiesCustomSortedByComponent(componentToFind int, compareFunc func(a, b EntityID) int) []EntityID {
+	// First, get all entities that have the component we want to sort by.
+	// We use the new iter.Seq function to avoid memory allocation for entities
+	// that don't need sorting.
+	entitySeq := self.GetEntitiesWithComponents(componentToFind)
+
+	// Sort the iter.Seq
+	return slices.SortedStableFunc(entitySeq, compareFunc)
 }
 
 // AddSystem adds a system to the world.

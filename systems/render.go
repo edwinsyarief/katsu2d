@@ -35,12 +35,7 @@ func (self *RenderSystem) Update(world *ecs.World, timeScale float64) error {
 // Draw draws all individual drawable entities.
 func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 	// Get all entities with Drawable and Transform components
-	entities := world.GetEntitiesWithComponents(constants.ComponentDrawable, constants.ComponentTransform)
-	if len(entities) == 0 {
-		return
-	}
-
-	for _, entityID := range entities {
+	for entityID := range world.GetEntitiesWithComponents(constants.ComponentDrawable, constants.ComponentTransform) {
 		drawableComp, hasDrawable := world.GetComponent(entityID, constants.ComponentDrawable)
 		transformComp, hasTransform := world.GetComponent(entityID, constants.ComponentTransform)
 		if !hasDrawable || !hasTransform {
@@ -54,14 +49,14 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		}
 
 		t := transform.GetTransform()
-		if transform.GetInitialParentTransform() != nil {
+		/* if transform.GetInitialParentTransform() != nil {
 			t = transform.GetInitialParentTransform()
-		}
+		} */
 
 		realPos := ebimath.V2(0).Apply(t.Matrix())
-		if !transform.Origin().IsZero() {
+		/* if !transform.Origin().IsZero() {
 			realPos = realPos.Sub(transform.Origin())
-		}
+		} */
 
 		// Get the correct texture from the map using the component's TextureID
 		if self.textures == nil {

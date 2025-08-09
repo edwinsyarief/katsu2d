@@ -23,8 +23,7 @@ func NewCooldownSystem() *CooldownSystem {
 // Update updates all cooldown timers.
 func (self *CooldownSystem) Update(world *ecs.World, timeScale float64) error {
 	// Get all entities with Cooldown components
-	entities := world.GetEntitiesWithComponents(constants.ComponentCooldown)
-	for _, entityID := range entities {
+	for entityID := range world.GetEntitiesWithComponents(constants.ComponentCooldown) {
 		if component, exists := world.GetComponent(entityID, constants.ComponentCooldown); exists {
 			if cooldown, ok := component.(*components.Cooldown); ok {
 				if cooldown.Active {
