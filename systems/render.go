@@ -6,6 +6,7 @@ import (
 	"katsu2d/ecs"
 	"katsu2d/graphics"
 
+	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -52,6 +53,16 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			continue
 		}
 
+		t := transform.GetTransform()
+		if transform.GetInitialParentTransform() != nil {
+			t = transform.GetInitialParentTransform()
+		}
+
+		realPos := ebimath.V2(0).Apply(t.Matrix())
+		if !transform.Origin().IsZero() {
+			realPos = realPos.Sub(transform.Origin())
+		}
+
 		// Get the correct texture from the map using the component's TextureID
 		if self.textures == nil {
 			self.renderer.Begin(nil)
@@ -65,16 +76,20 @@ func (self *RenderSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		if drawable.TextureID <= 0 {
 			// Draw a colored quad if no texture is specified
 			self.renderer.DrawTransformedQuad(
-				transform,
+				realPos.X, realPos.Y,
 				drawable.Width,
 				drawable.Height,
+				transform.Scale().X, transform.Scale().Y,
+				transform.Rotation(),
 				drawable.Color,
 			)
 		} else {
 			self.renderer.DrawTexturedQuad(
-				transform,
+				realPos.X, realPos.Y,
 				drawable.Width,
 				drawable.Height,
+				transform.Scale().X, transform.Scale().Y,
+				transform.Rotation(),
 				0, 0, drawable.Width, drawable.Height,
 				drawable.Color,
 			)

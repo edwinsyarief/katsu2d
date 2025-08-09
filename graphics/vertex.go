@@ -1,6 +1,10 @@
 package graphics
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"sync"
+
+	"github.com/hajimehoshi/ebiten/v2"
+)
 
 // Vertex represents a single vertex with position, texture coordinates, and color.
 type Vertex struct {
@@ -22,6 +26,18 @@ func (self *Vertex) ToEbitenVertex() ebiten.Vertex {
 	}
 }
 
+var vertexBufferPool = sync.Pool{
+	New: func() interface{} {
+		return &VertexBuffer{
+			vertices: make([]Vertex, 0, defaultCapacity),
+			indices:  make([]uint16, 0, defaultCapacity*6/4),
+			capacity: defaultCapacity,
+		}
+	},
+}
+
+const defaultCapacity = 1024
+
 // VertexBuffer is a data structure for storing vertices and indices for batching.
 type VertexBuffer struct {
 	vertices []Vertex
@@ -31,11 +47,35 @@ type VertexBuffer struct {
 
 // NewVertexBuffer creates a new VertexBuffer with a given capacity.
 func NewVertexBuffer(capacity int) *VertexBuffer {
-	return &VertexBuffer{
-		vertices: make([]Vertex, 0, capacity),
-		indices:  make([]uint16, 0, capacity*6/4), // Assuming quads (6 indices per 4 vertices)
-		capacity: capacity,
+	if capacity <= 0 {
+		capacity = defaultCapacity
 	}
+
+	vb := vertexBufferPool.Get().(*VertexBuffer)
+	if cap(vb.vertices) < capacity {
+		// If the pooled buffer is too small, create a new one
+		vb.vertices = make([]Vertex, 0, capacity)
+		vb.indices = make([]uint16, 0, capacity*6/4)
+		vb.capacity = capacity
+	} else {
+		// Reuse the existing buffer but reset its length
+		vb.vertices = vb.vertices[:0]
+		vb.indices = vb.indices[:0]
+		vb.capacity = capacity
+	}
+	return vb
+}
+
+// Release returns the VertexBuffer to the pool.
+func (self *VertexBuffer) Release() {
+	self.Clear()
+	vertexBufferPool.Put(self)
+}
+
+// Clear resets the buffer.
+func (self *VertexBuffer) Clear() {
+	self.vertices = self.vertices[:0]
+	self.indices = self.indices[:0]
 }
 
 // AddQuad adds a single quad to the vertex buffer.
@@ -59,12 +99,6 @@ func (self *VertexBuffer) AddQuad(x, y, w, h float64, u1, v1, u2, v2 float64, r,
 		baseIndex, baseIndex+1, baseIndex+2, // First triangle
 		baseIndex, baseIndex+2, baseIndex+3, // Second triangle
 	)
-}
-
-// Clear resets the buffer.
-func (self *VertexBuffer) Clear() {
-	self.vertices = self.vertices[:0]
-	self.indices = self.indices[:0]
 }
 
 // GetVertices returns the stored vertices.

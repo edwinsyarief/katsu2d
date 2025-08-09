@@ -6,6 +6,7 @@ import (
 	"katsu2d/ecs"
 	"katsu2d/graphics"
 
+	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -56,6 +57,16 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 			continue
 		}
 
+		t := transform.GetTransform()
+		if transform.GetInitialParentTransform() != nil {
+			t = transform.GetInitialParentTransform()
+		}
+
+		realPos := ebimath.V2(0).Apply(t.Matrix())
+		if !transform.Origin().IsZero() {
+			realPos = realPos.Sub(transform.Origin())
+		}
+
 		// Check if the texture ID has changed
 		if drawable.TextureID != currentTextureID {
 			// Flush the previous batch (if one exists)
@@ -83,9 +94,11 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		if drawable.TextureID <= 0 {
 			// Draw a colored quad if no texture is specified
 			self.renderer.GetBatcher().AddTransformedQuad(
-				transform,
+				realPos.X, realPos.Y,
 				drawable.Width,
 				drawable.Height,
+				transform.Scale().X, transform.Scale().Y,
+				transform.Rotation(),
 				0, 0, 1, 1,
 				float64(drawable.Color.R)/255.0,
 				float64(drawable.Color.G)/255.0,
@@ -95,9 +108,11 @@ func (self *BatchSystem) Draw(world *ecs.World, screen *ebiten.Image) {
 		} else {
 			// Add the transformed quad to the batch
 			self.renderer.GetBatcher().AddTransformedQuad(
-				transform,
+				realPos.X, realPos.Y,
 				drawable.Width,
 				drawable.Height,
+				transform.Scale().X, transform.Scale().Y,
+				transform.Rotation(),
 				drawable.SrcX, drawable.SrcY,
 				drawable.SrcX+drawable.SrcW,
 				drawable.SrcY+drawable.SrcH,
