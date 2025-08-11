@@ -1,4 +1,4 @@
-module katsu2d
+module github.com/edwinsyarief/katsu2d
 
 go 1.24.5
 
