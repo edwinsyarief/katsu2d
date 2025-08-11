@@ -318,3 +318,31 @@ func GenerateHorizontalImageRectangles(x, y, width, height, count int) []image.R
 
 	return result
 }
+
+// AdjustDestinationPixel is the original ebitengine implementation found here:
+// https://github.com/hajimehoshi/ebiten/blob/v2.8.0-alpha.1/internal/graphics/vertex.go#L102-L126
+func AdjustDestinationPixel(x float32) float32 {
+	// Avoid the center of the pixel, which is problematic (#929, #1171).
+	// Instead, align the vertices with about 1/3 pixels.
+	//
+	// The intention here is roughly this code:
+	//
+	//     float32(math.Floor((float64(x)+1.0/6.0)*3) / 3)
+	//
+	// The actual implementation is more optimized than the above implementation.
+	ix := float32(int(x))
+	if x < 0 && x != ix {
+		ix -= 1
+	}
+	frac := x - ix
+	switch {
+	case frac < 3.0/16.0:
+		return ix
+	case frac < 8.0/16.0:
+		return ix + 5.0/16.0
+	case frac < 13.0/16.0:
+		return ix + 11.0/16.0
+	default:
+		return ix + 1
+	}
+}

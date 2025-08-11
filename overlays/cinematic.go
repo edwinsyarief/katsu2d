@@ -303,10 +303,10 @@ func (self *CinematicOverlay) drawLetterbox(width, height int, drawOptions *ebit
 	p3 := ebimath.V(0, middle+halfScalingSize)
 
 	placeholderVertices := []ebiten.Vertex{
-		{DstX: float32(p0.X), DstY: float32(p0.Y), SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-		{DstX: float32(p1.X), DstY: float32(p1.Y), SrcX: 1, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-		{DstX: float32(p2.X), DstY: float32(p2.Y), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-		{DstX: float32(p3.X), DstY: float32(p3.Y), SrcX: 0, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		{DstX: utils.AdjustDestinationPixel(float32(p0.X)), DstY: utils.AdjustDestinationPixel(float32(p0.Y)), SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		{DstX: utils.AdjustDestinationPixel(float32(p1.X)), DstY: utils.AdjustDestinationPixel(float32(p1.Y)), SrcX: 1, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		{DstX: utils.AdjustDestinationPixel(float32(p2.X)), DstY: utils.AdjustDestinationPixel(float32(p2.Y)), SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		{DstX: utils.AdjustDestinationPixel(float32(p3.X)), DstY: utils.AdjustDestinationPixel(float32(p3.Y)), SrcX: 0, SrcY: 1, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
 	}
 
 	overlayIndices := []uint16{0, 1, 2, 0, 2, 3}
@@ -335,8 +335,8 @@ func (self *CinematicOverlay) drawSpotlight(drawOptions *ebiten.DrawTrianglesOpt
 		x := centerX + radius*math.Cos(angle)
 		y := centerY + radius*math.Sin(angle)
 		spotlightVertices[i+1] = ebiten.Vertex{
-			DstX:   float32(x),
-			DstY:   float32(y),
+			DstX:   utils.AdjustDestinationPixel(float32(x)),
+			DstY:   utils.AdjustDestinationPixel(float32(y)),
 			SrcX:   0.5,
 			SrcY:   0.5,
 			ColorR: 1,

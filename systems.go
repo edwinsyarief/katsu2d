@@ -7,6 +7,7 @@ import (
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
+	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -125,10 +126,10 @@ func (s *RenderSystem) Draw(w *World, screen *ebiten.Image) {
 
 		baseIdx := len(verts)
 		verts = append(verts,
-			ebiten.Vertex{DstX: px + rx0, DstY: py + ry0, SrcX: sx0, SrcY: sy0, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-			ebiten.Vertex{DstX: px + rx1, DstY: py + ry1, SrcX: sx1, SrcY: sy0, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-			ebiten.Vertex{DstX: px + rx2, DstY: py + ry2, SrcX: sx0, SrcY: sy1, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-			ebiten.Vertex{DstX: px + rx3, DstY: py + ry3, SrcX: sx1, SrcY: sy1, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
+			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx0), DstY: utils.AdjustDestinationPixel(py + ry0), SrcX: sx0, SrcY: sy0, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
+			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx1), DstY: utils.AdjustDestinationPixel(py + ry1), SrcX: sx1, SrcY: sy0, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
+			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx2), DstY: utils.AdjustDestinationPixel(py + ry2), SrcX: sx0, SrcY: sy1, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
+			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx3), DstY: utils.AdjustDestinationPixel(py + ry3), SrcX: sx1, SrcY: sy1, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
 		)
 		bi := uint16(baseIdx)
 		indices = append(indices, bi, bi+1, bi+2, bi+1, bi+3, bi+2)
