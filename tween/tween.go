@@ -3,9 +3,7 @@
 // duration, typically using an easing function to create smooth transitions.
 package tween
 
-import (
-	"katsu2d/ease"
-)
+import "katsu2d/ease"
 
 // Tween represents a tweening object that interpolates between a start and end
 // value over a specified duration using an easing function. It supports features

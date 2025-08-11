@@ -1,236 +1,178 @@
 package katsu2d
 
 import (
-	"image/color"
-	"log"
-
-	"katsu2d/components"
-	"katsu2d/constants"
-	"katsu2d/ecs"
-	"katsu2d/scene"
+	"embed"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-var (
-	layoutWidth  = 1280
-	layoutHeight = 720
-)
-
-// game is the main Ebitengine game struct.
-type game struct {
-	engine *Engine
+// Engine manages the game loop, world, systems, and window settings.
+type Engine struct {
+	world                *World
+	tm                   *TextureManager
+	sm                   *SceneManager
+	systems              []System
+	timeScale            float64
+	windowWidth          int
+	windowHeight         int
+	windowTitle          string
+	windowResizeMode     ebiten.WindowResizingModeType
+	fullScreen, vsync    bool
+	clearScreenEachFrame bool
+	cursorMode           ebiten.CursorModeType
 }
 
-// Update handles game logic updates.
-func (self *game) Update() error {
-	return self.engine.Update()
-}
-
-// Draw handles rendering to the screen.
-func (self *game) Draw(screen *ebiten.Image) {
-	if !ebiten.IsScreenClearedEveryFrame() {
-		screen.Fill(color.RGBA{0, 0, 0, 255}) // Clear the screen with black if not cleared every frame
-	}
-
-	self.engine.Draw(screen)
-}
-
-// Layout sets the game screen size.
-func (self *game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return layoutWidth, layoutHeight
-}
-
-// Option is a function type for configuring GrassSystem.
+// Option is a functional option for configuring the engine.
 type Option func(*Engine)
 
-// WithTileSize sets the size of the grid cells for grass placement.
-func WithWindowSize(width, height int) Option {
-	return func(_ *Engine) {
-		ebiten.SetWindowSize(width, height)
-
-		layoutWidth = width
-		layoutHeight = height
+// WithWindowSize sets the window dimensions.
+func WithWindowSize(w, h int) Option {
+	return func(e *Engine) {
+		e.windowWidth = w
+		e.windowHeight = h
 	}
 }
 
-// WithWindowResizingMode sets the resizing mode for the game window.
-func WithWindowsResizeMode(mode ebiten.WindowResizingModeType) Option {
-	return func(_ *Engine) {
-		ebiten.SetWindowResizingMode(mode)
-	}
-}
-
-// WithWindowSize sets the size of the game window.
+// WithWindowTitle sets the window title.
 func WithWindowTitle(title string) Option {
-	return func(_ *Engine) {
-		ebiten.SetWindowTitle(title)
+	return func(e *Engine) {
+		e.windowTitle = title
 	}
 }
 
-// WithWindowFullscreen enables fullscreen mode for the game window.
-func WithWindowFullscreen(fullscreen bool) Option {
-	return func(_ *Engine) {
-		ebiten.SetFullscreen(fullscreen)
+// WithWindowResizeMode sets whether the window is resizeable
+func WithWindowResizeMode(mode ebiten.WindowResizingModeType) Option {
+	return func(e *Engine) {
+		e.windowResizeMode = mode
 	}
 }
 
-// WithWindowVsync enables or disables VSync for the game window.
-func WithWindowVsync(vsync bool) Option {
-	return func(_ *Engine) {
-		ebiten.SetVsyncEnabled(vsync)
+// WithFullScreen sets whether the window is fullscreen
+func WithFullScreen(full bool) Option {
+	return func(e *Engine) {
+		e.fullScreen = full
 	}
 }
 
-// WithScreenClearedEveryFrame sets whether the screen should be cleared every frame.
-func WithScreenClearedEveryFrame(clear bool) Option {
-	return func(_ *Engine) {
-		ebiten.SetScreenClearedEveryFrame(clear)
+// WithVsyncEnable sets whether the vsync is enabled
+func WithVsyncEnabled(vsync bool) Option {
+	return func(e *Engine) {
+		e.vsync = vsync
 	}
 }
 
-// WithCursorMode sets the cursor mode for the game window.
+// WithCursorMode sets the cursor mode
 func WithCursorMode(mode ebiten.CursorModeType) Option {
-	return func(_ *Engine) {
-		ebiten.SetCursorMode(mode)
+	return func(e *Engine) {
+		e.cursorMode = mode
 	}
 }
 
-// Engine is the main game interface, providing a simplified API over the ECS.
-type Engine struct {
-	world           *ecs.World
-	sceneManager    *scene.Manager
-	timeScale       float64
-	targetTimeScale float64
-	lerpSpeed       float64
-
-	game *game // Reference to the Ebitengine game struct
+func WithClearScreenEachFrame(clear bool) Option {
+	return func(e *Engine) {
+		e.clearScreenEachFrame = clear
+	}
 }
 
-// NewEngine creates a new Engine instance.
+// NewEngine creates a new engine with default or optional settings.
 func NewEngine(opts ...Option) *Engine {
-	// Initialize the underlying ECS world and scene manager
-	world := ecs.NewWorld()
-	sceneManager := scene.NewManager()
-
-	engine := &Engine{
-		world:           world,
-		sceneManager:    sceneManager,
-		timeScale:       1.0,
-		targetTimeScale: 1.0,
-		lerpSpeed:       0.1,
+	e := &Engine{
+		world:                NewWorld(),
+		tm:                   NewTextureManager(),
+		sm:                   &SceneManager{},
+		timeScale:            1.0,
+		windowWidth:          800,
+		windowHeight:         600,
+		windowTitle:          "Katsu2D",
+		windowResizeMode:     ebiten.WindowResizingModeEnabled,
+		fullScreen:           false,
+		vsync:                false,
+		clearScreenEachFrame: false,
+		cursorMode:           ebiten.CursorModeVisible,
 	}
-
 	for _, opt := range opts {
-		opt(engine)
+		opt(e)
 	}
-
-	engine.game = &game{engine: engine}
-
-	return engine
+	ebiten.SetWindowSize(e.windowWidth, e.windowHeight)
+	ebiten.SetWindowTitle(e.windowTitle)
+	ebiten.SetWindowResizingMode(e.windowResizeMode)
+	ebiten.SetFullscreen(e.fullScreen)
+	ebiten.SetVsyncEnabled(e.vsync)
+	ebiten.SetScreenClearedEveryFrame(e.clearScreenEachFrame)
+	ebiten.SetCursorMode(e.cursorMode)
+	return e
 }
 
-// RunGame starts the game loop using Ebitengine.
-func (self *Engine) RunGame() error {
-	return ebiten.RunGame(self.game)
+func (self *Engine) InitFS(fs embed.FS) {
+	initFS(fs)
 }
 
-// World returns the ECS World.
-func (self *Engine) World() *ecs.World {
+func (self *Engine) InitAssetReader(path string, key []byte) {
+	initAssetReader(path, key)
+}
+
+// World returns the ECS world (note: scenes may use their own worlds).
+func (self *Engine) World() *World {
 	return self.world
 }
 
-func (self *Engine) NewWorld() *ecs.World {
-	self.world = ecs.NewWorld()
-	return self.world
+// TextureManager returns the texture manager.
+func (self *Engine) TextureManager() *TextureManager {
+	return self.tm
 }
 
-// SceneManager returns the SceneManager.
-func (self *Engine) SceneManager() *scene.Manager {
-	return self.sceneManager
+// AddSystem add systems
+func (self *Engine) AddSystem(s System) {
+	self.systems = append(self.systems, s)
 }
 
-// AddSystem adds a system to the game.
-func (self *Engine) AddSystem(system ecs.System) {
-	self.world.AddSystem(system)
+// SetScene switches to a new scene.
+func (self *Engine) SetScene(s Scene) {
+	self.sm.SetScene(s)
 }
 
-// AddEntity creates a new entity and adds the provided components.
-func (self *Engine) AddEntity(comps ...ecs.Component) ecs.EntityID {
-	entityID := self.world.CreateEntity()
-	for _, comp := range comps {
-		self.world.AddComponent(entityID, comp)
-	}
-	return entityID
+// SetTimeScale adjusts the game speed.
+func (self *Engine) SetTimeScale(ts float64) {
+	self.timeScale = ts
 }
 
-// Update runs the game logic for the current frame.
+// ScreenWidth returns the screen width.
+func (self *Engine) ScreenWidth() int {
+	return self.windowWidth
+}
+
+// ScreenWidth returns the screen height.
+func (self *Engine) ScreenHeight() int {
+	return self.windowHeight
+}
+
+// Update runs scene manager update with delta time.
 func (self *Engine) Update() error {
-	// Lerp the time scale smoothly towards the target
-	self.timeScale = self.timeScale + (self.targetTimeScale-self.timeScale)*self.lerpSpeed
+	dt := 1.0 / 60.0 * self.timeScale // Fixed timestep assumption (Ebitengine targets 60 FPS)
 
-	// Update current scene
-	if err := self.sceneManager.Update(); err != nil {
-		return err
+	self.sm.Update(dt, self)
+	for _, sys := range self.systems {
+		sys.Update(self.world, dt)
 	}
-
-	// Update ECS systems
-	return self.world.Update(self.timeScale)
+	return nil
 }
 
-// Draw renders the game state to the screen.
+// Draw all objects in scene
 func (self *Engine) Draw(screen *ebiten.Image) {
-	// Draw current scene
-	self.sceneManager.Draw(screen)
+	screen.Clear() // Optional: clear screen every frame
 
-	// Draw ECS systems
-	self.world.Draw(screen)
-}
-
-// SetTimeScale sets the target time scale for the game.
-func (self *Engine) SetTimeScale(scale float64) {
-	self.targetTimeScale = scale
-}
-
-// ToggleSlowMotion switches between normal speed and a slow motion effect.
-func (self *Engine) ToggleSlowMotion() {
-	if self.targetTimeScale == 1.0 {
-		self.targetTimeScale = 0.2 // Slow motion
-		log.Println("Slow motion enabled.")
-	} else {
-		self.targetTimeScale = 1.0 // Normal speed
-		log.Println("Slow motion disabled.")
+	self.sm.Draw(screen)
+	for _, sys := range self.systems {
+		sys.Draw(self.world, screen)
 	}
 }
 
-// FindEntityByTag finds an entity by its tag.
-func (self *Engine) FindEntityByTag(tag string) (ecs.EntityID, bool) {
-	for entityID := range self.world.GetEntitiesWithComponents(constants.ComponentTag) {
-		if comp, exists := self.world.GetComponent(entityID, constants.ComponentTag); exists {
-			if tagComp, ok := comp.(*components.Tag); ok && tagComp.Name == tag {
-				return entityID, true
-			}
-		}
-	}
-	return constants.InvalidEntityID, false
+// Layout returns window dimension
+func (self *Engine) Layout(outsideWidth, outsideHeight int) (int, int) {
+	return self.windowWidth, self.windowHeight
 }
 
-// GetComponent functions to easily get a component
-func (self *Engine) GetTransform(entityID ecs.EntityID) (*components.Transform, bool) {
-	if comp, exists := self.world.GetComponent(entityID, constants.ComponentTransform); exists {
-		if transform, ok := comp.(*components.Transform); ok {
-			return transform, true
-		}
-	}
-	return nil, false
-}
-
-// GetCooldown retrieves the cooldown component for an entity.
-func (self *Engine) GetCooldown(entityID ecs.EntityID) (*components.Cooldown, bool) {
-	if comp, exists := self.world.GetComponent(entityID, constants.ComponentCooldown); exists {
-		if cooldown, ok := comp.(*components.Cooldown); ok {
-			return cooldown, true
-		}
-	}
-	return nil, false
+// Run engine
+func (self *Engine) Run() error {
+	return ebiten.RunGame(self)
 }

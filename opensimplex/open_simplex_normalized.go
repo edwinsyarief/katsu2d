@@ -1,0 +1,97 @@
+package opensimplex
+
+const (
+	// The normMin and normScale constants are used
+	// in the formula for normalizing the raw output
+	// of the OpenSimplex algorithm. They were
+	// derived from empirical observations of the
+	// range of raw values. Different constants are
+	// required for each of Eval2, Eval3, and Eval4.
+	normMin2   = 0.8659203878240322
+	normScale2 = 0.577420288914181
+
+	normMin3   = 0.9871048542519545
+	normScale3 = 0.506595297177236
+
+	normMin4   = 1.0040848236330158
+	normScale4 = 0.5007450643319374
+)
+
+type normNoise struct {
+	base Noise
+}
+
+// Eval2 returns a random noise value in two dimensions
+// in the range [0, 1).
+func (self *normNoise) Eval2(x, y float64) float64 {
+	//return norm2_64(s.base.Eval2(x, y))
+	r := self.base.Eval2(x, y)
+	return (r + normMin2) * normScale2
+}
+
+// Eval3 returns a random noise value in three dimensions
+// in the range [0, 1).
+func (self *normNoise) Eval3(x, y, z float64) float64 {
+	r := self.base.Eval3(x, y, z)
+	return (r + normMin3) * normScale3
+}
+
+// Eval4 returns a random noise value in four dimensions
+// in the range [0, 1).
+func (self *normNoise) Eval4(x, y, z, t float64) float64 {
+	r := self.base.Eval4(x, y, z, t)
+	return (r + normMin4) * normScale4
+}
+
+type normNoise32 struct {
+	base Noise
+}
+
+// Eval2 returns a random noise value in two dimensions
+// in the range [0, 1).
+func (self *normNoise32) Eval2(x, y float32) float32 {
+	r := self.base.Eval2(float64(x), float64(y))
+	norm64 := (r + normMin2) * normScale2
+	norm32 := float32(norm64)
+
+	// Empirical testing shows that a simple float32 cast
+	// from the normalized float64, as above, will sometimes
+	// produce a value of 1.0.
+	if norm32 >= 1.0 {
+		return float32(0.999999)
+	} else {
+		return norm32
+	}
+}
+
+// Eval3 returns a random noise value in three dimensions
+// in the range [0, 1).
+func (self *normNoise32) Eval3(x, y, z float32) float32 {
+	r := self.base.Eval3(float64(x), float64(y), float64(z))
+	norm64 := (r + normMin3) * normScale3
+	norm32 := float32(norm64)
+
+	// Unlike Eval2, have not actually tested whether a
+	// simple float32 cast will produce 1.0, but it seems likely.
+	if norm32 >= 1.0 {
+		return float32(0.999999)
+	} else {
+		return norm32
+	}
+}
+
+// Eval4 returns a random noise value in four dimensions
+// in the range [0, 1).
+func (self *normNoise32) Eval4(x, y, z, t float32) float32 {
+	r := self.base.Eval4(float64(x), float64(y), float64(z), float64(t))
+	norm64 := (r + normMin4) * normScale4
+	norm32 := float32(norm64)
+
+	// Unlike Eval2, have not actually tested whether a
+	// simple float32 cast will produce 1.0, but it seems likely.
+	if norm32 >= 1.0 {
+		return float32(0.999999)
+	} else {
+		return norm32
+	}
+}
