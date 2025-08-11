@@ -84,6 +84,8 @@ func main() {
 
 ![Simple Demo](./screenshot.png)
 
+Here is the example repo: [https://github.com/edwinsyarief/katsu2d-simple-demo](https://github.com/edwinsyarief/katsu2d-simple-demo)
+
 ### Functional options
 
 The `katsu2d.NewEngine` function accepts various Option functions to configure the engine:
