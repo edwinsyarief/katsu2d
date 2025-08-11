@@ -3,9 +3,10 @@ package katsu2d
 import (
 	"image"
 	"image/color"
-	"katsu2d/ease"
-	"katsu2d/overlays"
-	"katsu2d/tween"
+
+	"github.com/edwinsyarief/katsu2d/ease"
+	"github.com/edwinsyarief/katsu2d/overlays"
+	"github.com/edwinsyarief/katsu2d/tween"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 )

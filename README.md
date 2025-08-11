@@ -36,12 +36,12 @@ go get github.com/edwinsyarief/katsu2d
 
 ```go
 import (
-	"katsu2d"
-	"katsu2d/components"
-	"katsu2d/constants"
-	"katsu2d/ecs"
-	"katsu2d/scene"
-	"katsu2d/systems"
+	"github.com/edwinsyarief/katsu2d"
+	"github.com/edwinsyarief/katsu2d/components"
+	"github.com/edwinsyarief/katsu2d/constants"
+	"github.com/edwinsyarief/katsu2d/ecs"
+	"github.com/edwinsyarief/katsu2d/scene"
+	"github.com/edwinsyarief/katsu2d/systems"
 	
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -49,7 +49,7 @@ import (
 func main() {
 	game := katsu2d.NewEngine(
 		katsu2d.WithWindowSize(800, 600),
-		katsu2d.WithWindowTitle("Katsu2D Demo"),
+		katsu2d.WithWindowTitle("github.com/edwinsyarief/katsu2d Demo"),
 		katsu2d.WithWindowsResizeMode(ebiten.WindowResizingModeEnabled),
 		katsu2d.WithWindowFullscreen(false),
 		katsu2d.WithWindowVsync(true),

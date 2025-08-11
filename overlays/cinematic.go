@@ -2,12 +2,13 @@ package overlays
 
 import (
 	"image/color"
-	"katsu2d/ease"
-	"katsu2d/managers"
-	"katsu2d/tween"
-	"katsu2d/utils"
 	"math"
 	"sync"
+
+	"github.com/edwinsyarief/katsu2d/ease"
+	"github.com/edwinsyarief/katsu2d/managers"
+	"github.com/edwinsyarief/katsu2d/tween"
+	"github.com/edwinsyarief/katsu2d/utils"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"

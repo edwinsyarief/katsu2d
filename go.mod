@@ -1,6 +1,6 @@
 module github.com/edwinsyarief/katsu2d
 
-go 1.24.5
+go 1.24.6
 
 require (
 	github.com/edwinsyarief/assetpacker v1.0.0
@@ -9,11 +9,11 @@ require (
 )
 
 require (
-	github.com/ebitengine/gomobile v0.0.0-20241016134836-cc2e38a7c0ee // indirect
+	github.com/ebitengine/gomobile v0.0.0-20250329061421-6d0a8e981e4c // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
-	github.com/ebitengine/purego v0.8.2 // indirect
+	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/jezek/xgb v1.1.1 // indirect
-	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/exp v0.0.0-20250808145144-a408d31f581a // indirect
+	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 )

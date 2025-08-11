@@ -2,8 +2,9 @@ package overlays
 
 import (
 	"image/color"
-	"katsu2d/ease"
-	"katsu2d/tween"
+
+	"github.com/edwinsyarief/katsu2d/ease"
+	"github.com/edwinsyarief/katsu2d/tween"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )

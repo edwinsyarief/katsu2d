@@ -83,7 +83,7 @@ func NewEngine(opts ...Option) *Engine {
 		timeScale:            1.0,
 		windowWidth:          800,
 		windowHeight:         600,
-		windowTitle:          "Katsu2D",
+		windowTitle:          "github.com/edwinsyarief/katsu2d",
 		windowResizeMode:     ebiten.WindowResizingModeEnabled,
 		fullScreen:           false,
 		vsync:                false,
