@@ -3,7 +3,9 @@ package katsu2d
 import (
 	"embed"
 
+	"github.com/edwinsyarief/katsu2d/input"
 	"github.com/hajimehoshi/ebiten/v2"
+	dinput "github.com/quasilyte/ebitengine-input"
 )
 
 // Engine manages the game loop, world, systems, and window settings.
@@ -111,6 +113,10 @@ func (self *Engine) InitAssetReader(path string, key []byte) {
 	initAssetReader(path, key)
 }
 
+func (self *Engine) InitInput(id uint8, keymaps dinput.Keymap) {
+	input.Initialize(id, keymaps)
+}
+
 // World returns the ECS world (note: scenes may use their own worlds).
 func (self *Engine) World() *World {
 	return self.world
@@ -131,6 +137,11 @@ func (self *Engine) SetScene(s Scene) {
 	self.sm.SetScene(s)
 }
 
+// SetLoadingScene switches to a loading scene with function to execute and callback when finishes
+func (self *Engine) SetLoadingScene(task func() []any, callback func([]any)) {
+	self.sm.SetLoadingScene(task, callback)
+}
+
 // SetTimeScale adjusts the game speed.
 func (self *Engine) SetTimeScale(ts float64) {
 	self.timeScale = ts
@@ -149,6 +160,8 @@ func (self *Engine) ScreenHeight() int {
 // Update runs scene manager update with delta time.
 func (self *Engine) Update() error {
 	dt := 1.0 / 60.0 * self.timeScale // Fixed timestep assumption (Ebitengine targets 60 FPS)
+
+	input.Update()
 
 	self.sm.Update(dt, self)
 	for _, sys := range self.systems {

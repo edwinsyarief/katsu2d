@@ -141,6 +141,10 @@ func (s *RenderSystem) Draw(w *World, screen *ebiten.Image) {
 // TweenSystem updates tweens and sequences.
 type TweenSystem struct{}
 
+func NewTweenSystem() *TweenSystem {
+	return &TweenSystem{}
+}
+
 func (s *TweenSystem) Update(w *World, dt float64) {
 	// Standalone tweens
 	entities := w.QueryAll(CTTween)
@@ -161,6 +165,10 @@ func (s *TweenSystem) Draw(*World, *ebiten.Image) {}
 
 // AnimationSystem updates animations.
 type AnimationSystem struct{}
+
+func NewAnimationSystem() *AnimationSystem {
+	return &AnimationSystem{}
+}
 
 func (s *AnimationSystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTAnimation, CTSprite)
@@ -209,6 +217,10 @@ func (s *AnimationSystem) Draw(*World, *ebiten.Image) {}
 
 type FadeOverlaySystem struct{}
 
+func NewFadeOverlaySystem() *FadeOverlaySystem {
+	return &FadeOverlaySystem{}
+}
+
 func (self *FadeOverlaySystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTFadeOverlay)
 	for _, e := range entities {
@@ -226,6 +238,10 @@ func (self *FadeOverlaySystem) Draw(w *World, screen *ebiten.Image) {
 }
 
 type CinematicOverlaySystem struct{}
+
+func NewCinematicOverlaySystem() *CinematicOverlaySystem {
+	return &CinematicOverlaySystem{}
+}
 
 func (self *CinematicOverlaySystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTCinematicOverlay)
@@ -245,6 +261,10 @@ func (self *CinematicOverlaySystem) Draw(w *World, screen *ebiten.Image) {
 
 type CooldownSystem struct{}
 
+func NewCooldownSystem() *CooldownSystem {
+	return &CooldownSystem{}
+}
+
 func (self *CooldownSystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTCooldown)
 	for _, e := range entities {
@@ -256,6 +276,10 @@ func (self *CooldownSystem) Update(w *World, dt float64) {
 func (self *CooldownSystem) Draw(*World, *ebiten.Image) {}
 
 type DelayManager struct{}
+
+func NewDelayManager() *DelayManager {
+	return &DelayManager{}
+}
 
 func (self *DelayManager) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTDelayer)
