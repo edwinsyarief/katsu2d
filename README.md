@@ -35,89 +35,54 @@ go get github.com/edwinsyarief/katsu2d
 ### Usage example
 
 ```go
+package main
+
 import (
+	"image/color"
+
+	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d"
-	"github.com/edwinsyarief/katsu2d/components"
-	"github.com/edwinsyarief/katsu2d/constants"
-	"github.com/edwinsyarief/katsu2d/ecs"
-	"github.com/edwinsyarief/katsu2d/scene"
-	"github.com/edwinsyarief/katsu2d/systems"
-	
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func main() {
+	// Initialize engine
 	game := katsu2d.NewEngine(
-		katsu2d.WithWindowSize(800, 600),
-		katsu2d.WithWindowTitle("github.com/edwinsyarief/katsu2d Demo"),
-		katsu2d.WithWindowsResizeMode(ebiten.WindowResizingModeEnabled),
-		katsu2d.WithWindowFullscreen(false),
-		katsu2d.WithWindowVsync(true),
-		katsu2d.WithCursorMode(ebiten.CursorModeHidden),
-		katsu2d.WithScreenClearedEveryFrame(false),
+		katsu2d.WithWindowSize(640, 480),
+		katsu2d.WithWindowTitle("Katsu2D Simple Demonstration"),
+		katsu2d.WithWindowResizeMode(ebiten.WindowResizingModeEnabled),
+		katsu2d.WithClearScreenEachFrame(false),
 	)
 
-	game.SetTimeScale(1) // Set the time scale to 100% for normal speed
+	// Register built-in system
+	game.AddSystem(
+		katsu2d.NewRenderSystem(game.TextureManager()),
+	)
 
-	// Create default scene
-	defaultScene := scene.NewDefaultScene()
-	game.SceneManager().AddScene("default", defaultScene)
-	game.SceneManager().SwitchScene("default")
+	// Create a new entity
+	e := game.World().NewEntity()
 
-	// Register systems
-	game.World().AddSystem(systems.NewUpdateSystem())
-	game.World().AddSystem(systems.NewBatchSystem(nil))
+	// Create a transform component
+	t := katsu2d.NewTransform()
+	t.SetPosition(ebimath.V(100, 100))
 
-	// Create a batched sprite entity (red square)
-	// This entity will now be rendered with the new batcher, but with no rotation.
-	entity1 := game.World().CreateEntity()
-	t := katsu2d.T()
-	t.SetPosition(katsu2d.V2(100))
-	world.AddComponent(entity1, t)
-	world.AddComponent(entity1, &components.DrawableBatch{
-		TextureID: 0, // Assuming texture ID 0 is a placeholder
-		Width:     64,
-		Height:    64,
-		Color:     color.RGBA{R: 255, G: 0, B: 0, A: 255}, // Red
-	})
+	// Create a sprite component
+	s := katsu2d.NewSprite(0, 50, 50)
+	s.Color = color.RGBA{R: 255, G: 0, B: 0, A: 255}
 
-	// Create an updatable entity with a batched drawable (blue square)
-	// This entity will now visibly rotate and scale, demonstrating the new batcher's capabilities.
-	entity2 := game.World().CreateEntity()
-	t2 := katsu2d.TPos(300, 300)
-	world.AddComponent(entity2, t2)
-	world.AddComponent(entity2, &components.Updatable{
-		UpdateFunc: func(dt float64, w *ecs.World, eID ecs.EntityID) {
-			// Simple rotation effect
-			if component, exists := w.GetComponent(eID, constants.ComponentTransform); exists {
-				if transform, ok := component.(*components.Transform); ok {
-					transform.Rotate(dt)
-					if transform.Rotation() > 2*math.Pi {
-						transform.Rotate(-2 * math.Pi)
-					}
-					// Simple scaling effect
-					transform.SetScale(
-						katsu2d.V(
-							1.0+float64(math.Sin(float64(transform.Rotation())*2.0))*0.5,
-							1.0+float64(math.Sin(float64(transform.Rotation())*2.0))*0.5,
-						),
-					)
-				}
-			}
-		},
-	})
-	world.AddComponent(entity2, &components.DrawableBatch{
-		TextureID: 0,
-		Width:     32,
-		Height:    32,
-		Color:     color.RGBA{R: 0, G: 0, B: 255, A: 255}, // Blue
-	})
+	// Add components into entity
+	game.World().AddComponent(e, t)
+	game.World().AddComponent(e, s)
 
-	if err := game.RunGame(); err != nil {
+	if err := game.Run(); err != nil {
 		panic(err)
 	}
 }
 ```
+
+#### Screenshot
+
+![Simple Demo](./screenshot.png)
 
 ### Functional options
 
