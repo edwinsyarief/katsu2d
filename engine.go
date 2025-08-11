@@ -138,8 +138,8 @@ func (self *Engine) SetScene(s Scene) {
 }
 
 // SetLoadingScene switches to a loading scene with function to execute and callback when finishes
-func (self *Engine) SetLoadingScene(task func() []any, callback func([]any)) {
-	self.sm.SetLoadingScene(task, callback)
+func (self *Engine) SetLoadingScene(task func() []any, callback func([]any), drawFunc func(*ebiten.Image)) {
+	self.sm.SetLoadingScene(task, callback, drawFunc)
 }
 
 // SetTimeScale adjusts the game speed.

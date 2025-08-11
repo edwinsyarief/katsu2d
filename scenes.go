@@ -53,10 +53,11 @@ func (self *SceneManager) SetScene(s Scene) {
 	self.next = s
 }
 
-func (self *SceneManager) SetLoadingScene(task func() []any, callback func([]any)) {
+func (self *SceneManager) SetLoadingScene(task func() []any, callback func([]any), drawFunc func(*ebiten.Image)) {
 	loading := &LoadingScene{
 		task:         task,
 		callback:     callback,
+		drawFunc:     drawFunc,
 		fadeInSpeed:  1.75,
 		fadeOutSpeed: 1.15,
 	}
