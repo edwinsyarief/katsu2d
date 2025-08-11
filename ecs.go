@@ -5,6 +5,9 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/edwinsyarief/katsu2d/managers"
+	"github.com/edwinsyarief/katsu2d/overlays"
 )
 
 // Entity is a unique identifier for game objects.
@@ -26,6 +29,8 @@ var (
 	CTAnimation        ComponentID
 	CTFadeOverlay      ComponentID
 	CTCinematicOverlay ComponentID
+	CTCooldown         ComponentID
+	CTDelayer          ComponentID
 )
 
 func init() {
@@ -35,8 +40,10 @@ func init() {
 	CTTween = RegisterComponent[Tween]()
 	CTSequence = RegisterComponent[Sequence]()
 	CTAnimation = RegisterComponent[Animation]()
-	CTFadeOverlay = RegisterComponent[FadeOverlay]()
-	CTCinematicOverlay = RegisterComponent[CinematicOverlay]()
+	CTFadeOverlay = RegisterComponent[overlays.FadeOverlay]()
+	CTCinematicOverlay = RegisterComponent[overlays.CinematicOverlay]()
+	CTCooldown = RegisterComponent[managers.CooldownManager]()
+	CTDelayer = RegisterComponent[managers.DelayManager]()
 }
 
 // RegisterComponent registers a new component type and returns its ComponentID.

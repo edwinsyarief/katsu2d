@@ -5,7 +5,6 @@ import (
 	"image/color"
 
 	"github.com/edwinsyarief/katsu2d/ease"
-	"github.com/edwinsyarief/katsu2d/overlays"
 	"github.com/edwinsyarief/katsu2d/tween"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
@@ -108,29 +107,4 @@ type Animation struct {
 	Mode      AnimMode // Animation mode
 	Direction bool     // For boomerang: true forward, false backward
 	Active    bool     // Is animation playing
-}
-
-type FadeOverlay struct {
-	*overlays.FadeOverlay
-}
-
-func NewFadeOverlay(width, height int, fadeType overlays.FadeType, fadeColor color.RGBA, duration float64, callback func()) *FadeOverlay {
-	return &FadeOverlay{
-		FadeOverlay: overlays.NewFadeOverlay(width, height, fadeType, fadeColor, duration, callback),
-	}
-}
-
-type CinematicOverlay struct {
-	*overlays.CinematicOverlay
-}
-
-func NewCinematicOverlay(width, height int, col color.RGBA, opacity float64, cinematicType overlays.CinematicType,
-	startType, endType overlays.CinematicOverlayType, startFade, endFade, autoFinish bool,
-	cinematicDelay, radius, startSpeed, endSpeed float64, offset ebimath.Vector, callback func()) *CinematicOverlay {
-	return &CinematicOverlay{
-		CinematicOverlay: overlays.NewCinematicOverlay(
-			width, height, col, opacity,
-			cinematicType, startType, endType, startFade, endFade,
-			autoFinish, cinematicDelay, radius, startSpeed, endSpeed, offset, callback),
-	}
 }

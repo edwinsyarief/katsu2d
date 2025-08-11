@@ -72,7 +72,7 @@ type CinematicOverlay struct {
 	renderTarget         *ebiten.Image // Renamed from temp for clarity
 
 	tween   *tween.Sequence
-	delayer *managers.Delayer
+	delayer *managers.DelayManager
 
 	lastStepOnce sync.Once
 
@@ -99,7 +99,7 @@ func NewCinematicOverlay(width, height int, col color.RGBA, opacity float64, cin
 		startSpeed:     startSpeed,
 		endSpeed:       endSpeed,
 		offset:         offset,
-		delayer:        managers.NewDelayer(),
+		delayer:        managers.NewDelayManager(),
 		callback:       callback,
 	}
 

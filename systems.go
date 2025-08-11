@@ -5,6 +5,8 @@ import (
 	"sort"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/edwinsyarief/katsu2d/managers"
+	"github.com/edwinsyarief/katsu2d/overlays"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -209,7 +211,7 @@ type FadeOverlaySystem struct{}
 func (self *FadeOverlaySystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTFadeOverlay)
 	for _, e := range entities {
-		fade := w.GetComponent(e, CTFadeOverlay).(*FadeOverlay)
+		fade := w.GetComponent(e, CTFadeOverlay).(*overlays.FadeOverlay)
 		fade.Update(dt)
 	}
 }
@@ -217,7 +219,7 @@ func (self *FadeOverlaySystem) Update(w *World, dt float64) {
 func (self *FadeOverlaySystem) Draw(w *World, screen *ebiten.Image) {
 	entities := w.QueryAll(CTFadeOverlay)
 	for _, e := range entities {
-		fade := w.GetComponent(e, CTFadeOverlay).(*FadeOverlay)
+		fade := w.GetComponent(e, CTFadeOverlay).(*overlays.FadeOverlay)
 		fade.Draw(screen)
 	}
 }
@@ -227,15 +229,39 @@ type CinematicOverlaySystem struct{}
 func (self *CinematicOverlaySystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTCinematicOverlay)
 	for _, e := range entities {
-		fade := w.GetComponent(e, CTCinematicOverlay).(*CinematicOverlay)
-		fade.Update(dt)
+		cinematic := w.GetComponent(e, CTCinematicOverlay).(*overlays.CinematicOverlay)
+		cinematic.Update(dt)
 	}
 }
 
 func (self *CinematicOverlaySystem) Draw(w *World, screen *ebiten.Image) {
 	entities := w.QueryAll(CTCinematicOverlay)
 	for _, e := range entities {
-		fade := w.GetComponent(e, CTCinematicOverlay).(*CinematicOverlay)
-		fade.Draw(screen)
+		cinematic := w.GetComponent(e, CTCinematicOverlay).(*overlays.CinematicOverlay)
+		cinematic.Draw(screen)
 	}
 }
+
+type CooldownSystem struct{}
+
+func (self *CooldownSystem) Update(w *World, dt float64) {
+	entities := w.QueryAll(CTCooldown)
+	for _, e := range entities {
+		cm := w.GetComponent(e, CTCooldown).(*managers.CooldownManager)
+		cm.Update(dt)
+	}
+}
+
+func (self *CooldownSystem) Draw(*World, *ebiten.Image) {}
+
+type DelayManager struct{}
+
+func (self *DelayManager) Update(w *World, dt float64) {
+	entities := w.QueryAll(CTDelayer)
+	for _, e := range entities {
+		delay := w.GetComponent(e, CTDelayer).(*managers.DelayManager)
+		delay.Update(dt)
+	}
+}
+
+func (self *DelayManager) Draw(*World, *ebiten.Image) {}
