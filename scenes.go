@@ -65,25 +65,25 @@ func (self *SceneManager) SetLoadingScene(task func() []any, callback func([]any
 }
 
 type BaseScene struct {
-	world   *World
-	systems []System
+	World   *World
+	Systems []System
 }
 
 func (self *BaseScene) Update(dt float64) {
-	for _, sys := range self.systems {
-		sys.Update(self.world, dt)
+	for _, sys := range self.Systems {
+		sys.Update(self.World, dt)
 	}
 }
 
 func (self *BaseScene) Draw(screen *ebiten.Image) {
-	for _, sys := range self.systems {
-		sys.Draw(self.world, screen)
+	for _, sys := range self.Systems {
+		sys.Draw(self.World, screen)
 	}
 }
 
 func (self *BaseScene) OnExit() {
-	self.systems = nil
-	self.world = nil
+	self.Systems = nil
+	self.World = nil
 }
 
 // maxRetries defines the maximum number of retry attempts for the task.
