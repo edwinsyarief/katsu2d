@@ -1,6 +1,3 @@
-// package: katsu2d
-// file: ecs.go
-
 package katsu2d
 
 import (
@@ -23,6 +20,8 @@ type ComponentID uint32
 var (
 	// componentIDMap maps component types to their IDs.
 	componentIDMap = make(map[reflect.Type]ComponentID)
+	// componentTypeMap maps component IDs back to their types for debugging.
+	componentTypeMap = make(map[ComponentID]reflect.Type)
 	// nextComponentID is the next available component ID.
 	nextComponentID ComponentID
 	// Built-in component IDs.
@@ -40,7 +39,6 @@ var (
 
 func init() {
 	// Register built-in components during initialization.
-	// This ensures that our core components are always available.
 	CTTransform = RegisterComponent[Transform]()
 	CTSprite = RegisterComponent[Sprite]()
 	CTTween = RegisterComponent[tween.Tween]()
@@ -56,6 +54,7 @@ func init() {
 // RegisterComponent registers a new component type and returns its ComponentID.
 // This function should be called once per component type at program startup.
 func RegisterComponent[T any]() ComponentID {
+	// We get the type of T, not a pointer to T. This ensures consistency.
 	t := reflect.TypeOf((*T)(nil)).Elem()
 	if id, ok := componentIDMap[t]; ok {
 		return id // Component already registered, return its ID.
@@ -64,6 +63,7 @@ func RegisterComponent[T any]() ComponentID {
 	id := nextComponentID
 	nextComponentID++
 	componentIDMap[t] = id
+	componentTypeMap[id] = t
 	return id
 }
 
@@ -82,9 +82,11 @@ type Archetype struct {
 	componentIDs []ComponentID       // The list of component IDs.
 	componentMap map[ComponentID]int // A map for fast lookup of a component's index.
 	entities     []Entity            // The dense array of entities.
-	data         [][]any             // The dense arrays of component data.
-	capacity     int                 // The current allocated capacity.
-	length       int                 // The number of active entities.
+	// We're now using a map from ComponentID to a slice of reflect.Value,
+	// which is safer and more robust than a generic `[][]any`.
+	data     map[ComponentID]reflect.Value // The dense arrays of component data.
+	capacity int                           // The current allocated capacity.
+	length   int                           // The number of active entities.
 }
 
 // has checks if the archetype contains a specific component.
@@ -103,7 +105,7 @@ func (self *Archetype) containsAll(cts []ComponentID) bool {
 	return true
 }
 
-// containsAny checks if the archetype has at least one of the specified components.
+// containsAny checks if the archetype contains at least one of the specified components.
 func (self *Archetype) containsAny(cts []ComponentID) bool {
 	for _, ct := range cts {
 		if _, ok := self.componentMap[ct]; ok {
@@ -126,10 +128,12 @@ func (self *Archetype) addEmptySlot() int {
 		copy(newEntities, self.entities)
 		self.entities = newEntities
 
-		for i := range self.data {
-			newData := make([]any, newCap)
-			copy(newData, self.data[i])
-			self.data[i] = newData
+		for id, oldData := range self.data {
+			// Create a new slice with the new capacity.
+			newData := reflect.MakeSlice(oldData.Type(), self.length, newCap)
+			// Copy the old data to the new slice.
+			reflect.Copy(newData, oldData)
+			self.data[id] = newData
 		}
 
 		self.capacity = newCap
@@ -140,55 +144,38 @@ func (self *Archetype) addEmptySlot() int {
 	return idx
 }
 
-// swapRemove removes an entity at a given index by swapping it with the last
-// entity in the archetype. This is a high-performance removal method for dense arrays.
-func (self *Archetype) swapRemove(index int, world *World) {
-	if self.length == 0 {
-		return
-	}
-
-	last := self.length - 1
-
-	// If the entity to remove is not the last one, we need to swap.
-	if index != last {
-		// Get the entity ID of the last element, which will be moved.
-		swappedE := self.entities[last]
-
-		// Copy the last entity's ID and component data to the target index.
-		self.entities[index] = swappedE
-		for i := range self.data {
-			self.data[i][index] = self.data[i][last]
-		}
-
-		// IMPORTANT: Update the world's entityInfo for the entity that was swapped.
-		// This is a critical step to ensure the entity still points to its correct location.
-		world.entityInfo[swappedE] = entityLocation{arch: self, index: index}
-	}
-
-	// Now, clear the last slot and shrink the slice.
-	// This prevents memory leaks and ensures no stale data remains.
-	for i := range self.data {
-		self.data[i][last] = nil
-	}
-	self.entities[last] = 0
-
-	self.length--
+// pendingChange represents a structural change to be processed later
+type pendingChange struct {
+	entity      Entity
+	component   any
+	operation   changeOperation
+	componentID ComponentID
 }
+
+type changeOperation int
+
+const (
+	opAddComponent changeOperation = iota
+	opRemoveComponent
+)
 
 // World manages all entities, archetypes, and systems.
 type World struct {
-	nextEntity Entity                    // Next available entity ID.
-	archetypes map[string]*Archetype     // Map of archetype keys to archetypes.
-	entityInfo map[Entity]entityLocation // Map of entity to its location.
-	systems    []System                  // A slice to hold all registered systems.
+	nextEntity      Entity                    // Next available entity ID.
+	archetypes      map[string]*Archetype     // Map of archetype keys to archetypes.
+	entityInfo      map[Entity]entityLocation // Map of entity to its location.
+	systems         []System                  // A slice to hold all registered systems.
+	pendingChanges  []pendingChange           // Queue for structural changes during query processing
+	processingQuery bool                      // Flag to prevent structural changes during queries
 }
 
 // NewWorld creates a new ECS world with an empty archetype.
 func NewWorld() *World {
 	w := &World{
-		archetypes: make(map[string]*Archetype),
-		entityInfo: make(map[Entity]entityLocation),
-		systems:    make([]System, 0),
+		archetypes:     make(map[string]*Archetype),
+		entityInfo:     make(map[Entity]entityLocation),
+		systems:        make([]System, 0),
+		pendingChanges: make([]pendingChange, 0),
 	}
 	// The empty archetype is the starting point for all new entities.
 	w.getOrCreateArchetype([]ComponentID{})
@@ -204,6 +191,50 @@ func (self *World) AddSystem(s System) {
 func (self *World) UpdateSystems(dt float64) {
 	for _, s := range self.systems {
 		s.Update(self, dt)
+	}
+	// Process any pending structural changes after all systems have run
+	self.processPendingChanges()
+}
+
+// processPendingChanges processes all queued structural changes
+func (self *World) processPendingChanges() {
+	if len(self.pendingChanges) == 0 {
+		return
+	}
+
+	changes := self.pendingChanges
+	self.pendingChanges = self.pendingChanges[:0] // Clear the slice
+
+	for _, change := range changes {
+		switch change.operation {
+		case opAddComponent:
+			// Validate entity still exists and doesn't already have the component
+			if loc, ok := self.entityInfo[change.entity]; ok {
+				ct, err := getComponentID(change.component)
+				if err != nil {
+					fmt.Printf("Failed to get component ID for pending change: %v\n", err)
+					continue
+				}
+				if !loc.arch.has(ct) {
+					newIDs := append(loc.arch.componentIDs, ct)
+					newArch := self.getOrCreateArchetype(newIDs)
+					self.migrate(change.entity, loc.arch, newArch, change.component)
+				}
+			}
+		case opRemoveComponent:
+			if loc, ok := self.entityInfo[change.entity]; ok {
+				if loc.arch.has(change.componentID) {
+					var newIDs []ComponentID
+					for _, id := range loc.arch.componentIDs {
+						if id != change.componentID {
+							newIDs = append(newIDs, id)
+						}
+					}
+					newArch := self.getOrCreateArchetype(newIDs)
+					self.migrate(change.entity, loc.arch, newArch, nil)
+				}
+			}
+		}
 	}
 }
 
@@ -231,14 +262,22 @@ func (self *World) getOrCreateArchetype(ids []ComponentID) *Archetype {
 		componentIDs: append([]ComponentID{}, ids...),
 		componentMap: make(map[ComponentID]int),
 		entities:     make([]Entity, initialCap),
-		data:         make([][]any, len(ids)),
+		data:         make(map[ComponentID]reflect.Value),
 		capacity:     initialCap,
 		length:       0,
 	}
 
 	for i, id := range ids {
 		a.componentMap[id] = i
-		a.data[i] = make([]any, initialCap)
+		// Get the type of the component from our global map
+		t, ok := componentTypeMap[id]
+		if !ok {
+			panic(fmt.Sprintf("Component ID %d not registered", id))
+		}
+		// Create a slice of this component type. `reflect.New` creates a pointer,
+		// so we must use `reflect.New(reflect.SliceOf(t)).Elem()` to get the slice value itself.
+		sliceType := reflect.SliceOf(t)
+		a.data[id] = reflect.MakeSlice(sliceType, initialCap, initialCap)
 	}
 
 	self.archetypes[k] = a
@@ -260,19 +299,47 @@ func (self *World) NewEntity() Entity {
 }
 
 // getComponentID retrieves the ID for a given component instance.
-func getComponentID(c any) ComponentID {
-	t := reflect.TypeOf(c).Elem()
+// It is now more robust to handle both pointers and non-pointers.
+// It also returns an error instead of panicking.
+func getComponentID(c any) (ComponentID, error) {
+	if c == nil {
+		return 0, fmt.Errorf("component is nil")
+	}
+
+	t := reflect.TypeOf(c)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
 	id, ok := componentIDMap[t]
 	if !ok {
-		panic("Unregistered component type; call RegisterComponent first")
+		return 0, fmt.Errorf("unregistered component type: %s. Call RegisterComponent first", t.String())
 	}
-	return id
+	return id, nil
 }
 
 // AddComponent adds a component to an entity. This moves the entity
 // to a new, more specific archetype.
+// Queues changes during query processing to prevent iteration invalidation
 func (self *World) AddComponent(e Entity, c any) {
-	ct := getComponentID(c)
+	if c == nil {
+		return
+	}
+
+	if self.processingQuery {
+		self.pendingChanges = append(self.pendingChanges, pendingChange{
+			entity:    e,
+			component: c,
+			operation: opAddComponent,
+		})
+		return
+	}
+
+	ct, err := getComponentID(c)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	loc, ok := self.entityInfo[e]
 	if !ok {
 		panic("Entity does not exist")
@@ -280,43 +347,36 @@ func (self *World) AddComponent(e Entity, c any) {
 
 	oldArch := loc.arch
 	if oldArch.has(ct) {
-		panic("Entity already has this component")
+		fmt.Printf("Entity %d already has component %d. Skipping.\n", e, ct)
+		return
 	}
 
-	// Build the new archetype's component IDs.
 	newIDs := append(oldArch.componentIDs, ct)
 	newArch := self.getOrCreateArchetype(newIDs)
-	newIndex := newArch.addEmptySlot()
-	newArch.entities[newIndex] = e
 
-	// Copy existing components from the old archetype to the new one.
-	for _, oldID := range oldArch.componentIDs {
-		oldIdx := oldArch.componentMap[oldID]
-		oldComp := oldArch.data[oldIdx][loc.index]
-		newIdx := newArch.componentMap[oldID]
-		newArch.data[newIdx][newIndex] = oldComp
-	}
-
-	// Add the new component.
-	newIdx := newArch.componentMap[ct]
-	newArch.data[newIdx][newIndex] = c
-
-	// Update the entity's location in the world.
-	self.entityInfo[e] = entityLocation{arch: newArch, index: newIndex}
-
-	// Remove the entity from its old archetype.
-	oldArch.swapRemove(loc.index, self)
+	self.migrate(e, oldArch, newArch, c)
 }
 
 // RemoveComponents removes one or more components from an entity.
-func (w *World) RemoveComponents(e Entity, cts ...ComponentID) {
-	loc, ok := w.entityInfo[e]
+// Queues changes during query processing to prevent iteration invalidation
+func (self *World) RemoveComponents(e Entity, cts ...ComponentID) {
+	if self.processingQuery {
+		for _, ct := range cts {
+			self.pendingChanges = append(self.pendingChanges, pendingChange{
+				entity:      e,
+				operation:   opRemoveComponent,
+				componentID: ct,
+			})
+		}
+		return
+	}
+
+	loc, ok := self.entityInfo[e]
 	if !ok {
-		return // Entity does not exist.
+		return
 	}
 
 	oldArch := loc.arch
-	// Create a set of component IDs to be removed for fast lookups.
 	removeSet := make(map[ComponentID]bool, len(cts))
 	for _, ct := range cts {
 		if oldArch.has(ct) {
@@ -324,10 +384,9 @@ func (w *World) RemoveComponents(e Entity, cts ...ComponentID) {
 		}
 	}
 	if len(removeSet) == 0 {
-		return // No components to remove.
+		return
 	}
 
-	// Build the component IDs for the new archetype.
 	var newIDs []ComponentID
 	for _, id := range oldArch.componentIDs {
 		if !removeSet[id] {
@@ -335,27 +394,96 @@ func (w *World) RemoveComponents(e Entity, cts ...ComponentID) {
 		}
 	}
 
-	// Get or create the new archetype.
-	newArch := w.getOrCreateArchetype(newIDs)
+	newArch := self.getOrCreateArchetype(newIDs)
+	self.migrate(e, oldArch, newArch, nil)
+}
+
+// swapAndRemove is an internal helper function that removes an entity from an archetype
+// at a given index. It swaps the last element into the removed position to
+// maintain a dense array. This function now performs all necessary state updates
+// for the swapped entity.
+func (self *World) swapAndRemove(arch *Archetype, index int) {
+	if arch.length == 0 || index >= arch.length {
+		return
+	}
+
+	lastIndex := arch.length - 1
+
+	if index != lastIndex {
+		swappedEntity := arch.entities[lastIndex]
+		arch.entities[index] = swappedEntity
+
+		if loc, ok := self.entityInfo[swappedEntity]; ok {
+			loc.index = index
+			self.entityInfo[swappedEntity] = loc
+		}
+
+		for _, data := range arch.data {
+			// Copy the last element's data to the removed index
+			data.Index(index).Set(data.Index(lastIndex))
+		}
+	}
+
+	// For memory safety, we clear the last element.
+	for _, data := range arch.data {
+		data.Index(lastIndex).Set(reflect.Zero(data.Type().Elem()))
+	}
+	arch.entities[lastIndex] = 0
+
+	arch.length--
+}
+
+// migrate performs the atomic movement of an entity from one archetype to another.
+// It is now more robust and type-safe using reflection.
+func (self *World) migrate(e Entity, oldArch, newArch *Archetype, newComponent any) {
+	loc := self.entityInfo[e]
+
 	newIndex := newArch.addEmptySlot()
 	newArch.entities[newIndex] = e
 
-	// Copy components that are staying.
-	for _, id := range newIDs {
-		oldIdx := oldArch.componentMap[id]
-		newIdx := newArch.componentMap[id]
-		newArch.data[newIdx][newIndex] = oldArch.data[oldIdx][loc.index]
-		oldArch.data[oldIdx][loc.index] = nil // Clear old reference to prevent memory leak.
+	// Copy existing components from the old archetype to the new one.
+	for _, oldID := range oldArch.componentIDs {
+		// Check if the component is also in the new archetype.
+		if _, ok := newArch.componentMap[oldID]; ok {
+			oldData := oldArch.data[oldID]
+			newData := newArch.data[oldID]
+
+			// Defensive check to prevent "call of reflect.Value.Index on zero Value"
+			if !oldData.IsValid() || !newData.IsValid() {
+				// This should not happen if the archetype is valid.
+				// For now, we'll just skip the copy and continue.
+				continue
+			}
+
+			// Copy the component instance from the old archetype to the new one.
+			newData.Index(newIndex).Set(oldData.Index(loc.index))
+		}
 	}
 
-	// Update the entity's location.
-	w.entityInfo[e] = entityLocation{arch: newArch, index: newIndex}
+	// Add the new component if one exists.
+	if newComponent != nil {
+		ct, _ := getComponentID(newComponent)
+		if _, ok := newArch.componentMap[ct]; ok {
+			newData := newArch.data[ct]
 
-	// Remove the entity from its old archetype.
-	oldArch.swapRemove(loc.index, w)
+			// Handle both pointers and values for assignment.
+			compVal := reflect.ValueOf(newComponent)
+			if compVal.IsValid() && compVal.Kind() == reflect.Ptr {
+				compVal = compVal.Elem()
+			}
+
+			if newData.IsValid() && compVal.IsValid() {
+				newData.Index(newIndex).Set(compVal)
+			}
+		}
+	}
+
+	self.swapAndRemove(oldArch, loc.index)
+	self.entityInfo[e] = entityLocation{arch: newArch, index: newIndex}
 }
 
 // GetComponent retrieves a component from an entity.
+// It now returns a pointer to the component for consistency with the user's factories.
 func (self *World) GetComponent(e Entity, ct ComponentID) any {
 	loc, ok := self.entityInfo[e]
 	if !ok {
@@ -364,13 +492,63 @@ func (self *World) GetComponent(e Entity, ct ComponentID) any {
 	if !loc.arch.has(ct) {
 		return nil
 	}
-	idx := loc.arch.componentMap[ct]
-	return loc.arch.data[idx][loc.index]
+	// Get the component slice using the ID.
+	compSlice := loc.arch.data[ct]
+	if compSlice.IsValid() && loc.index < compSlice.Len() {
+		// Extract the component value and return a pointer to it.
+		// This makes the API consistent with what the factories expect.
+		val := compSlice.Index(loc.index)
+		return val.Addr().Interface()
+	}
+	return nil
+}
+
+// GetAllEntityComponents retrieves all components for a given entity,
+// returning them as a map from component ID to the component instance pointer.
+// This is now consistent with the user's expectations.
+func (self *World) GetAllEntityComponents(e Entity) map[ComponentID]any {
+	loc, ok := self.entityInfo[e]
+	if !ok {
+		return nil
+	}
+
+	components := make(map[ComponentID]any, len(loc.arch.componentIDs))
+	for _, ct := range loc.arch.componentIDs {
+		compSlice := loc.arch.data[ct]
+		if compSlice.IsValid() && loc.index < compSlice.Len() {
+			// Return a pointer to the component value, not the value itself.
+			val := compSlice.Index(loc.index)
+			components[ct] = val.Addr().Interface()
+		}
+	}
+	return components
+}
+
+// GetComponentSafe retrieves a component from an entity with explicit nil checking.
+// Returns a pointer to the component and a boolean indicating if the component exists and is not nil.
+func (self *World) GetComponentSafe(e Entity, ct ComponentID) (any, bool) {
+	loc, ok := self.entityInfo[e]
+	if !ok {
+		return nil, false
+	}
+	if !loc.arch.has(ct) {
+		return nil, false
+	}
+	compSlice := loc.arch.data[ct]
+	if compSlice.IsValid() && loc.index < compSlice.Len() {
+		val := compSlice.Index(loc.index)
+		component := val.Addr().Interface()
+		return component, component != nil
+	}
+	return nil, false
 }
 
 // QueryAll returns all entities that have ALL of the specified components.
+// Sets processingQuery flag to prevent structural changes during iteration
 func (self *World) QueryAll(cts ...ComponentID) []Entity {
-	// Initialize with a slice to ensure a valid empty slice is returned if no matches are found.
+	self.processingQuery = true
+	defer func() { self.processingQuery = false }()
+
 	var entities []Entity
 	for _, a := range self.archetypes {
 		if a.containsAll(cts) {
@@ -381,7 +559,11 @@ func (self *World) QueryAll(cts ...ComponentID) []Entity {
 }
 
 // QueryAny returns all entities that have AT LEAST ONE of the specified components.
+// Sets processingQuery flag to prevent structural changes during iteration
 func (self *World) QueryAny(cts ...ComponentID) []Entity {
+	self.processingQuery = true
+	defer func() { self.processingQuery = false }()
+
 	var entities []Entity
 	for _, a := range self.archetypes {
 		if a.containsAny(cts) {
@@ -391,37 +573,53 @@ func (self *World) QueryAny(cts ...ComponentID) []Entity {
 	return entities
 }
 
-// DestroyEntity removes an entity and all its components from the world.
-func (w *World) DestroyEntity(e Entity) {
-	loc, ok := w.entityInfo[e]
-	if !ok {
-		return // Entity does not exist.
+// QueryWith returns entities that have ALL required components AND at least one from optional components
+func (self *World) QueryWith(required []ComponentID, optional []ComponentID) []Entity {
+	self.processingQuery = true
+	defer func() { self.processingQuery = false }()
+
+	var entities []Entity
+	for _, a := range self.archetypes {
+		hasRequired := len(required) == 0 || a.containsAll(required)
+		hasOptional := len(optional) == 0 || a.containsAny(optional)
+		if hasRequired && hasOptional {
+			entities = append(entities, a.entities[:a.length]...)
+		}
 	}
+	return entities
+}
+
+// DestroyEntity removes an entity and all its components from the world.
+func (self *World) DestroyEntity(e Entity) {
+	loc, ok := self.entityInfo[e]
+	if !ok {
+		return
+	}
+
 	arch := loc.arch
-	arch.swapRemove(loc.index, w)
-	delete(w.entityInfo, e)
+	self.swapAndRemove(arch, loc.index)
+
+	delete(self.entityInfo, e)
 }
 
 // DestroyAllEntitiesWith destroys all entities that have all the specified components.
-func (w *World) DestroyAllEntitiesWith(cts ...ComponentID) {
-	for _, a := range w.archetypes {
+func (self *World) DestroyAllEntitiesWith(cts ...ComponentID) {
+	for _, a := range self.archetypes {
 		if a.containsAll(cts) {
-			// Clear all entities in this archetype.
 			for i := 0; i < a.length; i++ {
 				e := a.entities[i]
-				delete(w.entityInfo, e)
+				delete(self.entityInfo, e)
 			}
-			// Reset the length to effectively clear the archetype's data.
 			a.length = 0
 		}
 	}
 }
 
 // DestroyAllEntities removes all entities from the world, resetting it to empty.
-func (w *World) DestroyAllEntities() {
-	for _, a := range w.archetypes {
+func (self *World) DestroyAllEntities() {
+	for _, a := range self.archetypes {
 		a.length = 0
 	}
-	w.entityInfo = make(map[Entity]entityLocation)
-	w.nextEntity = 0
+	self.entityInfo = make(map[Entity]entityLocation)
+	self.nextEntity = 0
 }
