@@ -39,13 +39,20 @@ func New(start, end, duration float32, easing ease.EaseFunc) *Tween {
 // current value to start, finished to false, and clears the callback. This
 // prepares the tween to restart from the beginning, discarding any previous
 // delay or callback settings.
-func (self *Tween) Reset() {
+func (self *Tween) Reset(start, end, duration float32, easing ease.EaseFunc) {
+	self.start = start
+	self.end = end
+	self.duration = duration
+	self.easing = easing
 	self.time = 0
 	self.delay = 0
 	self.current = self.start
 	self.finished = false
 	if self.onDone != nil {
 		self.onDone = nil // Reset callback
+	}
+	if self.onUpdate != nil {
+		self.onUpdate = nil // Rest callback
 	}
 }
 

@@ -7,6 +7,7 @@ require (
 	github.com/edwinsyarief/ebi-math v1.1.0
 	github.com/hajimehoshi/ebiten/v2 v2.8.8
 	github.com/quasilyte/ebitengine-input v0.9.1
+	golang.org/x/text v0.23.0
 )
 
 require (
@@ -20,5 +21,4 @@ require (
 	golang.org/x/image v0.25.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
 )
