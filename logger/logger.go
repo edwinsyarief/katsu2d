@@ -5,22 +5,22 @@ type Logger struct {
 }
 
 // Common methods for both environments
-func (l *Logger) SetDebugMode(debug bool) {
-	l.isDebug = debug
+func (self *Logger) SetDebugMode(debug bool) {
+	self.isDebug = debug
 }
 
-func (l *Logger) Error(format string, v ...any) {
-	l.log("ERROR", format, v...)
+func (self *Logger) Error(format string, v ...any) {
+	self.log("ERROR", format, v...)
 }
 
-func (l *Logger) Info(format string, v ...any) {
-	if l.isDebug {
-		l.log("INFO", format, v...)
+func (self *Logger) Info(format string, v ...any) {
+	if self.isDebug {
+		self.log("INFO", format, v...)
 	}
 }
 
-func (l *Logger) Debug(format string, v ...any) {
-	if l.isDebug {
-		l.log("DEBUG", format, v...)
+func (self *Logger) Debug(format string, v ...any) {
+	if self.isDebug {
+		self.log("DEBUG", format, v...)
 	}
 }

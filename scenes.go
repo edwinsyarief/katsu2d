@@ -101,31 +101,36 @@ type LoadingScene struct {
 	callback                  func([]any)
 	retryCount                int // Number of retry attempts
 	fadeColor                 color.RGBA
-	fadeOverlay               *overlays.FadeOverlay // Fade effect for transitions
-	startTask                 bool                  // Flag to start the task after fade-in
-	drawFunc                  func(*ebiten.Image)   // provide this to display something in the loading scene
-	mutex                     sync.Mutex            // Protects loading state
-	fadeInSpeed, fadeOutSpeed float64               // fade speed
+	startTask                 bool                // Flag to start the task after fade-in
+	drawFunc                  func(*ebiten.Image) // provide this to display something in the loading scene
+	mutex                     sync.Mutex          // Protects loading state
+	fadeInSpeed, fadeOutSpeed float64             // fade speed
 	engine                    *Engine
 }
 
 // Init initializes the loading scene, setting up the text label and fade overlay.
 func (self *LoadingScene) OnEnter(engine *Engine) {
 	self.engine = engine
+	self.World = NewWorld()
+	self.Systems = []System{
+		NewFadeOverlaySystem(),
+	}
 
-	self.fadeOverlay = overlays.NewFadeOverlay(
+	e := self.World.NewEntity()
+	self.World.AddComponent(e, overlays.NewFadeOverlay(
 		self.engine.ScreenWidth(),
 		self.engine.ScreenHeight(),
 		overlays.FadeTypeIn,
 		self.fadeColor,
 		self.fadeInSpeed,
 		self.onFadeIn,
-	)
+	))
 }
 
 // Update advances the scene’s state, managing the fade overlay and task execution.
 func (self *LoadingScene) Update(dt float64) {
-	self.fadeOverlay.Update(dt)
+	self.BaseScene.Update(dt)
+
 	if self.task == nil || !self.startTask {
 		return
 	}
@@ -145,7 +150,7 @@ func (self *LoadingScene) Draw(screen *ebiten.Image) {
 	if self.drawFunc != nil {
 		self.drawFunc(screen)
 	}
-	self.fadeOverlay.Draw(screen)
+	self.BaseScene.Draw(screen)
 }
 
 // executeTask runs the loading task, handling retries and errors.
@@ -162,7 +167,9 @@ func (self *LoadingScene) executeTask() {
 			self.args = result
 			self.task = nil
 			self.mutex.Unlock()
-			self.fadeOverlay.Reset(overlays.FadeTypeOut, color.RGBA{R: 0, G: 0, B: 0, A: 255}, 1, self.fadeOutSpeed, self.onFadeOut)
+			e := self.World.QueryAll(CTFadeOverlay)[0]
+			fade := self.World.GetComponent(e, CTFadeOverlay).(*overlays.FadeOverlay)
+			fade.Reset(overlays.FadeTypeOut, color.RGBA{R: 0, G: 0, B: 0, A: 255}, 1, self.fadeOutSpeed, self.onFadeOut)
 			return
 		}
 		self.retryCount++

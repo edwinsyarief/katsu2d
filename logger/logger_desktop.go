@@ -53,12 +53,12 @@ func initLogger() (*Logger, error) {
 	}, nil
 }
 
-func (l *Logger) log(level string, format string, v ...any) {
+func (self *Logger) log(level string, format string, v ...any) {
 	log.Printf("[%s] "+format, append([]any{level}, v...)...)
 }
 
-func (l *Logger) Close() error {
-	if l != instance {
+func (self *Logger) Close() error {
+	if self != instance {
 		return nil // Only close if this is the singleton instance
 	}
 	return os.Stdout.Sync() // Sync stdout if used
