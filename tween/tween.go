@@ -19,6 +19,7 @@ type Tween struct {
 	current  float32       // Current value of the tween
 	finished bool          // Indicates if the tween has completed
 	onDone   func()        // Callback function called when the tween finishes
+	onUpdate func(float32) // Callback function called every update when tween is running
 }
 
 // New creates a new Tween instance with the specified start value, end value,
@@ -111,6 +112,12 @@ func (self *Tween) SetCallback(callback func()) {
 	self.onDone = callback
 }
 
+// SetOnUpdate sets a callback function to be executed every tween update called
+// when the tween is running
+func (self *Tween) SetOnUpdate(updateCallback func(float32)) {
+	self.onUpdate = updateCallback
+}
+
 // Update advances the tween by the given delta time (in seconds) and returns the
 // current value and a boolean indicating whether the tween has finished. If the
 // tween completes during this update, the callback is triggered.
@@ -128,6 +135,9 @@ func (self *Tween) Update(delta float32) (float32, bool) {
 	if self.time >= self.duration+self.delay {
 		self.current = self.end
 		self.finished = true
+		if self.onUpdate != nil {
+			self.onUpdate(self.current)
+		}
 		if self.onDone != nil {
 			self.onDone() // Call the callback if set
 		}
@@ -135,5 +145,8 @@ func (self *Tween) Update(delta float32) (float32, bool) {
 	}
 
 	self.current = self.easing(self.time-self.delay, self.start, self.end-self.start, self.duration)
+	if self.onUpdate != nil {
+		self.onUpdate(self.current)
+	}
 	return self.current, false // Tween is still in progress
 }

@@ -7,6 +7,7 @@ import (
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
+	"github.com/edwinsyarief/katsu2d/tween"
 	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -28,7 +29,7 @@ func NewRenderSystem(tm *TextureManager) *RenderSystem {
 }
 
 // Update does nothing for this system.
-func (s *RenderSystem) Update(*World, float64) {}
+func (self *RenderSystem) Update(*World, float64) {}
 
 // RenderItem is used for sorting entities by Z-index.
 type RenderItem struct {
@@ -37,7 +38,7 @@ type RenderItem struct {
 }
 
 // Draw renders all sprites, sorted by Z, batched by texture.
-func (s *RenderSystem) Draw(w *World, screen *ebiten.Image) {
+func (self *RenderSystem) Draw(w *World, screen *ebiten.Image) {
 	entities := w.QueryAll(CTTransform, CTSprite)
 	var items []RenderItem
 	for _, e := range entities {
@@ -60,7 +61,7 @@ func (s *RenderSystem) Draw(w *World, screen *ebiten.Image) {
 		if len(verts) == 0 {
 			return
 		}
-		img := s.tm.Get(currentTex)
+		img := self.tm.Get(currentTex)
 		screen.DrawTriangles(verts, indices, img, nil)
 		verts = verts[:0]
 		indices = indices[:0]
@@ -77,7 +78,7 @@ func (s *RenderSystem) Draw(w *World, screen *ebiten.Image) {
 			currentTex = texID
 		}
 
-		img := s.tm.Get(texID)
+		img := self.tm.Get(texID)
 		iw, ih := float32(img.Bounds().Dx()), float32(img.Bounds().Dy())
 
 		// Get adjusted sprite dimensions
@@ -123,6 +124,7 @@ func (s *RenderSystem) Draw(w *World, screen *ebiten.Image) {
 			b = float32(bb) / 0xFFFF
 			a = float32(aa) / 0xFFFF
 		}
+		a *= spr.Opacity
 
 		baseIdx := len(verts)
 		verts = append(verts,
@@ -145,23 +147,23 @@ func NewTweenSystem() *TweenSystem {
 	return &TweenSystem{}
 }
 
-func (s *TweenSystem) Update(w *World, dt float64) {
+func (self *TweenSystem) Update(w *World, dt float64) {
 	// Standalone tweens
 	entities := w.QueryAll(CTTween)
 	for _, e := range entities {
-		tw := w.GetComponent(e, CTTween).(*Tween)
+		tw := w.GetComponent(e, CTTween).(*tween.Tween)
 		tw.Update(float32(dt))
 	}
 
 	// Sequences
 	entities = w.QueryAll(CTSequence)
 	for _, e := range entities {
-		seq := w.GetComponent(e, CTSequence).(*Sequence)
+		seq := w.GetComponent(e, CTSequence).(*tween.Sequence)
 		seq.Update(float32(dt))
 	}
 }
 
-func (s *TweenSystem) Draw(*World, *ebiten.Image) {}
+func (self *TweenSystem) Draw(*World, *ebiten.Image) {}
 
 // AnimationSystem updates animations.
 type AnimationSystem struct{}
@@ -170,7 +172,7 @@ func NewAnimationSystem() *AnimationSystem {
 	return &AnimationSystem{}
 }
 
-func (s *AnimationSystem) Update(w *World, dt float64) {
+func (self *AnimationSystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTAnimation, CTSprite)
 	for _, e := range entities {
 		anim := w.GetComponent(e, CTAnimation).(*Animation)
@@ -213,7 +215,7 @@ func (s *AnimationSystem) Update(w *World, dt float64) {
 	}
 }
 
-func (s *AnimationSystem) Draw(*World, *ebiten.Image) {}
+func (self *AnimationSystem) Draw(*World, *ebiten.Image) {}
 
 type FadeOverlaySystem struct{}
 

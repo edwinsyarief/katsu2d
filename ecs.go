@@ -8,6 +8,7 @@ import (
 
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
+	"github.com/edwinsyarief/katsu2d/tween"
 )
 
 // Entity is a unique identifier for game objects.
@@ -38,8 +39,8 @@ func init() {
 	// Register built-in components during initialization.
 	CTTransform = RegisterComponent[Transform]()
 	CTSprite = RegisterComponent[Sprite]()
-	CTTween = RegisterComponent[Tween]()
-	CTSequence = RegisterComponent[Sequence]()
+	CTTween = RegisterComponent[tween.Tween]()
+	CTSequence = RegisterComponent[tween.Sequence]()
 	CTAnimation = RegisterComponent[Animation]()
 	CTFadeOverlay = RegisterComponent[overlays.FadeOverlay]()
 	CTCinematicOverlay = RegisterComponent[overlays.CinematicOverlay]()
@@ -137,6 +138,8 @@ func (self *Archetype) swapRemove(index int) {
 	}
 	swappedE := self.entities[last]
 	self.entities[index] = swappedE
+	// Clear the old last position to avoid a "zombie" reference.
+	self.entities[last] = 0
 	self.length--
 }
 
@@ -257,6 +260,52 @@ func (self *World) AddComponent(e Entity, c any) {
 	}
 }
 
+// RemoveComponents removes the specified components from the entity, if present.
+func (w *World) RemoveComponents(e Entity, cts ...ComponentID) {
+	loc, ok := w.entityInfo[e]
+	if !ok {
+		return // Entity does not exist
+	}
+	oldArch := loc.arch
+	// Create set of components to remove for fast lookup
+	removeSet := make(map[ComponentID]bool, len(cts))
+	for _, ct := range cts {
+		if oldArch.has(ct) {
+			removeSet[ct] = true
+		}
+	}
+	if len(removeSet) == 0 {
+		return // No components to remove
+	}
+	// Build new component IDs without the removed ones
+	var newIDs []ComponentID
+	for _, id := range oldArch.componentIDs {
+		if !removeSet[id] {
+			newIDs = append(newIDs, id)
+		}
+	}
+	// Get or create new archetype
+	newArch := w.getOrCreateArchetype(newIDs)
+	newIndex := newArch.addEmptySlot()
+	newArch.entities[newIndex] = e
+	// Copy remaining components
+	for _, id := range newIDs {
+		oldIdx := oldArch.componentMap[id]
+		newIdx := newArch.componentMap[id]
+		newArch.data[newIdx][newIndex] = oldArch.data[oldIdx][loc.index]
+		oldArch.data[oldIdx][loc.index] = nil // Clear old to avoid memory leak
+	}
+	// Update entity location
+	w.entityInfo[e] = entityLocation{arch: newArch, index: newIndex}
+	// Remove from old archetype
+	oldArch.swapRemove(loc.index)
+	// Update swapped entity's location if necessary
+	if oldArch.length > loc.index {
+		swappedE := oldArch.entities[loc.index]
+		w.entityInfo[swappedE] = entityLocation{arch: oldArch, index: loc.index}
+	}
+}
+
 // GetComponent retrieves a component from an entity if it exists.
 func (self *World) GetComponent(e Entity, ct ComponentID) any {
 	loc, ok := self.entityInfo[e]
@@ -294,4 +343,43 @@ func (self *World) QueryAny(cts ...ComponentID) []Entity {
 		}
 	}
 	return entities
+}
+
+// DestroyEntity removes an entity and all its components from the world.
+func (w *World) DestroyEntity(e Entity) {
+	loc, ok := w.entityInfo[e]
+	if !ok {
+		return // Entity does not exist
+	}
+	arch := loc.arch
+	arch.swapRemove(loc.index)
+	// Update swapped entity's location if necessary
+	if arch.length > loc.index {
+		swappedE := arch.entities[loc.index]
+		w.entityInfo[swappedE] = entityLocation{arch: arch, index: loc.index}
+	}
+	delete(w.entityInfo, e)
+}
+
+// DestroyAllEntitiesWith destroys all entities that have all the specified components.
+func (w *World) DestroyAllEntitiesWith(cts ...ComponentID) {
+	for _, a := range w.archetypes {
+		if a.containsAll(cts) {
+			// Destroy all entities in this archetype
+			for i := a.length - 1; i >= 0; i-- {
+				e := a.entities[i]
+				a.swapRemove(i)
+				delete(w.entityInfo, e)
+			}
+		}
+	}
+}
+
+// DestroyAllEntities removes all entities from the world, resetting it to empty.
+func (w *World) DestroyAllEntities() {
+	for _, a := range w.archetypes {
+		a.length = 0
+	}
+	w.entityInfo = make(map[Entity]entityLocation)
+	w.nextEntity = 0
 }

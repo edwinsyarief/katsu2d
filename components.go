@@ -4,8 +4,6 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/edwinsyarief/katsu2d/ease"
-	"github.com/edwinsyarief/katsu2d/tween"
 	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -36,6 +34,7 @@ type Sprite struct {
 	DstW      float32 // if 0, use SrcW
 	DstH      float32 // if 0, use SrcH
 	Color     color.RGBA
+	Opacity   float32
 }
 
 func NewSprite(textureID, width, height int) *Sprite {
@@ -43,6 +42,7 @@ func NewSprite(textureID, width, height int) *Sprite {
 		TextureID: textureID,
 		DstW:      float32(width),
 		DstH:      float32(height),
+		Opacity:   1.0,
 	}
 }
 
@@ -66,31 +66,6 @@ func (self *Sprite) GetDestSize(sourceWidth, sourceHeight float32) (w, h float32
 		h = sourceHeight
 	}
 	return
-}
-
-// Tween component for interpolating a value over time.
-type Tween struct {
-	*tween.Tween
-}
-
-// NewTween creates a new Tween instance with the specified start value, end value,
-// duration, and easing function. The tween starts at the initial value with a
-// default delay of 0.
-func NewTween(start, end, duration float32, easing ease.EaseFunc) *Tween {
-	return &Tween{
-		Tween: tween.New(start, end, duration, easing),
-	}
-}
-
-// Sequence component for chaining tweens.
-type Sequence struct {
-	*tween.Sequence
-}
-
-func NewSequence(tweens ...*tween.Tween) *Sequence {
-	return &Sequence{
-		Sequence: tween.NewSequence(tweens...),
-	}
 }
 
 // AnimMode defines animation playback modes.
