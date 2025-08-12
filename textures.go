@@ -27,11 +27,9 @@ func NewTextureManager() *TextureManager {
 // Load loads an image from file and returns its ID.
 func (self *TextureManager) Load(path string) (int, error) {
 	var result *ebiten.Image
-
-	// check from the logical path
 	_, img, err := ebitenutil.NewImageFromFile(path)
 	if err != nil {
-		return -1, err
+		panic(err)
 	}
 
 	result = ebiten.NewImageFromImage(img)
@@ -44,15 +42,16 @@ func (self *TextureManager) Load(path string) (int, error) {
 // LoadEmbedded loads an image from embedded file and returns its ID.
 func (self *TextureManager) LoadEmbedded(path string) int {
 	b := openEmbeddedFile(path)
-	img := ebiten.NewImageFromImage(*self.decodeImage(&b))
-	id := len(self.textures)
-	self.textures = append(self.textures, img)
-	return id
+	return self.fromByte(b)
 }
 
 func (self *TextureManager) LoadFromAssetPacker(path string) int {
 	b := openBundledFile(path)
-	img := ebiten.NewImageFromImage(*self.decodeImage(&b))
+	return self.fromByte(b)
+}
+
+func (self *TextureManager) fromByte(content []byte) int {
+	img := ebiten.NewImageFromImage(*self.decodeImage(&content))
 	id := len(self.textures)
 	self.textures = append(self.textures, img)
 	return id

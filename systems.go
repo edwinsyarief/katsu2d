@@ -275,13 +275,13 @@ func (self *CooldownSystem) Update(w *World, dt float64) {
 
 func (self *CooldownSystem) Draw(*World, *ebiten.Image) {}
 
-type DelayManager struct{}
+type DelaySystem struct{}
 
-func NewDelayManager() *DelayManager {
-	return &DelayManager{}
+func NewDelaySystem() *DelaySystem {
+	return &DelaySystem{}
 }
 
-func (self *DelayManager) Update(w *World, dt float64) {
+func (self *DelaySystem) Update(w *World, dt float64) {
 	entities := w.QueryAll(CTDelayer)
 	for _, e := range entities {
 		delay := w.GetComponent(e, CTDelayer).(*managers.DelayManager)
@@ -289,4 +289,21 @@ func (self *DelayManager) Update(w *World, dt float64) {
 	}
 }
 
-func (self *DelayManager) Draw(*World, *ebiten.Image) {}
+func (self *DelaySystem) Draw(*World, *ebiten.Image) {}
+
+type TextRenderSystem struct{}
+
+func NewTextRenderSystem() *TextRenderSystem {
+	return &TextRenderSystem{}
+}
+
+func (self *TextRenderSystem) Update(*World, float64) {}
+
+func (self *TextRenderSystem) Draw(w *World, screen *ebiten.Image) {
+	entities := w.QueryAll(CTTransform, CTText)
+	for _, e := range entities {
+		transform := w.GetComponent(e, CTTransform).(*Transform)
+		txt := w.GetComponent(e, CTText).(*Text)
+		txt.Draw(transform.Transform, screen)
+	}
+}

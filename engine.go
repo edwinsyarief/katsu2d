@@ -12,6 +12,7 @@ import (
 type Engine struct {
 	world                *World
 	tm                   *TextureManager
+	fm                   *FontManager
 	sm                   *SceneManager
 	systems              []System
 	timeScale            float64
@@ -81,7 +82,8 @@ func NewEngine(opts ...Option) *Engine {
 	e := &Engine{
 		world:                NewWorld(),
 		tm:                   NewTextureManager(),
-		sm:                   &SceneManager{},
+		fm:                   NewFontManager(),
+		sm:                   NewSceneManager(),
 		timeScale:            1.0,
 		windowWidth:          800,
 		windowHeight:         600,
@@ -125,6 +127,11 @@ func (self *Engine) World() *World {
 // TextureManager returns the texture manager.
 func (self *Engine) TextureManager() *TextureManager {
 	return self.tm
+}
+
+// FontManager returns the font manager.
+func (self *Engine) FontManager() *FontManager {
+	return self.fm
 }
 
 // AddSystem add systems

@@ -16,6 +16,7 @@ This project is currently under active development. While core functionalities a
 - **Flexible Cooldown System:** Easily manage ability cooldowns or timed events with a dedicated component and system.
 - **Simplified API with Functional Options:** A fluent, chainable API for engine configuration and entity creation, inspired by the "Functional Options" pattern, making setup and game logic development more intuitive.
 - **Modular and Extensible:** Designed with clear separation of concerns, making it easy to add new components, systems, or features.
+- **Built-in components:** Too lazy to create sprite, text, or other components? No worries, we have built-int components and systems that are ready to use.
 
 ## Getting Started
 

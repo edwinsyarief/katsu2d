@@ -3,6 +3,7 @@ package katsu2d
 import (
 	"embed"
 	"encoding/json"
+	"os"
 
 	"github.com/edwinsyarief/assetpacker"
 )
@@ -16,6 +17,14 @@ var assets = &assetManager{}
 
 func initFS(fs embed.FS) {
 	assets.fs = fs
+}
+
+func readFile(name string) []byte {
+	content, err := os.ReadFile(name)
+	if err != nil {
+		panic(err)
+	}
+	return content
 }
 
 func openBundledFile(name string) []byte {

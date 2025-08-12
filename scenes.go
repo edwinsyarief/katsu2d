@@ -26,6 +26,10 @@ type SceneManager struct {
 	next    Scene // Next scene to switch to
 }
 
+func NewSceneManager() *SceneManager {
+	return &SceneManager{}
+}
+
 // Update handles scene switching and updates the current scene.
 func (self *SceneManager) Update(dt float64, engine *Engine) {
 	if self.next != nil {
@@ -58,8 +62,8 @@ func (self *SceneManager) SetLoadingScene(task func() []any, callback func([]any
 		task:         task,
 		callback:     callback,
 		drawFunc:     drawFunc,
-		fadeInSpeed:  1.75,
-		fadeOutSpeed: 1.15,
+		fadeInSpeed:  .55,
+		fadeOutSpeed: .85,
 	}
 
 	self.SetScene(loading)

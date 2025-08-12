@@ -31,6 +31,7 @@ var (
 	CTCinematicOverlay ComponentID
 	CTCooldown         ComponentID
 	CTDelayer          ComponentID
+	CTText             ComponentID
 )
 
 func init() {
@@ -44,6 +45,7 @@ func init() {
 	CTCinematicOverlay = RegisterComponent[overlays.CinematicOverlay]()
 	CTCooldown = RegisterComponent[managers.CooldownManager]()
 	CTDelayer = RegisterComponent[managers.DelayManager]()
+	CTText = RegisterComponent[Text]()
 }
 
 // RegisterComponent registers a new component type and returns its ComponentID.
