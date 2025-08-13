@@ -12,7 +12,7 @@ import (
 	ebimath "github.com/edwinsyarief/ebi-math"
 )
 
-// Transform component defines position, offset, origin, scale, rotation, and z-index
+// Transform component defines position, offset, origin, scale, rotation, and z-index.
 type Transform struct {
 	*ebimath.Transform
 	Z float64 // for draw order
@@ -115,6 +115,7 @@ var alignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
 	TextAlignmentTopLeft:      func(w, h float64) (float64, float64) { return 0, 0 },
 }
 
+// Text component for drawing text.
 type Text struct {
 	Alignment TextAlignment
 	Caption   string
@@ -192,6 +193,8 @@ func (self *Text) SetOpacity(opacity float64) *Text {
 	return self
 }
 
+// Draw method for the Text component.
+// This is not intended to be called directly by a user, but by a DrawSystem.
 func (self *Text) Draw(transform *ebimath.Transform, screen *ebiten.Image) {
 	self.updateCache()
 

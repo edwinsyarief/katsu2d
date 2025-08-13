@@ -1,211 +1,93 @@
 package katsu2d
 
-import (
-	"fmt"
-	"image/color"
-	"os"
-	"sync"
-	"time"
-
-	"github.com/edwinsyarief/katsu2d/logger"
-	"github.com/edwinsyarief/katsu2d/overlays"
-	"github.com/hajimehoshi/ebiten/v2"
-)
-
-// Scene defines the interface for game scenes.
-type Scene interface {
-	OnEnter(*Engine)    // Called when entering the scene (load/setup)
-	Update(float64)     // Update logic (delegates to systems)
-	Draw(*ebiten.Image) // Draw logic (delegates to systems)
-	OnExit()            // Called when exiting the scene (cleanup)
+// Scene represents a game scene. It is a self-contained unit
+// with its own World, systems, and lifecycle hooks.
+type Scene struct {
+	World         *World
+	UpdateSystems []UpdateSystem
+	DrawSystems   []DrawSystem
+	OnEnter       func(*Engine)
+	OnExit        func(*Engine)
 }
 
-// SceneManager manages scene switching.
+// NewScene creates a new scene with its own dedicated World.
+func NewScene() *Scene {
+	return &Scene{
+		World: NewWorld(),
+	}
+}
+
+// AddSystem adds a system to the scene.
+func (self *Scene) AddSystem(sys any) {
+	if us, ok := sys.(UpdateSystem); ok {
+		self.UpdateSystems = append(self.UpdateSystems, us)
+	}
+	if ds, ok := sys.(DrawSystem); ok {
+		self.DrawSystems = append(self.DrawSystems, ds)
+	}
+}
+
+// Update runs all the scene's update systems.
+func (self *Scene) Update(e *Engine, dt float64) {
+	// First, process any deferred entity removals for this scene's world.
+	self.World.processRemovals()
+	// Then, run the scene's own update systems.
+	for _, us := range self.UpdateSystems {
+		us.Update(e, dt)
+	}
+}
+
+// Draw runs all the scene's draw systems using the engine's shared renderer.
+func (self *Scene) Draw(e *Engine, renderer *BatchRenderer) {
+	for _, ds := range self.DrawSystems {
+		ds.Draw(e, renderer)
+	}
+}
+
+// SceneManager manages scenes and scene transitions.
 type SceneManager struct {
-	current Scene // Current active scene
-	next    Scene // Next scene to switch to
+	scenes  map[string]*Scene
+	current *Scene
 }
 
+// NewSceneManager creates a new scene manager.
 func NewSceneManager() *SceneManager {
-	return &SceneManager{}
+	return &SceneManager{scenes: make(map[string]*Scene)}
 }
 
-// Update handles scene switching and updates the current scene.
-func (self *SceneManager) Update(dt float64, engine *Engine) {
-	if self.next != nil {
-		if self.current != nil {
-			self.current.OnExit()
-		}
-		self.current = self.next
-		self.next = nil
-		self.current.OnEnter(engine)
-	}
-	if self.current != nil {
-		self.current.Update(dt)
-	}
+// AddScene adds a scene by name.
+func (self *SceneManager) AddScene(name string, scene *Scene) {
+	self.scenes[name] = scene
 }
 
-// Draw draws the current scene.
-func (self *SceneManager) Draw(screen *ebiten.Image) {
-	if self.current != nil {
-		self.current.Draw(screen)
-	}
+func (self *SceneManager) GetScene(name string) *Scene {
+	return self.scenes[name]
 }
 
-// SetScene queues a scene switch for the next update.
-func (self *SceneManager) SetScene(s Scene) {
-	self.next = s
+func (self *SceneManager) CurrentScene() *Scene {
+	return self.current
 }
 
-func (self *SceneManager) SetLoadingScene(task func() []any, callback func([]any), drawFunc func(*ebiten.Image)) {
-	loading := &LoadingScene{
-		task:         task,
-		callback:     callback,
-		drawFunc:     drawFunc,
-		fadeInSpeed:  .55,
-		fadeOutSpeed: .85,
-	}
-
-	self.SetScene(loading)
+func (self *SceneManager) Query(componentIDs ...ComponentID) []Entity {
+	return self.current.World.Query(componentIDs...)
 }
 
-type BaseScene struct {
-	World   *World
-	Systems []System
+func (self *SceneManager) GetComponent(e Entity, id ComponentID) (any, bool) {
+	return self.current.World.GetComponent(e, id)
 }
 
-func (self *BaseScene) Update(dt float64) {
-	for _, sys := range self.Systems {
-		sys.Update(self.World, dt)
-	}
-}
-
-func (self *BaseScene) Draw(screen *ebiten.Image) {
-	for _, sys := range self.Systems {
-		sys.Draw(self.World, screen)
-	}
-}
-
-func (self *BaseScene) OnExit() {
-	self.Systems = nil
-	self.World = nil
-}
-
-// maxRetries defines the maximum number of retry attempts for the task.
-const maxRetries = 3
-
-// LoadingScene displays a loading screen while executing a task asynchronously.
-// It transitions to the next scene upon task completion, with a fade effect.
-type LoadingScene struct {
-	BaseScene
-
-	args                      []any        // Arguments to pass to the next scene
-	loading                   bool         // Indicates if the task is running
-	task                      func() []any // Task to execute during loading
-	callback                  func([]any)
-	retryCount                int // Number of retry attempts
-	fadeColor                 color.RGBA
-	startTask                 bool                // Flag to start the task after fade-in
-	drawFunc                  func(*ebiten.Image) // provide this to display something in the loading scene
-	mutex                     sync.Mutex          // Protects loading state
-	fadeInSpeed, fadeOutSpeed float64             // fade speed
-	engine                    *Engine
-}
-
-// Init initializes the loading scene, setting up the text label and fade overlay.
-func (self *LoadingScene) OnEnter(engine *Engine) {
-	self.engine = engine
-	self.World = NewWorld()
-	self.Systems = []System{
-		NewFadeOverlaySystem(),
-	}
-
-	e := self.World.NewEntity()
-	self.World.AddComponent(e, overlays.NewFadeOverlay(
-		self.engine.ScreenWidth(),
-		self.engine.ScreenHeight(),
-		overlays.FadeTypeIn,
-		self.fadeColor,
-		self.fadeInSpeed,
-		self.onFadeIn,
-	))
-}
-
-// Update advances the scene’s state, managing the fade overlay and task execution.
-func (self *LoadingScene) Update(dt float64) {
-	self.BaseScene.Update(dt)
-
-	if self.task == nil || !self.startTask {
+// SwitchTo switches to a new scene, running its OnEnter hook and the old scene's OnExit hook.
+// This is the only place where the active scene is changed.
+func (self *SceneManager) SwitchTo(e *Engine, name string) {
+	newScene, ok := self.scenes[name]
+	if !ok {
 		return
 	}
-	self.mutex.Lock()
-	if self.loading {
-		self.mutex.Unlock()
-		return
+	if self.current != nil && self.current.OnExit != nil {
+		self.current.OnExit(e)
 	}
-	self.loading = true
-	self.mutex.Unlock()
-	// Execute task asynchronously
-	go self.executeTask()
-}
-
-// Draw renders the loading text and fade overlay to the screen.
-func (self *LoadingScene) Draw(screen *ebiten.Image) {
-	if self.drawFunc != nil {
-		self.drawFunc(screen)
-	}
-	self.BaseScene.Draw(screen)
-}
-
-// executeTask runs the loading task, handling retries and errors.
-func (self *LoadingScene) executeTask() {
-	defer func() {
-		self.mutex.Lock()
-		self.loading = false
-		self.mutex.Unlock()
-	}()
-	for {
-		result, err := self.runTask()
-		if err == nil {
-			self.mutex.Lock()
-			self.args = result
-			self.task = nil
-			self.mutex.Unlock()
-			e := self.World.QueryAll(CTFadeOverlay)[0]
-			fade := self.World.GetComponent(e, CTFadeOverlay).(*overlays.FadeOverlay)
-			fade.Reset(overlays.FadeTypeOut, color.RGBA{R: 0, G: 0, B: 0, A: 255}, 1, self.fadeOutSpeed, self.onFadeOut)
-			return
-		}
-		self.retryCount++
-		logger.GetLogger().Error("Loading task failed: %v, attempt %d/%d", err, self.retryCount, maxRetries)
-		if self.retryCount >= maxRetries {
-			logger.GetLogger().Error("Max retries reached for loading task. Aborting.")
-			os.Exit(1)
-		}
-		time.Sleep(2 * time.Second)
-	}
-}
-
-// runTask executes the task and captures any panics or errors.
-func (self *LoadingScene) runTask() (result []any, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic in loading task: %v", r)
-			logger.GetLogger().Error("Panic in loading task: %v", err)
-		}
-	}()
-	result = self.task()
-	return result, nil
-}
-
-// onFadeIn is called when the fade-in effect completes, starting the task.
-func (self *LoadingScene) onFadeIn() {
-	self.startTask = true
-}
-
-// onFadeOut is called when the fade-out effect completes, transitioning to the next scene.
-func (self *LoadingScene) onFadeOut() {
-	if self.callback != nil {
-		self.callback(self.args)
+	self.current = newScene
+	if self.current.OnEnter != nil {
+		self.current.OnEnter(e)
 	}
 }

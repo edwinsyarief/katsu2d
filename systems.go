@@ -1,311 +1,145 @@
 package katsu2d
 
 import (
+	"image/color"
 	"math"
-	"sort"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
-	"github.com/edwinsyarief/katsu2d/managers"
-	"github.com/edwinsyarief/katsu2d/overlays"
-	"github.com/edwinsyarief/katsu2d/tween"
-	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// System defines the interface for game systems that update or draw.
-type System interface {
-	Update(world *World, dt float64)
-	Draw(world *World, screen *ebiten.Image)
+// --- SYSTEMS ---
+
+// UpdateSystem is an interface for update logic.
+type UpdateSystem interface {
+	Update(*Engine, float64)
 }
 
-// RenderSystem handles batched sprite (quad) rendering using DrawTriangles.
-type RenderSystem struct {
-	tm *TextureManager
+// DrawSystem is an interface for draw logic.
+type DrawSystem interface {
+	Draw(*Engine, *BatchRenderer)
 }
 
-// NewRenderSystem creates a new render system with the given texture manager.
-func NewRenderSystem(tm *TextureManager) *RenderSystem {
-	return &RenderSystem{tm: tm}
+// --- RENDERER ---
+
+// BatchRenderer batches draw calls for performance.
+type BatchRenderer struct {
+	screen       *ebiten.Image
+	vertices     []ebiten.Vertex
+	indices      []uint16
+	currentImage *ebiten.Image
 }
 
-// Update does nothing for this system.
-func (self *RenderSystem) Update(*World, float64) {}
-
-// RenderItem is used for sorting entities by Z-index.
-type RenderItem struct {
-	Entity Entity
-	Z      float64
-}
-
-// Draw renders all sprites, sorted by Z, batched by texture.
-func (self *RenderSystem) Draw(w *World, screen *ebiten.Image) {
-	entities := w.QueryAll(CTTransform, CTSprite)
-	var items []RenderItem
-	for _, e := range entities {
-		pos := w.GetComponent(e, CTTransform).(*Transform)
-		items = append(items, RenderItem{Entity: e, Z: pos.Z})
-	}
-
-	// Sort by Z for correct draw order
-	sort.SliceStable(items, func(i, j int) bool {
-		return items[i].Z < items[j].Z
-	})
-
-	// Batching
-	var verts []ebiten.Vertex
-	var indices []uint16
-	currentTex := -1
-
-	// drawBatch flushes the current vertex batch to the screen.
-	drawBatch := func() {
-		if len(verts) == 0 {
-			return
-		}
-		img := self.tm.Get(currentTex)
-		screen.DrawTriangles(verts, indices, img, nil)
-		verts = verts[:0]
-		indices = indices[:0]
-	}
-
-	for _, item := range items {
-		e := item.Entity
-		pos := w.GetComponent(e, CTTransform).(*Transform)
-		spr := w.GetComponent(e, CTSprite).(*Sprite)
-
-		texID := spr.TextureID
-		if texID != currentTex {
-			drawBatch()
-			currentTex = texID
-		}
-
-		img := self.tm.Get(texID)
-		iw, ih := float32(img.Bounds().Dx()), float32(img.Bounds().Dy())
-
-		// Get adjusted sprite dimensions
-		sx, sy, sw, sh := spr.GetSourceRect(iw, ih)
-		dw, dh := spr.GetDestSize(sw, sh)
-
-		hw := dw / 2
-		hh := dh / 2
-
-		cos := float32(math.Cos(pos.Rotation()))
-		sin := float32(math.Sin(pos.Rotation()))
-
-		lx0, ly0 := -hw, -hh
-		lx1, ly1 := hw, hh
-
-		lx0 *= float32(pos.Scale().X)
-		lx1 *= float32(pos.Scale().X)
-		ly0 *= float32(pos.Scale().Y)
-		ly1 *= float32(pos.Scale().Y)
-
-		// Rotated coordinates
-		rx0 := lx0*cos - ly0*sin
-		ry0 := lx0*sin + ly0*cos
-		rx1 := lx1*cos - ly0*sin
-		ry1 := lx1*sin + ly0*cos
-		rx2 := lx0*cos - ly1*sin
-		ry2 := lx0*sin + ly1*cos
-		rx3 := lx1*cos - ly1*sin
-		ry3 := lx1*sin + ly1*cos
-
-		vec := ebimath.V2(0).Apply(pos.Matrix())
-		px, py := float32(vec.X), float32(vec.Y)
-
-		sx0, sy0 := sx, sy
-		sx1, sy1 := sx+sw, sy+sh
-
-		// Color (default to white if fully transparent/zero)
-		r, g, b, a := float32(1), float32(1), float32(1), float32(1)
-		if spr.Color.A != 0 {
-			rr, gg, bb, aa := spr.Color.RGBA()
-			r = float32(rr) / 0xFFFF
-			g = float32(gg) / 0xFFFF
-			b = float32(bb) / 0xFFFF
-			a = float32(aa) / 0xFFFF
-		}
-		a *= spr.Opacity
-
-		baseIdx := len(verts)
-		verts = append(verts,
-			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx0), DstY: utils.AdjustDestinationPixel(py + ry0), SrcX: sx0, SrcY: sy0, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx1), DstY: utils.AdjustDestinationPixel(py + ry1), SrcX: sx1, SrcY: sy0, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx2), DstY: utils.AdjustDestinationPixel(py + ry2), SrcX: sx0, SrcY: sy1, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-			ebiten.Vertex{DstX: utils.AdjustDestinationPixel(px + rx3), DstY: utils.AdjustDestinationPixel(py + ry3), SrcX: sx1, SrcY: sy1, ColorR: r, ColorG: g, ColorB: b, ColorA: a},
-		)
-		bi := uint16(baseIdx)
-		indices = append(indices, bi, bi+1, bi+2, bi+1, bi+3, bi+2)
-	}
-
-	drawBatch()
-}
-
-// TweenSystem updates tweens and sequences.
-type TweenSystem struct{}
-
-func NewTweenSystem() *TweenSystem {
-	return &TweenSystem{}
-}
-
-func (self *TweenSystem) Update(w *World, dt float64) {
-	// Standalone tweens
-	entities := w.QueryAll(CTTween)
-	for _, e := range entities {
-		tw := w.GetComponent(e, CTTween).(*tween.Tween)
-		tw.Update(float32(dt))
-	}
-
-	// Sequences
-	entities = w.QueryAll(CTSequence)
-	for _, e := range entities {
-		seq := w.GetComponent(e, CTSequence).(*tween.Sequence)
-		seq.Update(float32(dt))
+// NewBatchRenderer creates a new batch renderer.
+func NewBatchRenderer() *BatchRenderer {
+	return &BatchRenderer{
+		vertices: make([]ebiten.Vertex, 0, 4096),
+		indices:  make([]uint16, 0, 6144),
 	}
 }
 
-func (self *TweenSystem) Draw(*World, *ebiten.Image) {}
-
-// AnimationSystem updates animations.
-type AnimationSystem struct{}
-
-func NewAnimationSystem() *AnimationSystem {
-	return &AnimationSystem{}
+func (self *BatchRenderer) GetScreen() *ebiten.Image {
+	return self.screen
 }
 
-func (self *AnimationSystem) Update(w *World, dt float64) {
-	entities := w.QueryAll(CTAnimation, CTSprite)
-	for _, e := range entities {
-		anim := w.GetComponent(e, CTAnimation).(*Animation)
-		spr := w.GetComponent(e, CTSprite).(*Sprite)
-		if !anim.Active || len(anim.Frames) == 0 {
-			continue
-		}
-		anim.Elapsed += dt
-		if anim.Elapsed >= anim.Speed {
-			anim.Elapsed -= anim.Speed
-			if anim.Direction {
-				anim.Current++
-			} else {
-				anim.Current--
-			}
-			nf := len(anim.Frames)
-			switch anim.Mode {
-			case AnimOnce:
-				if anim.Current >= nf {
-					anim.Current = nf - 1
-					anim.Active = false
-				}
-			case AnimLoop:
-				anim.Current %= nf
-			case AnimBoomerang:
-				if anim.Current >= nf {
-					anim.Current = nf - 2
-					anim.Direction = false
-				} else if anim.Current < 0 {
-					anim.Current = 1
-					anim.Direction = true
-				}
-			}
-			frame := anim.Frames[anim.Current]
-			spr.SrcX = float32(frame.Min.X)
-			spr.SrcY = float32(frame.Min.Y)
-			spr.SrcW = float32(frame.Dx())
-			spr.SrcH = float32(frame.Dy())
+// Begin prepares the renderer for a new frame.
+func (self *BatchRenderer) Begin(screen *ebiten.Image) {
+	self.screen = screen
+	self.vertices = self.vertices[:0]
+	self.indices = self.indices[:0]
+	self.currentImage = nil
+}
+
+// Flush draws the current batch.
+func (self *BatchRenderer) Flush() {
+	if len(self.vertices) == 0 {
+		return
+	}
+	self.screen.DrawTriangles(self.vertices, self.indices, self.currentImage, nil)
+	self.vertices = self.vertices[:0]
+	self.indices = self.indices[:0]
+	self.currentImage = nil
+}
+
+// AddVertices adds custom vertices and indices to the batch.
+func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img *ebiten.Image) {
+	if img != self.currentImage && self.currentImage != nil {
+		self.Flush()
+	}
+	self.currentImage = img
+	offset := len(self.vertices)
+	self.vertices = append(self.vertices, verts...)
+	for _, i := range inds {
+		self.indices = append(self.indices, uint16(offset)+i)
+	}
+}
+
+// DrawQuad draws a quad (sprite).
+func (self *BatchRenderer) DrawQuad(pos, scale, offset, origin ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA) {
+	if img != self.currentImage && self.currentImage != nil {
+		self.Flush()
+	}
+	self.currentImage = img
+
+	w, h := float64(img.Bounds().Dx())*scale.X, float64(img.Bounds().Dy())*scale.Y
+	ox, oy := float64(origin.X), float64(origin.Y)
+
+	p0 := ebimath.V(-ox, -oy)
+	p1 := ebimath.V(w-ox, -oy)
+	p2 := ebimath.V(w-ox, h-oy)
+	p3 := ebimath.V(-ox, h-oy)
+
+	if rotation != 0 {
+		c, s := math.Cos(rotation), math.Sin(rotation)
+		p0 = ebimath.V(p0.X*c-p0.Y*s, p0.X*s+p0.Y*c)
+		p1 = ebimath.V(p1.X*c-p1.Y*s, p1.X*s+p1.Y*c)
+		p2 = ebimath.V(p2.X*c-p2.Y*s, p2.X*s+p2.Y*c)
+		p3 = ebimath.V(p3.X*c-p3.Y*s, p3.X*s+p3.Y*c)
+	}
+
+	p0 = p0.Add(pos)
+	p1 = p1.Add(pos)
+	p2 = p2.Add(pos)
+	p3 = p3.Add(pos)
+
+	minX, minY := float32(img.Bounds().Min.X), float32(img.Bounds().Min.Y)
+	maxX, maxY := float32(img.Bounds().Max.X), float32(img.Bounds().Max.Y)
+
+	cr, cg, cb, ca := float32(clr.R)/255, float32(clr.G)/255, float32(clr.B)/255, float32(clr.A)/255
+
+	vertIndex := len(self.vertices)
+	self.vertices = append(self.vertices,
+		ebiten.Vertex{DstX: float32(p0.X), DstY: float32(p0.Y), SrcX: minX, SrcY: minY, ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+		ebiten.Vertex{DstX: float32(p1.X), DstY: float32(p1.Y), SrcX: maxX, SrcY: minY, ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+		ebiten.Vertex{DstX: float32(p2.X), DstY: float32(p2.Y), SrcX: maxX, SrcY: maxY, ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+		ebiten.Vertex{DstX: float32(p3.X), DstY: float32(p3.Y), SrcX: minX, SrcY: maxY, ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+	)
+	self.indices = append(self.indices, uint16(vertIndex), uint16(vertIndex+1), uint16(vertIndex+2), uint16(vertIndex), uint16(vertIndex+2), uint16(vertIndex+3))
+}
+
+// DrawTriangleStrip draws a triangle strip.
+func (self *BatchRenderer) DrawTriangleStrip(verts []ebiten.Vertex, img *ebiten.Image) {
+	if img != self.currentImage && self.currentImage != nil {
+		self.Flush()
+	}
+	self.currentImage = img
+	offset := len(self.vertices)
+	self.vertices = append(self.vertices, verts...)
+	for i := 0; i < len(verts)-2; i++ {
+		a := uint16(offset + i)
+		bb := uint16(offset + i + 1)
+		c := uint16(offset + i + 2)
+		if i%2 == 0 {
+			self.indices = append(self.indices, a, bb, c)
+		} else {
+			self.indices = append(self.indices, a, c, bb)
 		}
 	}
 }
 
-func (self *AnimationSystem) Draw(*World, *ebiten.Image) {}
-
-type FadeOverlaySystem struct{}
-
-func NewFadeOverlaySystem() *FadeOverlaySystem {
-	return &FadeOverlaySystem{}
-}
-
-func (self *FadeOverlaySystem) Update(w *World, dt float64) {
-	entities := w.QueryAll(CTFadeOverlay)
-	for _, e := range entities {
-		fade := w.GetComponent(e, CTFadeOverlay).(*overlays.FadeOverlay)
-		fade.Update(dt)
-	}
-}
-
-func (self *FadeOverlaySystem) Draw(w *World, screen *ebiten.Image) {
-	entities := w.QueryAll(CTFadeOverlay)
-	for _, e := range entities {
-		fade := w.GetComponent(e, CTFadeOverlay).(*overlays.FadeOverlay)
-		fade.Draw(screen)
-	}
-}
-
-type CinematicOverlaySystem struct{}
-
-func NewCinematicOverlaySystem() *CinematicOverlaySystem {
-	return &CinematicOverlaySystem{}
-}
-
-func (self *CinematicOverlaySystem) Update(w *World, dt float64) {
-	entities := w.QueryAll(CTCinematicOverlay)
-	for _, e := range entities {
-		cinematic := w.GetComponent(e, CTCinematicOverlay).(*overlays.CinematicOverlay)
-		cinematic.Update(dt)
-	}
-}
-
-func (self *CinematicOverlaySystem) Draw(w *World, screen *ebiten.Image) {
-	entities := w.QueryAll(CTCinematicOverlay)
-	for _, e := range entities {
-		cinematic := w.GetComponent(e, CTCinematicOverlay).(*overlays.CinematicOverlay)
-		cinematic.Draw(screen)
-	}
-}
-
-type CooldownSystem struct{}
-
-func NewCooldownSystem() *CooldownSystem {
-	return &CooldownSystem{}
-}
-
-func (self *CooldownSystem) Update(w *World, dt float64) {
-	entities := w.QueryAll(CTCooldown)
-	for _, e := range entities {
-		cm := w.GetComponent(e, CTCooldown).(*managers.CooldownManager)
-		cm.Update(dt)
-	}
-}
-
-func (self *CooldownSystem) Draw(*World, *ebiten.Image) {}
-
-type DelaySystem struct{}
-
-func NewDelaySystem() *DelaySystem {
-	return &DelaySystem{}
-}
-
-func (self *DelaySystem) Update(w *World, dt float64) {
-	entities := w.QueryAll(CTDelayer)
-	for _, e := range entities {
-		delay := w.GetComponent(e, CTDelayer).(*managers.DelayManager)
-		delay.Update(dt)
-	}
-}
-
-func (self *DelaySystem) Draw(*World, *ebiten.Image) {}
-
-type TextRenderSystem struct{}
-
-func NewTextRenderSystem() *TextRenderSystem {
-	return &TextRenderSystem{}
-}
-
-func (self *TextRenderSystem) Update(*World, float64) {}
-
-func (self *TextRenderSystem) Draw(w *World, screen *ebiten.Image) {
-	entities := w.QueryAll(CTTransform, CTText)
-	for _, e := range entities {
-		transform := w.GetComponent(e, CTTransform).(*Transform)
-		txt := w.GetComponent(e, CTText).(*Text)
-		txt.Draw(transform.Transform, screen)
-	}
+// DrawText draws text, flushing the batch first to maintain render order.
+// This is necessary because text.Draw is a separate operation from DrawTriangles.
+func (self *BatchRenderer) DrawText(txt *Text, transform *ebimath.Transform) {
+	self.Flush()
+	txt.Draw(transform, self.screen)
 }
