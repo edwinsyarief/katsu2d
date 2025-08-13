@@ -2,8 +2,9 @@ package katsu2d
 
 import (
 	"reflect"
+	"sort"
 	"sync"
-	"sync/atomic" // We will use atomic for the entity ID counter for better performance
+	"sync/atomic"
 
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
@@ -12,13 +13,11 @@ import (
 
 // --- ECS CORE ---
 
-// nextComponentID is a counter to assign unique IDs to component types.
+// Global component registry
 var (
 	nextComponentID ComponentID
-	// typeToID maps a component's reflect.Type to its unique ComponentID.
-	typeToID = make(map[reflect.Type]ComponentID)
-	// componentTypes maps a ComponentID back to its reflect.Type.
-	componentTypes = make(map[ComponentID]reflect.Type)
+	typeToID        = make(map[reflect.Type]ComponentID)
+	componentTypes  = make(map[ComponentID]reflect.Type)
 )
 
 // ComponentID is a unique identifier for a component type.
@@ -27,14 +26,15 @@ type ComponentID uint32
 // RegisterComponent registers a component type and returns its unique ID.
 // This should be called once for each component type at the beginning of the program.
 func RegisterComponent[T any]() ComponentID {
-	t := reflect.TypeOf((*T)(nil)).Elem()
-	if id, ok := typeToID[t]; ok {
+	var t T
+	compType := reflect.TypeOf(t)
+	if id, ok := typeToID[compType]; ok {
 		return id
 	}
 	id := nextComponentID
 	nextComponentID++
-	typeToID[t] = id
-	componentTypes[id] = t
+	typeToID[compType] = id
+	componentTypes[id] = compType
 	return id
 }
 
@@ -53,54 +53,114 @@ var (
 )
 
 func init() {
-	CTTransform = RegisterComponent[TransformComponent]()
-	CTSprite = RegisterComponent[SpriteComponent]()
-	CTAnimation = RegisterComponent[AnimationComponent]()
-	CTTween = RegisterComponent[tween.Tween]()
-	CTSequence = RegisterComponent[tween.Sequence]()
-	CTFadeOverlay = RegisterComponent[overlays.FadeOverlay]()
-	CTCinematicOverlay = RegisterComponent[overlays.CinematicOverlay]()
-	CTText = RegisterComponent[TextComponent]()
-	CTCooldown = RegisterComponent[managers.CooldownManager]()
-	CTDelayer = RegisterComponent[managers.DelayManager]()
+	CTTransform = RegisterComponent[*TransformComponent]()
+	CTSprite = RegisterComponent[*SpriteComponent]()
+	CTAnimation = RegisterComponent[*AnimationComponent]()
+	CTTween = RegisterComponent[*tween.Tween]()
+	CTSequence = RegisterComponent[*tween.Sequence]()
+	CTFadeOverlay = RegisterComponent[*overlays.FadeOverlay]()
+	CTCinematicOverlay = RegisterComponent[*overlays.CinematicOverlay]()
+	CTText = RegisterComponent[*TextComponent]()
+	CTCooldown = RegisterComponent[*managers.CooldownManager]()
+	CTDelayer = RegisterComponent[*managers.DelayManager]()
 }
 
-// Entity is a unique identifier for an entity.
-type Entity uint64
+// Entity is a unique identifier for an entity, including a version for safety.
+type Entity struct {
+	ID      uint32
+	Version uint32
+}
 
-// archetype is an internal structure to hold entities and their indices for fast removal.
-type archetype struct {
-	entities      []Entity
-	entityIndices map[Entity]int
+// entityMeta stores internal metadata for each entity.
+type entityMeta struct {
+	Archetype *Archetype
+	Index     uint32
+	Version   uint32 // Added Version field for correct validation
 }
 
 // World manages entities and their components.
 type World struct {
-	mu              sync.Mutex // Mutex to ensure thread safety for all state changes.
-	nextEntityID    uint64     // Using uint64 to be compatible with atomic.
-	entities        map[Entity]struct{}
-	componentStores map[reflect.Type]map[Entity]any
-	entityMasks     map[Entity]uint64
-	archetypes      map[uint64]*archetype
-	toRemove        []Entity
+	mu           sync.RWMutex // A read/write mutex for better concurrency performance.
+	nextEntityID uint32
+	// We'll store entity metadata in a map for proper sparse ID handling.
+	entities map[uint32]entityMeta
+	// The archetypes map now maps a component mask to a single archetype struct.
+	archetypes map[uint64]*Archetype
+	// A map to store component pools for each component type to reduce GC.
+	componentPools sync.Map
+	toRemove       []Entity
 }
 
-// NewWorld creates a new ECS world.
+// Archetype is a contiguous block of memory for a specific set of components.
+type Archetype struct {
+	mask     uint64
+	entities []Entity
+	// Component data is stored in a slice of slices, where each inner slice
+	// holds all components of a single type. This is the key to cache efficiency.
+	componentData [][]any
+	// componentMap maps a component ID to its index in the componentData slice.
+	componentMap map[ComponentID]int
+	// componentIDs are sorted to ensure consistent archetype masks.
+	componentIDs []ComponentID
+}
+
+// NewWorld creates a new, high-performance ECS world.
 func NewWorld() *World {
 	w := &World{
-		nextEntityID:    1,
-		entities:        make(map[Entity]struct{}),
-		componentStores: make(map[reflect.Type]map[Entity]any),
-		entityMasks:     make(map[Entity]uint64),
-		archetypes:      make(map[uint64]*archetype),
-		toRemove:        make([]Entity, 0),
+		nextEntityID: 1,
+		entities:     make(map[uint32]entityMeta), // Initialized as a map
+		archetypes:   make(map[uint64]*Archetype),
+		toRemove:     make([]Entity, 0),
 	}
-	// Initialize the default archetype for entities with no components.
-	w.archetypes[0] = &archetype{
-		entities:      make([]Entity, 0),
-		entityIndices: make(map[Entity]int),
+	// Create the initial empty archetype.
+	w.archetypes[0] = &Archetype{
+		mask:          0,
+		entities:      make([]Entity, 0, 1024),
+		componentData: make([][]any, 0),
+		componentMap:  make(map[ComponentID]int),
+		componentIDs:  make([]ComponentID, 0),
 	}
 	return w
+}
+
+// getOrCreateArchetype finds an existing archetype for the given mask, or creates a new one.
+func (self *World) getOrCreateArchetype(mask uint64) *Archetype {
+	if arch, ok := self.archetypes[mask]; ok {
+		return arch
+	}
+
+	// New archetype doesn't exist, create it.
+	newArch := &Archetype{
+		mask:          mask,
+		entities:      make([]Entity, 0, 1024),
+		componentData: make([][]any, 0),
+		componentMap:  make(map[ComponentID]int),
+		componentIDs:  make([]ComponentID, 0),
+	}
+	self.archetypes[mask] = newArch
+
+	// Populate the new archetype with component data slices based on the mask.
+	compIDs := make([]ComponentID, 0)
+	for id, _ := range componentTypes {
+		if (mask>>uint64(id))&1 == 1 {
+			compIDs = append(compIDs, id)
+		}
+	}
+
+	// Sort component IDs for consistent memory layout.
+	sort.Slice(compIDs, func(i, j int) bool {
+		return compIDs[i] < compIDs[j]
+	})
+
+	newArch.componentIDs = compIDs
+	newArch.componentData = make([][]any, len(compIDs))
+
+	for i, id := range compIDs {
+		newArch.componentMap[id] = i
+		newArch.componentData[i] = make([]any, 0, 1024)
+	}
+
+	return newArch
 }
 
 // CreateEntity creates a new entity.
@@ -108,18 +168,18 @@ func (self *World) CreateEntity() Entity {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	id := Entity(atomic.AddUint64(&self.nextEntityID, 1) - 1)
-	self.entities[id] = struct{}{}
-	self.entityMasks[id] = 0
+	id := atomic.AddUint32(&self.nextEntityID, 1) - 1
+	e := Entity{ID: id, Version: 1} // Initial version is 1.
 
 	// Add the new entity to the archetype for mask 0
 	arch := self.archetypes[0]
-	arch.entityIndices[id] = len(arch.entities)
-	arch.entities = append(arch.entities, id)
-	return id
+	self.entities[id] = entityMeta{Archetype: arch, Index: uint32(len(arch.entities)), Version: e.Version}
+	arch.entities = append(arch.entities, e)
+
+	return e
 }
 
-// RemoveEntity marks an entity for removal (deferred until end of frame).
+// RemoveEntity marks an entity for removal.
 func (self *World) RemoveEntity(e Entity) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
@@ -139,93 +199,65 @@ func (self *World) processRemovals() {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	// To handle potential duplicates, use a set
 	removeSet := make(map[Entity]struct{})
 	for _, e := range self.toRemove {
-		removeSet[e] = struct{}{}
+		meta, ok := self.entities[e.ID]
+		if ok && e.Version == meta.Version {
+			removeSet[e] = struct{}{}
+		}
 	}
 
 	for e := range removeSet {
-		// Clean up components and archetype
-		self.removeEntityInternal(e)
-	}
+		meta := self.entities[e.ID]
+		arch := meta.Archetype
 
+		// Return components to their pools
+		for i, compID := range arch.componentIDs {
+			compType := componentTypes[compID]
+			comp := arch.componentData[i][meta.Index]
+
+			// Use a pool for the specific component type
+			pool, _ := self.componentPools.LoadOrStore(compType, &sync.Pool{
+				New: func() any {
+					return reflect.New(compType.Elem()).Interface()
+				},
+			})
+			pool.(*sync.Pool).Put(comp)
+		}
+
+		// Remove the entity from its archetype and update metadata
+		self.removeEntityFromArchetype(arch, e, meta.Index)
+
+		// Invalidate the entity by deleting its metadata and incrementing its version.
+		delete(self.entities, e.ID)
+		e.Version++ // Increment version for safety
+	}
 	self.toRemove = self.toRemove[:0]
 }
 
-// removeEntityInternal is a helper function to remove an entity from all stores.
-// NOTE: This function assumes the mutex is already locked.
-func (self *World) removeEntityInternal(e Entity) {
-	// First, remove the entity from its archetype.
-	mask := self.entityMasks[e]
-	if arch, ok := self.archetypes[mask]; ok {
-		if index, ok := arch.entityIndices[e]; ok {
-			// Swap the entity to be removed with the last one in the slice
-			lastIndex := len(arch.entities) - 1
-			lastEntity := arch.entities[lastIndex]
+// removeEntityFromArchetype is a helper function to remove an entity and its components from an archetype.
+func (self *World) removeEntityFromArchetype(arch *Archetype, e Entity, index uint32) {
+	// Swap the entity with the last one in the archetype's entity list.
+	lastIndex := len(arch.entities) - 1
+	lastEntity := arch.entities[lastIndex]
+	arch.entities[index] = lastEntity
 
-			arch.entities[index] = lastEntity
-			arch.entityIndices[lastEntity] = index
-
-			// Truncate the slice and delete the index entry
-			arch.entities = arch.entities[:lastIndex]
-			delete(arch.entityIndices, e)
-
-			// If the archetype is now empty, and it's not the base archetype (mask 0),
-			// remove it from the map.
-			if len(arch.entities) == 0 && mask != 0 {
-				delete(self.archetypes, mask)
-			}
-		}
+	// Update the meta for the moved entity.
+	if lastEntity.ID != e.ID { // Don't update if we're removing the last entity itself
+		meta := self.entities[lastEntity.ID]
+		meta.Index = index
+		self.entities[lastEntity.ID] = meta
 	}
 
-	// Then, remove all of its components.
-	for _, store := range self.componentStores {
-		delete(store, e)
+	// Now truncate the slice.
+	arch.entities = arch.entities[:lastIndex]
+
+	// Also swap and truncate the component data for all component types.
+	for i := range arch.componentData {
+		lastComp := arch.componentData[i][lastIndex]
+		arch.componentData[i][index] = lastComp
+		arch.componentData[i] = arch.componentData[i][:lastIndex]
 	}
-
-	// Finally, remove the entity from the main entity and mask maps.
-	delete(self.entities, e)
-	delete(self.entityMasks, e)
-}
-
-// moveEntityArchetype moves an entity from old archetype to new.
-// NOTE: This function assumes the mutex is already locked.
-func (self *World) moveEntityArchetype(e Entity, oldMask, newMask uint64) {
-	if oldMask == newMask {
-		return
-	}
-
-	// Remove from the old archetype
-	if oldArch, ok := self.archetypes[oldMask]; ok {
-		if index, ok := oldArch.entityIndices[e]; ok {
-			lastIndex := len(oldArch.entities) - 1
-			lastEntity := oldArch.entities[lastIndex]
-
-			oldArch.entities[index] = lastEntity
-			oldArch.entityIndices[lastEntity] = index
-
-			oldArch.entities = oldArch.entities[:lastIndex]
-			delete(oldArch.entityIndices, e)
-
-			// If the old archetype is now empty, and it's not the base archetype (mask 0),
-			// remove it from the map.
-			if len(oldArch.entities) == 0 && oldMask != 0 {
-				delete(self.archetypes, oldMask)
-			}
-		}
-	}
-
-	// Add to the new archetype
-	if _, ok := self.archetypes[newMask]; !ok {
-		self.archetypes[newMask] = &archetype{
-			entities:      make([]Entity, 0),
-			entityIndices: make(map[Entity]int),
-		}
-	}
-	newArch := self.archetypes[newMask]
-	newArch.entityIndices[e] = len(newArch.entities)
-	newArch.entities = append(newArch.entities, e)
 }
 
 // AddComponent adds a component to an entity.
@@ -233,43 +265,72 @@ func (self *World) AddComponent(e Entity, comp any) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	if _, ok := self.entities[e]; !ok {
-		return // Entity does not exist
-	}
-	t := reflect.TypeOf(comp)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+	meta, ok := self.entities[e.ID]
+	if !ok || meta.Archetype == nil || e.Version != meta.Version {
+		return // Invalid or removed entity.
 	}
 
-	id, ok := typeToID[t]
+	compType := reflect.TypeOf(comp)
+	compID, ok := typeToID[compType]
 	if !ok {
-		panic("Component not registered: " + t.Name())
+		panic("Component not registered: " + compType.Name())
 	}
-	if self.componentStores[t] == nil {
-		self.componentStores[t] = make(map[Entity]any)
+
+	oldArch := meta.Archetype
+	oldIndex := meta.Index
+
+	// Calculate the new archetype mask.
+	newMask := oldArch.mask | (1 << uint64(compID))
+
+	// Find or create the new archetype.
+	newArch := self.getOrCreateArchetype(newMask)
+
+	// Add the entity to the new archetype.
+	newIndex := len(newArch.entities)
+	newArch.entities = append(newArch.entities, e)
+
+	// Copy existing components from the old archetype to the new one.
+	for _, oldCompID := range oldArch.componentIDs {
+		oldCompSliceIdx := oldArch.componentMap[oldCompID]
+		newCompSliceIdx := newArch.componentMap[oldCompID]
+
+		oldComp := oldArch.componentData[oldCompSliceIdx][oldIndex]
+
+		// DEEP COPY THE COMPONENT to avoid pointer aliasing.
+		newComp := reflect.New(reflect.TypeOf(oldComp).Elem()).Interface()
+		reflect.ValueOf(newComp).Elem().Set(reflect.ValueOf(oldComp).Elem())
+
+		newArch.componentData[newCompSliceIdx] = append(newArch.componentData[newCompSliceIdx], newComp)
 	}
-	self.componentStores[t][e] = comp
-	oldMask := self.entityMasks[e]
-	self.entityMasks[e] |= 1 << uint64(id)
-	newMask := self.entityMasks[e]
-	self.moveEntityArchetype(e, oldMask, newMask)
+
+	// Add the new component to the new archetype.
+	newCompSliceIdx := newArch.componentMap[compID]
+	newArch.componentData[newCompSliceIdx] = append(newArch.componentData[newCompSliceIdx], comp)
+
+	// Update entity metadata.
+	self.entities[e.ID] = entityMeta{Archetype: newArch, Index: uint32(newIndex), Version: e.Version}
+
+	// Remove from old archetype (this is the key to performance).
+	self.removeEntityFromArchetype(oldArch, e, oldIndex)
 }
 
 // GetComponent retrieves a component from an entity using a ComponentID.
 func (self *World) GetComponent(e Entity, id ComponentID) (any, bool) {
-	self.mu.Lock()
-	defer self.mu.Unlock()
+	self.mu.RLock()
+	defer self.mu.RUnlock()
 
-	t, ok := componentTypes[id]
-	if !ok {
-		return nil, false
+	meta, ok := self.entities[e.ID]
+	if !ok || meta.Archetype == nil || e.Version != meta.Version {
+		return nil, false // Invalid or removed entity.
 	}
-	store, ok := self.componentStores[t]
-	if !ok {
-		return nil, false
+
+	arch := meta.Archetype
+	if compIndex, ok := arch.componentMap[id]; ok {
+		comp := arch.componentData[compIndex][meta.Index]
+		return comp, true
 	}
-	c, ok := store[e]
-	return c, ok
+
+	return nil, false
 }
 
 // RemoveComponent removes a component from an entity.
@@ -277,35 +338,69 @@ func (self *World) RemoveComponent(e Entity, id ComponentID) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	t, ok := componentTypes[id]
-	if !ok {
-		return
+	meta, ok := self.entities[e.ID]
+	if !ok || meta.Archetype == nil || e.Version != meta.Version {
+		return // Invalid or removed entity.
 	}
-	if store, ok := self.componentStores[t]; ok {
-		delete(store, e)
+
+	oldArch := meta.Archetype
+	oldIndex := meta.Index
+
+	// Return the component being removed to its pool.
+	oldComp := oldArch.componentData[oldArch.componentMap[id]][oldIndex]
+	compType := reflect.TypeOf(oldComp)
+	pool, _ := self.componentPools.LoadOrStore(compType, &sync.Pool{
+		New: func() any {
+			return reflect.New(compType.Elem()).Interface()
+		},
+	})
+	pool.(*sync.Pool).Put(oldComp)
+
+	// Calculate new mask.
+	newMask := oldArch.mask & ^(1 << uint64(id))
+
+	// Find or create the new archetype.
+	newArch := self.getOrCreateArchetype(newMask)
+
+	// Add the entity to the new archetype.
+	newIndex := len(newArch.entities)
+	newArch.entities = append(newArch.entities, e)
+
+	// Copy components that are NOT being removed.
+	for _, oldCompID := range oldArch.componentIDs {
+		if oldCompID == id {
+			continue
+		}
+		oldCompSliceIdx := oldArch.componentMap[oldCompID]
+		newCompSliceIdx := newArch.componentMap[oldCompID]
+
+		oldComp := oldArch.componentData[oldCompSliceIdx][oldIndex]
+
+		// DEEP COPY THE COMPONENT
+		newComp := reflect.New(reflect.TypeOf(oldComp).Elem()).Interface()
+		reflect.ValueOf(newComp).Elem().Set(reflect.ValueOf(oldComp).Elem())
+
+		newArch.componentData[newCompSliceIdx] = append(newArch.componentData[newCompSliceIdx], newComp)
 	}
-	oldMask := self.entityMasks[e]
-	self.entityMasks[e] &= ^(1 << uint64(id))
-	newMask := self.entityMasks[e]
-	self.moveEntityArchetype(e, oldMask, newMask)
+
+	// Update entity metadata.
+	self.entities[e.ID] = entityMeta{Archetype: newArch, Index: uint32(newIndex), Version: e.Version}
+
+	// Remove from old archetype.
+	self.removeEntityFromArchetype(oldArch, e, oldIndex)
 }
 
 // Query returns entities that have all specified components.
 func (self *World) Query(componentIDs ...ComponentID) []Entity {
-	self.mu.Lock()
-	defer self.mu.Unlock()
+	self.mu.RLock()
+	defer self.mu.RUnlock()
 
 	res := make([]Entity, 0)
-	if len(componentIDs) == 0 {
-		for _, arch := range self.archetypes {
-			res = append(res, arch.entities...)
-		}
-		return res
-	}
 	var mask uint64
 	for _, id := range componentIDs {
 		mask |= 1 << uint64(id)
 	}
+
 	for archMask, arch := range self.archetypes {
 		if archMask&mask == mask {
 			res = append(res, arch.entities...)
