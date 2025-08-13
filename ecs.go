@@ -2,6 +2,8 @@ package katsu2d
 
 import (
 	"reflect"
+	"sync"
+	"sync/atomic" // We will use atomic for the entity ID counter for better performance
 
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
@@ -66,105 +68,179 @@ func init() {
 // Entity is a unique identifier for an entity.
 type Entity uint64
 
+// archetype is an internal structure to hold entities and their indices for fast removal.
+type archetype struct {
+	entities      []Entity
+	entityIndices map[Entity]int
+}
+
 // World manages entities and their components.
 type World struct {
-	nextEntityID    Entity
+	mu              sync.Mutex // Mutex to ensure thread safety for all state changes.
+	nextEntityID    uint64     // Using uint64 to be compatible with atomic.
 	entities        map[Entity]struct{}
 	componentStores map[reflect.Type]map[Entity]any
 	entityMasks     map[Entity]uint64
-	archetypes      map[uint64][]Entity
+	archetypes      map[uint64]*archetype
 	toRemove        []Entity
 }
 
 // NewWorld creates a new ECS world.
 func NewWorld() *World {
-	return &World{
+	w := &World{
 		nextEntityID:    1,
 		entities:        make(map[Entity]struct{}),
 		componentStores: make(map[reflect.Type]map[Entity]any),
 		entityMasks:     make(map[Entity]uint64),
-		archetypes:      make(map[uint64][]Entity),
+		archetypes:      make(map[uint64]*archetype),
 		toRemove:        make([]Entity, 0),
 	}
+	// Initialize the default archetype for entities with no components.
+	w.archetypes[0] = &archetype{
+		entities:      make([]Entity, 0),
+		entityIndices: make(map[Entity]int),
+	}
+	return w
 }
 
 // CreateEntity creates a new entity.
 func (self *World) CreateEntity() Entity {
-	id := self.nextEntityID
-	self.nextEntityID++
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
+	id := Entity(atomic.AddUint64(&self.nextEntityID, 1) - 1)
 	self.entities[id] = struct{}{}
 	self.entityMasks[id] = 0
-	self.archetypes[0] = append(self.archetypes[0], id)
+
+	// Add the new entity to the archetype for mask 0
+	arch := self.archetypes[0]
+	arch.entityIndices[id] = len(arch.entities)
+	arch.entities = append(arch.entities, id)
 	return id
 }
 
 // RemoveEntity marks an entity for removal (deferred until end of frame).
 func (self *World) RemoveEntity(e Entity) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
 	self.toRemove = append(self.toRemove, e)
 }
 
 // BatchRemoveEntities marks multiple entities for removal.
 func (self *World) BatchRemoveEntities(entities ...Entity) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
 	self.toRemove = append(self.toRemove, entities...)
 }
 
 // processRemovals removes marked entities.
 // This should be called once per frame by the Update loop.
 func (self *World) processRemovals() {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
 	// To handle potential duplicates, use a set
 	removeSet := make(map[Entity]struct{})
 	for _, e := range self.toRemove {
 		removeSet[e] = struct{}{}
 	}
+
 	for e := range removeSet {
-		mask := self.entityMasks[e]
-		if list, ok := self.archetypes[mask]; ok {
-			for i, ee := range list {
-				if ee == e {
-					list[i] = list[len(list)-1]
-					self.archetypes[mask] = list[:len(list)-1]
-					break
-				}
-			}
-			if len(self.archetypes[mask]) == 0 {
-				delete(self.archetypes, mask)
-			}
-		}
-		for _, store := range self.componentStores {
-			delete(store, e)
-		}
-		delete(self.entities, e)
-		delete(self.entityMasks, e)
+		// Clean up components and archetype
+		self.removeEntityInternal(e)
 	}
+
 	self.toRemove = self.toRemove[:0]
 }
 
+// removeEntityInternal is a helper function to remove an entity from all stores.
+// NOTE: This function assumes the mutex is already locked.
+func (self *World) removeEntityInternal(e Entity) {
+	// First, remove the entity from its archetype.
+	mask := self.entityMasks[e]
+	if arch, ok := self.archetypes[mask]; ok {
+		if index, ok := arch.entityIndices[e]; ok {
+			// Swap the entity to be removed with the last one in the slice
+			lastIndex := len(arch.entities) - 1
+			lastEntity := arch.entities[lastIndex]
+
+			arch.entities[index] = lastEntity
+			arch.entityIndices[lastEntity] = index
+
+			// Truncate the slice and delete the index entry
+			arch.entities = arch.entities[:lastIndex]
+			delete(arch.entityIndices, e)
+
+			// If the archetype is now empty, and it's not the base archetype (mask 0),
+			// remove it from the map.
+			if len(arch.entities) == 0 && mask != 0 {
+				delete(self.archetypes, mask)
+			}
+		}
+	}
+
+	// Then, remove all of its components.
+	for _, store := range self.componentStores {
+		delete(store, e)
+	}
+
+	// Finally, remove the entity from the main entity and mask maps.
+	delete(self.entities, e)
+	delete(self.entityMasks, e)
+}
+
 // moveEntityArchetype moves an entity from old archetype to new.
+// NOTE: This function assumes the mutex is already locked.
 func (self *World) moveEntityArchetype(e Entity, oldMask, newMask uint64) {
 	if oldMask == newMask {
 		return
 	}
-	if oldList, ok := self.archetypes[oldMask]; ok {
-		for i, ee := range oldList {
-			if ee == e {
-				oldList[i] = oldList[len(oldList)-1]
-				self.archetypes[oldMask] = oldList[:len(oldList)-1]
-				break
+
+	// Remove from the old archetype
+	if oldArch, ok := self.archetypes[oldMask]; ok {
+		if index, ok := oldArch.entityIndices[e]; ok {
+			lastIndex := len(oldArch.entities) - 1
+			lastEntity := oldArch.entities[lastIndex]
+
+			oldArch.entities[index] = lastEntity
+			oldArch.entityIndices[lastEntity] = index
+
+			oldArch.entities = oldArch.entities[:lastIndex]
+			delete(oldArch.entityIndices, e)
+
+			// If the old archetype is now empty, and it's not the base archetype (mask 0),
+			// remove it from the map.
+			if len(oldArch.entities) == 0 && oldMask != 0 {
+				delete(self.archetypes, oldMask)
 			}
 		}
-		if len(self.archetypes[oldMask]) == 0 {
-			delete(self.archetypes, oldMask)
+	}
+
+	// Add to the new archetype
+	if _, ok := self.archetypes[newMask]; !ok {
+		self.archetypes[newMask] = &archetype{
+			entities:      make([]Entity, 0),
+			entityIndices: make(map[Entity]int),
 		}
 	}
-	self.archetypes[newMask] = append(self.archetypes[newMask], e)
+	newArch := self.archetypes[newMask]
+	newArch.entityIndices[e] = len(newArch.entities)
+	newArch.entities = append(newArch.entities, e)
 }
 
 // AddComponent adds a component to an entity.
 func (self *World) AddComponent(e Entity, comp any) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
 	if _, ok := self.entities[e]; !ok {
 		return // Entity does not exist
 	}
-	t := reflect.TypeOf(comp).Elem()
+	t := reflect.TypeOf(comp)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
 	id, ok := typeToID[t]
 	if !ok {
 		panic("Component not registered: " + t.Name())
@@ -181,6 +257,9 @@ func (self *World) AddComponent(e Entity, comp any) {
 
 // GetComponent retrieves a component from an entity using a ComponentID.
 func (self *World) GetComponent(e Entity, id ComponentID) (any, bool) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
 	t, ok := componentTypes[id]
 	if !ok {
 		return nil, false
@@ -195,6 +274,9 @@ func (self *World) GetComponent(e Entity, id ComponentID) (any, bool) {
 
 // RemoveComponent removes a component from an entity.
 func (self *World) RemoveComponent(e Entity, id ComponentID) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
 	t, ok := componentTypes[id]
 	if !ok {
 		return
@@ -210,10 +292,13 @@ func (self *World) RemoveComponent(e Entity, id ComponentID) {
 
 // Query returns entities that have all specified components.
 func (self *World) Query(componentIDs ...ComponentID) []Entity {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
 	res := make([]Entity, 0)
 	if len(componentIDs) == 0 {
-		for _, list := range self.archetypes {
-			res = append(res, list...)
+		for _, arch := range self.archetypes {
+			res = append(res, arch.entities...)
 		}
 		return res
 	}
@@ -221,9 +306,9 @@ func (self *World) Query(componentIDs ...ComponentID) []Entity {
 	for _, id := range componentIDs {
 		mask |= 1 << uint64(id)
 	}
-	for archMask, list := range self.archetypes {
+	for archMask, arch := range self.archetypes {
 		if archMask&mask == mask {
-			res = append(res, list...)
+			res = append(res, arch.entities...)
 		}
 	}
 	return res
