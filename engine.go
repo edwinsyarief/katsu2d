@@ -90,16 +90,32 @@ func WithClearScreenEachFrame(clear bool) Option {
 }
 
 // WithBackgroundDrawSystem adds a DrawSystem that renders before the scene.
-func WithBackgroundDrawSystem(sys DrawSystem) Option {
+func WithBackgroundDrawSystem(sys any) Option {
 	return func(e *Engine) {
-		e.backgroundDrawSystems = append(e.backgroundDrawSystems, sys)
+		if us, ok := sys.(UpdateSystem); ok {
+			e.updateSystems = append(e.updateSystems, us)
+		}
+		if ds, ok := sys.(DrawSystem); ok {
+			e.backgroundDrawSystems = append(e.backgroundDrawSystems, ds)
+		}
 	}
 }
 
 // WithOverlayDrawSystem adds a DrawSystem that renders after the scene (on top).
-func WithOverlayDrawSystem(sys DrawSystem) Option {
+func WithOverlayDrawSystem(sys any) Option {
 	return func(e *Engine) {
-		e.overlayDrawSystems = append(e.overlayDrawSystems, sys)
+		if us, ok := sys.(UpdateSystem); ok {
+			e.updateSystems = append(e.updateSystems, us)
+		}
+		if ds, ok := sys.(DrawSystem); ok {
+			e.overlayDrawSystems = append(e.overlayDrawSystems, ds)
+		}
+	}
+}
+
+func WithUpdateSystem(sys UpdateSystem) Option {
+	return func(e *Engine) {
+		e.updateSystems = append(e.updateSystems, sys)
 	}
 }
 
@@ -113,11 +129,13 @@ func NewEngine(opts ...Option) *Engine {
 		sm:       NewSceneManager(),
 		renderer: NewBatchRenderer(),
 		// We can add global update systems here, such as input handlers.
-		updateSystems: make([]UpdateSystem, 0),
-		timeScale:     1.0,
-		windowWidth:   800,
-		windowHeight:  600,
-		windowTitle:   "Game",
+		updateSystems:         make([]UpdateSystem, 0),
+		backgroundDrawSystems: make([]DrawSystem, 0),
+		overlayDrawSystems:    make([]DrawSystem, 0),
+		timeScale:             1.0,
+		windowWidth:           800,
+		windowHeight:          600,
+		windowTitle:           "Game",
 		// ... default settings
 	}
 	for _, opt := range opts {
@@ -172,6 +190,9 @@ func (self *Engine) SetTimeScale(ts float64) {
 func (self *Engine) Update() error {
 	dt := (1.0 / 60.0) * self.timeScale
 
+	// 3. Process deferred removals for the engine's world.
+	self.World().processRemovals()
+
 	// 1. Update the engine's global systems first.
 	// These could be input handlers, etc.
 	for _, us := range self.updateSystems {
@@ -182,9 +203,6 @@ func (self *Engine) Update() error {
 	if self.sm.current != nil {
 		self.sm.current.Update(self, dt)
 	}
-
-	// 3. Process deferred removals for the engine's world.
-	self.World().processRemovals()
 
 	return nil
 }
