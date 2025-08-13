@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/edwinsyarief/katsu2d/managers"
+	"github.com/edwinsyarief/katsu2d/overlays"
 	"github.com/edwinsyarief/katsu2d/tween"
 )
 
@@ -41,12 +43,16 @@ func RegisterComponent[T any]() ComponentID {
 
 // Built-in component IDs. Registered once at init.
 var (
-	CTTransform ComponentID
-	CTSprite    ComponentID
-	CTAnimation ComponentID
-	CTTween     ComponentID
-	CTSequence  ComponentID
-	CTText      ComponentID
+	CTTransform        ComponentID
+	CTSprite           ComponentID
+	CTAnimation        ComponentID
+	CTTween            ComponentID
+	CTSequence         ComponentID
+	CTFadeOverlay      ComponentID
+	CTCinematicOverlay ComponentID
+	CTText             ComponentID
+	CTCooldown         ComponentID
+	CTDelayer          ComponentID
 )
 
 func init() {
@@ -55,7 +61,11 @@ func init() {
 	CTAnimation = RegisterComponent[Animation]()
 	CTTween = RegisterComponent[tween.Tween]()
 	CTSequence = RegisterComponent[tween.Sequence]()
+	CTFadeOverlay = RegisterComponent[overlays.FadeOverlay]()
+	CTCinematicOverlay = RegisterComponent[overlays.CinematicOverlay]()
 	CTText = RegisterComponent[Text]()
+	CTCooldown = RegisterComponent[managers.CooldownManager]()
+	CTDelayer = RegisterComponent[managers.DelayManager]()
 }
 
 // Entity is a unique identifier for an entity.
