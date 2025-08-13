@@ -33,6 +33,7 @@ type Engine struct {
 	fullScreen           bool
 	vsync                bool
 	clearScreenEachFrame bool
+	clearColor           color.Color
 	cursorMode           ebiten.CursorModeType
 }
 
@@ -89,6 +90,13 @@ func WithClearScreenEachFrame(clear bool) Option {
 	}
 }
 
+// WithClearColor sets a custom clear color for the screen.
+func WithClearColor(col color.Color) Option {
+	return func(e *Engine) {
+		e.clearColor = col
+	}
+}
+
 // WithBackgroundDrawSystem adds a DrawSystem that renders before the scene.
 func WithBackgroundDrawSystem(sys any) Option {
 	return func(e *Engine) {
@@ -103,6 +111,7 @@ func WithOverlayDrawSystem(sys any) Option {
 	}
 }
 
+// WithUpdateSystem adds an UpdateSystem that update before the scene update.
 func WithUpdateSystem(sys UpdateSystem) Option {
 	return func(e *Engine) {
 		e.updateSystems = append(e.updateSystems, sys)
@@ -231,8 +240,8 @@ func (self *Engine) Update() error {
 
 // Draw implements ebiten.Game.Draw. This method orchestrates the entire rendering pipeline.
 func (self *Engine) Draw(screen *ebiten.Image) {
-	if self.clearScreenEachFrame {
-		screen.Fill(color.Transparent)
+	if self.clearColor != nil {
+		screen.Fill(self.clearColor)
 	}
 
 	self.renderer.Begin(screen)
@@ -268,6 +277,10 @@ func (self *Engine) Run() error {
 	ebiten.SetFullscreen(self.fullScreen)
 	ebiten.SetVsyncEnabled(self.vsync)
 	ebiten.SetCursorMode(self.cursorMode)
-	ebiten.SetScreenClearedEveryFrame(self.clearScreenEachFrame)
+	if self.clearColor != nil {
+		ebiten.SetScreenClearedEveryFrame(false)
+	} else {
+		ebiten.SetScreenClearedEveryFrame(self.clearScreenEachFrame)
+	}
 	return ebiten.RunGame(self)
 }

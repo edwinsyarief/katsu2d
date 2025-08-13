@@ -5,12 +5,14 @@ import (
 	"math"
 	"sort"
 
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
+
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
 	"github.com/edwinsyarief/katsu2d/tween"
 	"github.com/edwinsyarief/katsu2d/utils"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // --- SYSTEMS ---
@@ -145,13 +147,6 @@ func (self *BatchRenderer) DrawTriangleStrip(verts []ebiten.Vertex, img *ebiten.
 	}
 }
 
-// DrawText draws text, flushing the batch first to maintain render order.
-// This is necessary because text.Draw is a separate operation from DrawTriangles.
-func (self *BatchRenderer) DrawText(txt *Text, transform *ebimath.Transform) {
-	self.Flush()
-	txt.Draw(transform, self.screen)
-}
-
 // TweenSystem updates tweens and sequences.
 type TweenSystem struct{}
 
@@ -192,9 +187,9 @@ func (self *AnimationSystem) Update(world *World, dt float64) {
 	entities := world.Query(CTAnimation, CTSprite)
 	for _, e := range entities {
 		animAny, _ := world.GetComponent(e, CTAnimation)
-		anim := animAny.(*Animation)
+		anim := animAny.(*AnimationComponent)
 		sprAny, _ := world.GetComponent(e, CTSprite)
-		spr := sprAny.(*Sprite)
+		spr := sprAny.(*SpriteComponent)
 
 		if !anim.Active || len(anim.Frames) == 0 {
 			continue
@@ -346,14 +341,22 @@ func NewTextRenderSystem() *TextRenderSystem {
 
 // Draw renders all text components in the world using their transforms.
 func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
-	for _, entity := range world.Query(CTText, CTTransform) {
-		if tx, ok := world.GetComponent(entity, CTTransform); ok {
-			t := tx.(*Transform)
-			if txt, ok := world.GetComponent(entity, CTText); ok {
-				text := txt.(*Text)
-				renderer.DrawText(text, t.Transform)
-			}
+	entities := world.Query(CTText, CTTransform)
+	for _, entity := range entities {
+		tx, _ := world.GetComponent(entity, CTTransform)
+		t := tx.(*TransformComponent)
+		txt, _ := world.GetComponent(entity, CTText)
+		textComp := txt.(*TextComponent)
+		renderer.Flush()
+		textComp.updateCache()
+		op := &text.DrawOptions{}
+		op.GeoM = t.Transform.Matrix()
+		if offsetFunc, ok := alignmentOffsets[textComp.Alignment]; ok {
+			offsetX, offsetY := offsetFunc(textComp.cachedWidth, textComp.cachedHeight)
+			op.GeoM.Translate(offsetX, offsetY)
 		}
+		op.ColorScale = utils.RGBAToColorScale(textComp.Color)
+		text.Draw(renderer.screen, textComp.Caption, textComp.fontFace, op)
 	}
 }
 
@@ -377,7 +380,7 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	drawables := make([]drawableEntity, 0, len(entitiesWithSprite))
 	for _, entity := range entitiesWithSprite {
 		tx, _ := world.GetComponent(entity, CTTransform)
-		t := tx.(*Transform)
+		t := tx.(*TransformComponent)
 		drawables = append(drawables, drawableEntity{Entity: entity, Z: t.Z})
 	}
 
@@ -388,9 +391,9 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	for _, drawable := range drawables {
 		entity := drawable.Entity
 		tx, _ := world.GetComponent(entity, CTTransform)
-		t := tx.(*Transform)
+		t := tx.(*TransformComponent)
 		sprite, _ := world.GetComponent(entity, CTSprite)
-		s := sprite.(*Sprite)
+		s := sprite.(*SpriteComponent)
 
 		img := self.tm.Get(s.TextureID)
 		if img == nil {

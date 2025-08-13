@@ -51,14 +51,14 @@ var (
 )
 
 func init() {
-	CTTransform = RegisterComponent[Transform]()
-	CTSprite = RegisterComponent[Sprite]()
-	CTAnimation = RegisterComponent[Animation]()
+	CTTransform = RegisterComponent[TransformComponent]()
+	CTSprite = RegisterComponent[SpriteComponent]()
+	CTAnimation = RegisterComponent[AnimationComponent]()
 	CTTween = RegisterComponent[tween.Tween]()
 	CTSequence = RegisterComponent[tween.Sequence]()
 	CTFadeOverlay = RegisterComponent[overlays.FadeOverlay]()
 	CTCinematicOverlay = RegisterComponent[overlays.CinematicOverlay]()
-	CTText = RegisterComponent[Text]()
+	CTText = RegisterComponent[TextComponent]()
 	CTCooldown = RegisterComponent[managers.CooldownManager]()
 	CTDelayer = RegisterComponent[managers.DelayManager]()
 }
@@ -72,6 +72,7 @@ type World struct {
 	entities        map[Entity]struct{}
 	componentStores map[reflect.Type]map[Entity]any
 	entityMasks     map[Entity]uint64
+	archetypes      map[uint64][]Entity
 	toRemove        []Entity
 }
 
@@ -82,6 +83,7 @@ func NewWorld() *World {
 		entities:        make(map[Entity]struct{}),
 		componentStores: make(map[reflect.Type]map[Entity]any),
 		entityMasks:     make(map[Entity]uint64),
+		archetypes:      make(map[uint64][]Entity),
 		toRemove:        make([]Entity, 0),
 	}
 }
@@ -92,6 +94,7 @@ func (self *World) CreateEntity() Entity {
 	self.nextEntityID++
 	self.entities[id] = struct{}{}
 	self.entityMasks[id] = 0
+	self.archetypes[0] = append(self.archetypes[0], id)
 	return id
 }
 
@@ -114,6 +117,19 @@ func (self *World) processRemovals() {
 		removeSet[e] = struct{}{}
 	}
 	for e := range removeSet {
+		mask := self.entityMasks[e]
+		if list, ok := self.archetypes[mask]; ok {
+			for i, ee := range list {
+				if ee == e {
+					list[i] = list[len(list)-1]
+					self.archetypes[mask] = list[:len(list)-1]
+					break
+				}
+			}
+			if len(self.archetypes[mask]) == 0 {
+				delete(self.archetypes, mask)
+			}
+		}
 		for _, store := range self.componentStores {
 			delete(store, e)
 		}
@@ -121,6 +137,26 @@ func (self *World) processRemovals() {
 		delete(self.entityMasks, e)
 	}
 	self.toRemove = self.toRemove[:0]
+}
+
+// moveEntityArchetype moves an entity from old archetype to new.
+func (self *World) moveEntityArchetype(e Entity, oldMask, newMask uint64) {
+	if oldMask == newMask {
+		return
+	}
+	if oldList, ok := self.archetypes[oldMask]; ok {
+		for i, ee := range oldList {
+			if ee == e {
+				oldList[i] = oldList[len(oldList)-1]
+				self.archetypes[oldMask] = oldList[:len(oldList)-1]
+				break
+			}
+		}
+		if len(self.archetypes[oldMask]) == 0 {
+			delete(self.archetypes, oldMask)
+		}
+	}
+	self.archetypes[newMask] = append(self.archetypes[newMask], e)
 }
 
 // AddComponent adds a component to an entity.
@@ -137,7 +173,10 @@ func (self *World) AddComponent(e Entity, comp any) {
 		self.componentStores[t] = make(map[Entity]any)
 	}
 	self.componentStores[t][e] = comp
+	oldMask := self.entityMasks[e]
 	self.entityMasks[e] |= 1 << uint64(id)
+	newMask := self.entityMasks[e]
+	self.moveEntityArchetype(e, oldMask, newMask)
 }
 
 // GetComponent retrieves a component from an entity using a ComponentID.
@@ -163,15 +202,18 @@ func (self *World) RemoveComponent(e Entity, id ComponentID) {
 	if store, ok := self.componentStores[t]; ok {
 		delete(store, e)
 	}
+	oldMask := self.entityMasks[e]
 	self.entityMasks[e] &= ^(1 << uint64(id))
+	newMask := self.entityMasks[e]
+	self.moveEntityArchetype(e, oldMask, newMask)
 }
 
 // Query returns entities that have all specified components.
 func (self *World) Query(componentIDs ...ComponentID) []Entity {
+	res := make([]Entity, 0)
 	if len(componentIDs) == 0 {
-		res := make([]Entity, 0, len(self.entities))
-		for e := range self.entities {
-			res = append(res, e)
+		for _, list := range self.archetypes {
+			res = append(res, list...)
 		}
 		return res
 	}
@@ -179,10 +221,9 @@ func (self *World) Query(componentIDs ...ComponentID) []Entity {
 	for _, id := range componentIDs {
 		mask |= 1 << uint64(id)
 	}
-	res := make([]Entity, 0)
-	for e := range self.entities {
-		if self.entityMasks[e]&mask == mask {
-			res = append(res, e)
+	for archMask, list := range self.archetypes {
+		if archMask&mask == mask {
+			res = append(res, list...)
 		}
 	}
 	return res

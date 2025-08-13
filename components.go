@@ -4,29 +4,27 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/edwinsyarief/katsu2d/utils"
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/text/language"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 )
 
-// Transform component defines position, offset, origin, scale, rotation, and z-index.
-type Transform struct {
+// TransformComponent component defines position, offset, origin, scale, rotation, and z-index.
+type TransformComponent struct {
 	*ebimath.Transform
 	Z float64 // for draw order
 }
 
-// NewTransform creates a new Transform component with default values.
-func NewTransform() *Transform {
-	return &Transform{
+// NewTransformComponent creates a new Transform component with default values.
+func NewTransformComponent() *TransformComponent {
+	return &TransformComponent{
 		Transform: ebimath.T(),
 	}
 }
 
-// Sprite component defines texture, source rect, destination size, and color tint.
-type Sprite struct {
+// SpriteComponent component defines texture, source rect, destination size, and color tint.
+type SpriteComponent struct {
 	TextureID int
 	SrcX      float32
 	SrcY      float32
@@ -38,9 +36,9 @@ type Sprite struct {
 	Opacity   float32
 }
 
-// NewSprite creates a new Sprite component for a given texture and destination size.
-func NewSprite(textureID, width, height int) *Sprite {
-	return &Sprite{
+// NewSpriteComponent creates a new Sprite component for a given texture and destination size.
+func NewSpriteComponent(textureID, width, height int) *SpriteComponent {
+	return &SpriteComponent{
 		TextureID: textureID,
 		DstW:      float32(width),
 		DstH:      float32(height),
@@ -50,7 +48,7 @@ func NewSprite(textureID, width, height int) *Sprite {
 }
 
 // GetSourceRect calculates the source rectangle coordinates and size.
-func (self *Sprite) GetSourceRect(textureWidth, textureHeight float32) (x, y, w, h float32) {
+func (self *SpriteComponent) GetSourceRect(textureWidth, textureHeight float32) (x, y, w, h float32) {
 	x, y = self.SrcX, self.SrcY
 	w, h = self.SrcW, self.SrcH
 	if w == 0 || h == 0 {
@@ -60,7 +58,7 @@ func (self *Sprite) GetSourceRect(textureWidth, textureHeight float32) (x, y, w,
 }
 
 // GetDestSize calculates the destination size, using source size as a fallback.
-func (self *Sprite) GetDestSize(sourceWidth, sourceHeight float32) (w, h float32) {
+func (self *SpriteComponent) GetDestSize(sourceWidth, sourceHeight float32) (w, h float32) {
 	w, h = self.DstW, self.DstH
 	if w == 0 {
 		w = sourceWidth
@@ -80,8 +78,8 @@ const (
 	AnimBoomerang                 // Forward then backward loop
 )
 
-// Animation component for sprite frame animations.
-type Animation struct {
+// AnimationComponent component for sprite frame animations.
+type AnimationComponent struct {
 	Frames    []image.Rectangle
 	Speed     float64  // Seconds per frame
 	Elapsed   float64  // Time since last frame
@@ -119,8 +117,8 @@ var alignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
 	TextAlignmentTopLeft:      func(w, h float64) (float64, float64) { return 0, 0 },
 }
 
-// Text component for drawing text.
-type Text struct {
+// TextComponent component for drawing text.
+type TextComponent struct {
 	Alignment TextAlignment
 	Caption   string
 	Size      float64
@@ -133,15 +131,15 @@ type Text struct {
 	cachedText                string
 }
 
-// NewText creates a new Text component with the specified font source, caption, size, and color.
-func NewText(source *text.GoTextFaceSource, caption string, size float64, col color.RGBA) *Text {
+// NewTextComponent creates a new Text component with the specified font source, caption, size, and color.
+func NewTextComponent(source *text.GoTextFaceSource, caption string, size float64, col color.RGBA) *TextComponent {
 	fontFace := &text.GoTextFace{
 		Source:    source,
 		Direction: text.DirectionLeftToRight,
 		Size:      size,
 		Language:  language.English,
 	}
-	result := &Text{
+	result := &TextComponent{
 		Caption:  caption,
 		Size:     size,
 		Color:    col,
@@ -152,7 +150,7 @@ func NewText(source *text.GoTextFaceSource, caption string, size float64, col co
 }
 
 // updateCache updates the cached measurements for the text if the caption has changed.
-func (self *Text) updateCache() {
+func (self *TextComponent) updateCache() {
 	if self.cachedText != self.Caption {
 		self.cachedWidth, self.cachedHeight = text.Measure(self.Caption, self.fontFace, 0)
 		self.cachedText = self.Caption
@@ -160,13 +158,13 @@ func (self *Text) updateCache() {
 }
 
 // SetAlignment sets the alignment for the text and returns the Text for chaining.
-func (self *Text) SetAlignment(alignment TextAlignment) *Text {
+func (self *TextComponent) SetAlignment(alignment TextAlignment) *TextComponent {
 	self.Alignment = alignment
 	return self
 }
 
 // SetText sets the caption for the text and returns the Text for chaining.
-func (self *Text) SetText(text string) *Text {
+func (self *TextComponent) SetText(text string) *TextComponent {
 	if self.Caption != text {
 		self.Caption = text
 		self.updateCache()
@@ -175,27 +173,31 @@ func (self *Text) SetText(text string) *Text {
 }
 
 // SetFontFace sets the font face for the text and returns the Text for chaining.
-func (self *Text) SetFontFace(fontFace *text.GoTextFace) *Text {
+func (self *TextComponent) SetFontFace(fontFace *text.GoTextFace) *TextComponent {
 	self.fontFace = fontFace
 	self.updateCache()
 	return self
 }
 
+func (self *TextComponent) FontFace() *text.GoTextFace {
+	return self.fontFace
+}
+
 // SetSize sets the size for the text and returns the Text for chaining.
-func (self *Text) SetSize(size float64) *Text {
+func (self *TextComponent) SetSize(size float64) *TextComponent {
 	self.fontFace.Size = size
 	self.updateCache()
 	return self
 }
 
 // SetColor sets the color for the text and returns the Text for chaining.
-func (self *Text) SetColor(color color.RGBA) *Text {
+func (self *TextComponent) SetColor(color color.RGBA) *TextComponent {
 	self.Color = color
 	return self
 }
 
 // SetOpacity sets the opacity by adjusting the alpha channel of the color and returns the Text for chaining.
-func (self *Text) SetOpacity(opacity float64) *Text {
+func (self *TextComponent) SetOpacity(opacity float64) *TextComponent {
 	val := ebimath.Min(ebimath.Max(opacity, 0.0), 1.0)
 
 	col := self.Color
@@ -203,21 +205,4 @@ func (self *Text) SetOpacity(opacity float64) *Text {
 	self.SetColor(col)
 
 	return self
-}
-
-// Draw method for the Text component.
-// This is not intended to be called directly by a user, but by a DrawSystem.
-func (self *Text) Draw(transform *ebimath.Transform, screen *ebiten.Image) {
-	self.updateCache()
-
-	op := &text.DrawOptions{}
-	op.GeoM = transform.Matrix()
-
-	if offsetFunc, ok := alignmentOffsets[self.Alignment]; ok {
-		offsetX, offsetY := offsetFunc(float64(self.cachedWidth), float64(self.cachedHeight))
-		op.GeoM.Translate(offsetX, offsetY)
-	}
-
-	op.ColorScale = utils.RGBAToColorScale(self.Color)
-	text.Draw(screen, self.Caption, self.fontFace, op)
 }
