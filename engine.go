@@ -21,8 +21,8 @@ type Engine struct {
 
 	// Engine-level systems
 	updateSystems         []UpdateSystem
-	backgroundDrawSystems []DrawSystem // New: For backgrounds and pre-scene rendering
-	overlayDrawSystems    []DrawSystem // New: For UI and post-scene rendering
+	backgroundDrawSystems []DrawSystem
+	overlayDrawSystems    []DrawSystem
 
 	// Game settings
 	timeScale            float64
@@ -92,24 +92,14 @@ func WithClearScreenEachFrame(clear bool) Option {
 // WithBackgroundDrawSystem adds a DrawSystem that renders before the scene.
 func WithBackgroundDrawSystem(sys any) Option {
 	return func(e *Engine) {
-		if us, ok := sys.(UpdateSystem); ok {
-			e.updateSystems = append(e.updateSystems, us)
-		}
-		if ds, ok := sys.(DrawSystem); ok {
-			e.backgroundDrawSystems = append(e.backgroundDrawSystems, ds)
-		}
+		e.AddBackgroundDrawSystem(sys)
 	}
 }
 
 // WithOverlayDrawSystem adds a DrawSystem that renders after the scene (on top).
 func WithOverlayDrawSystem(sys any) Option {
 	return func(e *Engine) {
-		if us, ok := sys.(UpdateSystem); ok {
-			e.updateSystems = append(e.updateSystems, us)
-		}
-		if ds, ok := sys.(DrawSystem); ok {
-			e.overlayDrawSystems = append(e.overlayDrawSystems, ds)
-		}
+		e.AddOverlayDrawSystem(sys)
 	}
 }
 
@@ -144,30 +134,37 @@ func NewEngine(opts ...Option) *Engine {
 	return e
 }
 
+// InitFS initializes the asset filesystem using an embedded FS.
 func (self *Engine) InitFS(fs embed.FS) {
 	initFS(fs)
 }
 
+// InitAssetReader initializes the asset reader with a path and encryption key.
 func (self *Engine) InitAssetReader(path string, key []byte) {
 	initAssetReader(path, key)
 }
 
+// World returns the engine's global ECS world.
 func (self *Engine) World() *World {
 	return self.world
 }
 
+// TextureManager returns the engine's texture manager.
 func (self *Engine) TextureManager() *TextureManager {
 	return self.tm
 }
 
+// AudioManager returns the engine's audio manager.
 func (self *Engine) AudioManager() *AudioManager {
 	return self.am
 }
 
+// SceneManager returns the engine's scene manager.
 func (self *Engine) SceneManager() *SceneManager {
 	return self.sm
 }
 
+// FontManager returns the engine's font manager.
 func (self *Engine) FontManager() *FontManager {
 	return self.fm
 }
@@ -177,8 +174,34 @@ func (self *Engine) SwitchScene(name string) {
 	self.sm.SwitchTo(self, name)
 }
 
+// AddScene adds a scene to the scene manager by name.
 func (self *Engine) AddScene(name string, scene *Scene) {
 	self.sm.AddScene(name, scene)
+}
+
+// AddUpdateSystem adds an update system to the engine's global update systems.
+func (self *Engine) AddUpdateSystem(sys UpdateSystem) {
+	self.updateSystems = append(self.updateSystems, sys)
+}
+
+// AddBackgroundDrawSystem adds a system that updates and/or draws before the scene.
+func (self *Engine) AddBackgroundDrawSystem(sys any) {
+	if us, ok := sys.(UpdateSystem); ok {
+		self.updateSystems = append(self.updateSystems, us)
+	}
+	if ds, ok := sys.(DrawSystem); ok {
+		self.backgroundDrawSystems = append(self.backgroundDrawSystems, ds)
+	}
+}
+
+// AddOverlayDrawSystem adds a system that updates and/or draws after the scene.
+func (self *Engine) AddOverlayDrawSystem(sys any) {
+	if us, ok := sys.(UpdateSystem); ok {
+		self.updateSystems = append(self.updateSystems, us)
+	}
+	if ds, ok := sys.(DrawSystem); ok {
+		self.overlayDrawSystems = append(self.overlayDrawSystems, ds)
+	}
 }
 
 // SetTimeScale adjusts the game speed.
@@ -190,18 +213,17 @@ func (self *Engine) SetTimeScale(ts float64) {
 func (self *Engine) Update() error {
 	dt := (1.0 / 60.0) * self.timeScale
 
-	// 3. Process deferred removals for the engine's world.
+	// Process deferred removals for the engine's world.
 	self.World().processRemovals()
 
-	// 1. Update the engine's global systems first.
-	// These could be input handlers, etc.
+	// Update the engine's global systems first.
 	for _, us := range self.updateSystems {
-		us.Update(self, dt)
+		us.Update(self.world, dt)
 	}
 
-	// 2. Then, update the active scene's systems.
+	// Then, update the active scene's systems.
 	if self.sm.current != nil {
-		self.sm.current.Update(self, dt)
+		self.sm.current.Update(self.sm.current.World, dt)
 	}
 
 	return nil
@@ -213,25 +235,23 @@ func (self *Engine) Draw(screen *ebiten.Image) {
 		screen.Fill(color.Transparent)
 	}
 
-	// Begin the batch renderer cycle. All drawing will be batched from this point.
 	self.renderer.Begin(screen)
 
-	// 1. Draw the engine's background systems (bottom-most layer).
+	// Draw the engine's background systems (bottom-most layer).
 	for _, ds := range self.backgroundDrawSystems {
-		ds.Draw(self, self.renderer)
+		ds.Draw(self.world, self.renderer)
 	}
 
-	// 2. Draw the active scene's content (the main game world).
+	// Draw the active scene's content (the main game world).
 	if self.sm.current != nil {
-		self.sm.current.Draw(self, self.renderer)
+		self.sm.current.Draw(self.sm.current.World, self.renderer)
 	}
 
-	// 3. Draw the engine's overlay systems (UI, HUD, FPS counter - top-most layer).
+	// Draw the engine's overlay systems (UI, HUD, FPS counter - top-most layer).
 	for _, ds := range self.overlayDrawSystems {
-		ds.Draw(self, self.renderer)
+		ds.Draw(self.world, self.renderer)
 	}
 
-	// 4. Flush all batched draw calls at once.
 	self.renderer.Flush()
 }
 

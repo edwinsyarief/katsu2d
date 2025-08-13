@@ -2,7 +2,6 @@ package katsu2d
 
 import (
 	"reflect"
-	"sync"
 
 	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/overlays"
@@ -18,8 +17,6 @@ var (
 	typeToID = make(map[reflect.Type]ComponentID)
 	// componentTypes maps a ComponentID back to its reflect.Type.
 	componentTypes = make(map[ComponentID]reflect.Type)
-	// mutex ensures thread safety for component registration.
-	mutex sync.Mutex
 )
 
 // ComponentID is a unique identifier for a component type.
@@ -28,8 +25,6 @@ type ComponentID uint32
 // RegisterComponent registers a component type and returns its unique ID.
 // This should be called once for each component type at the beginning of the program.
 func RegisterComponent[T any]() ComponentID {
-	mutex.Lock()
-	defer mutex.Unlock()
 	t := reflect.TypeOf((*T)(nil)).Elem()
 	if id, ok := typeToID[t]; ok {
 		return id

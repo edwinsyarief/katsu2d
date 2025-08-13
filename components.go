@@ -18,6 +18,7 @@ type Transform struct {
 	Z float64 // for draw order
 }
 
+// NewTransform creates a new Transform component with default values.
 func NewTransform() *Transform {
 	return &Transform{
 		Transform: ebimath.T(),
@@ -37,11 +38,13 @@ type Sprite struct {
 	Opacity   float32
 }
 
+// NewSprite creates a new Sprite component for a given texture and destination size.
 func NewSprite(textureID, width, height int) *Sprite {
 	return &Sprite{
 		TextureID: textureID,
 		DstW:      float32(width),
 		DstH:      float32(height),
+		Color:     color.RGBA{255, 255, 255, 255},
 		Opacity:   1.0,
 	}
 }
@@ -88,6 +91,7 @@ type Animation struct {
 	Active    bool     // Is animation playing
 }
 
+// TextAlignment defines text alignment modes.
 type TextAlignment int
 
 const (
@@ -129,6 +133,7 @@ type Text struct {
 	cachedText                string
 }
 
+// NewText creates a new Text component with the specified font source, caption, size, and color.
 func NewText(source *text.GoTextFaceSource, caption string, size float64, col color.RGBA) *Text {
 	fontFace := &text.GoTextFace{
 		Source:    source,
@@ -146,6 +151,7 @@ func NewText(source *text.GoTextFaceSource, caption string, size float64, col co
 	return result
 }
 
+// updateCache updates the cached measurements for the text if the caption has changed.
 func (self *Text) updateCache() {
 	if self.cachedText != self.Caption {
 		self.cachedWidth, self.cachedHeight = text.Measure(self.Caption, self.fontFace, 0)
@@ -153,11 +159,13 @@ func (self *Text) updateCache() {
 	}
 }
 
+// SetAlignment sets the alignment for the text and returns the Text for chaining.
 func (self *Text) SetAlignment(alignment TextAlignment) *Text {
 	self.Alignment = alignment
 	return self
 }
 
+// SetText sets the caption for the text and returns the Text for chaining.
 func (self *Text) SetText(text string) *Text {
 	if self.Caption != text {
 		self.Caption = text
@@ -166,23 +174,27 @@ func (self *Text) SetText(text string) *Text {
 	return self
 }
 
+// SetFontFace sets the font face for the text and returns the Text for chaining.
 func (self *Text) SetFontFace(fontFace *text.GoTextFace) *Text {
 	self.fontFace = fontFace
 	self.updateCache()
 	return self
 }
 
+// SetSize sets the size for the text and returns the Text for chaining.
 func (self *Text) SetSize(size float64) *Text {
 	self.fontFace.Size = size
 	self.updateCache()
 	return self
 }
 
+// SetColor sets the color for the text and returns the Text for chaining.
 func (self *Text) SetColor(color color.RGBA) *Text {
 	self.Color = color
 	return self
 }
 
+// SetOpacity sets the opacity by adjusting the alpha channel of the color and returns the Text for chaining.
 func (self *Text) SetOpacity(opacity float64) *Text {
 	val := ebimath.Min(ebimath.Max(opacity, 0.0), 1.0)
 
