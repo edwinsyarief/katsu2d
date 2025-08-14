@@ -2,7 +2,6 @@ package katsu2d
 
 import (
 	"image/color"
-	"math"
 	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -86,6 +85,12 @@ func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img
 
 	self.currentImage = img
 	offset := len(self.vertices)
+
+	for _, v := range verts {
+		v.DstX = utils.AdjustDestinationPixel(v.DstX)
+		v.DstY = utils.AdjustDestinationPixel(v.DstY)
+	}
+
 	self.vertices = append(self.vertices, verts...)
 	for _, i := range inds {
 		self.indices = append(self.indices, uint16(offset)+i)
@@ -93,7 +98,7 @@ func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img
 }
 
 // DrawQuad draws a quad (sprite) with specified source rectangle and destination size.
-func (self *BatchRenderer) DrawQuad(pos, scale, offset, origin ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA, srcMinX, srcMinY, srcMaxX, srcMaxY float32, destW, destH float64) {
+func (self *BatchRenderer) DrawQuad(pos, scale ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA, srcMinX, srcMinY, srcMaxX, srcMaxY float32, destW, destH float64) {
 	totalEstimation := len(self.vertices) + 4
 	if totalEstimation >= maxVertices {
 		self.Flush()
@@ -103,31 +108,26 @@ func (self *BatchRenderer) DrawQuad(pos, scale, offset, origin ebimath.Vector, r
 	}
 	self.currentImage = img
 
-	w, h := destW*scale.X, destH*scale.Y
-	ox, oy := origin.X, origin.Y
+	srcProjMinX := pos.X
+	srcProjMinY := pos.Y
+	srcProjMaxX := srcProjMinX + destW*scale.X
+	srcProjMaxY := srcProjMinY + destH*scale.Y
 
-	p0 := ebimath.V(-ox, -oy)
-	p1 := ebimath.V(w-ox, -oy)
-	p2 := ebimath.V(w-ox, h-oy)
-	p3 := ebimath.V(-ox, h-oy)
+	left, right := float32(srcProjMinX), float32(srcProjMaxX)
+	top, bottom := float32(srcProjMinY), float32(srcProjMaxY)
+
+	p0 := ebimath.V(float64(left), float64(top))
+	p1 := ebimath.V(float64(right), float64(top))
+	p2 := ebimath.V(float64(right), float64(bottom))
+	p3 := ebimath.V(float64(left), float64(bottom))
 
 	if rotation != 0 {
-		c, s := math.Cos(rotation), math.Sin(rotation)
-		p0 = ebimath.V(p0.X*c-p0.Y*s, p0.X*s+p0.Y*c)
-		p1 = ebimath.V(p1.X*c-p1.Y*s, p1.X*s+p1.Y*c)
-		p2 = ebimath.V(p2.X*c-p2.Y*s, p2.X*s+p2.Y*c)
-		p3 = ebimath.V(p3.X*c-p3.Y*s, p3.X*s+p3.Y*c)
+		srcOffset := ebimath.V(srcProjMinX, srcProjMinY)
+		p0 = p0.RotateAround(srcOffset, rotation)
+		p1 = p1.RotateAround(srcOffset, rotation)
+		p2 = p2.RotateAround(srcOffset, rotation)
+		p3 = p3.RotateAround(srcOffset, rotation)
 	}
-
-	p0 = p0.Add(offset)
-	p1 = p1.Add(offset)
-	p2 = p2.Add(offset)
-	p3 = p3.Add(offset)
-
-	p0 = p0.Add(pos)
-	p1 = p1.Add(pos)
-	p2 = p2.Add(pos)
-	p3 = p3.Add(pos)
 
 	cr, cg, cb, ca := float32(clr.R)/255, float32(clr.G)/255, float32(clr.B)/255, float32(clr.A)/255
 
@@ -152,6 +152,12 @@ func (self *BatchRenderer) DrawTriangleStrip(verts []ebiten.Vertex, img *ebiten.
 	}
 	self.currentImage = img
 	offset := len(self.vertices)
+
+	for _, v := range verts {
+		v.DstX = utils.AdjustDestinationPixel(v.DstX)
+		v.DstY = utils.AdjustDestinationPixel(v.DstY)
+	}
+
 	self.vertices = append(self.vertices, verts...)
 	for i := 0; i < len(verts)-2; i++ {
 		a := uint16(offset + i)
@@ -418,7 +424,7 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			continue
 		}
 
-		imgW, imgH := img.Size()
+		imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
 		srcX, srcY, srcW, srcH := s.GetSourceRect(float32(imgW), float32(imgH))
 		destW32, destH32 := s.GetDestSize(srcW, srcH)
 		destW, destH := float64(destW32), float64(destH32)
@@ -426,11 +432,14 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		effColor := s.Color
 		effColor.A = uint8(float32(s.Color.A) * s.Opacity)
 
+		realPos := ebimath.V2(0).Apply(t.Matrix())
+		if !t.Origin().IsZero() {
+			realPos = realPos.Sub(t.Origin())
+		}
+
 		renderer.DrawQuad(
-			t.Position(),
+			realPos,
 			t.Scale(),
-			t.Offset(),
-			t.Origin(),
 			t.Rotation(),
 			img,
 			effColor,

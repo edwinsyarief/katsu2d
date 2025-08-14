@@ -4,7 +4,7 @@ go 1.24.6
 
 require (
 	github.com/edwinsyarief/assetpacker v1.0.0
-	github.com/edwinsyarief/ebi-math v1.1.0
+	github.com/edwinsyarief/ebi-math v1.1.1
 	github.com/hajimehoshi/ebiten/v2 v2.8.8
 	github.com/quasilyte/ebitengine-input v0.9.1
 	golang.org/x/text v0.28.0
