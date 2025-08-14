@@ -15,6 +15,10 @@ import (
 	"github.com/edwinsyarief/katsu2d/utils"
 )
 
+const (
+	maxVertices = 65534
+)
+
 // --- SYSTEMS ---
 
 // UpdateSystem is an interface for update logic.
@@ -74,6 +78,12 @@ func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img
 	if img != self.currentImage && self.currentImage != nil {
 		self.Flush()
 	}
+
+	totalEstimation := len(self.vertices) + len(verts)
+	if totalEstimation >= maxVertices {
+		self.Flush()
+	}
+
 	self.currentImage = img
 	offset := len(self.vertices)
 	self.vertices = append(self.vertices, verts...)
@@ -84,6 +94,10 @@ func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img
 
 // DrawQuad draws a quad (sprite) with specified source rectangle and destination size.
 func (self *BatchRenderer) DrawQuad(pos, scale, offset, origin ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA, srcMinX, srcMinY, srcMaxX, srcMaxY float32, destW, destH float64) {
+	totalEstimation := len(self.vertices) + 4
+	if totalEstimation >= maxVertices {
+		self.Flush()
+	}
 	if img != self.currentImage && self.currentImage != nil {
 		self.Flush()
 	}
@@ -129,6 +143,10 @@ func (self *BatchRenderer) DrawQuad(pos, scale, offset, origin ebimath.Vector, r
 
 // DrawTriangleStrip draws a triangle strip.
 func (self *BatchRenderer) DrawTriangleStrip(verts []ebiten.Vertex, img *ebiten.Image) {
+	totalEstimation := len(self.vertices) + len(verts)
+	if totalEstimation >= maxVertices {
+		self.Flush()
+	}
 	if img != self.currentImage && self.currentImage != nil {
 		self.Flush()
 	}
