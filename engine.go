@@ -240,8 +240,12 @@ func (self *Engine) Update() error {
 
 // Draw implements ebiten.Game.Draw. This method orchestrates the entire rendering pipeline.
 func (self *Engine) Draw(screen *ebiten.Image) {
-	if self.clearColor != nil {
-		screen.Fill(self.clearColor)
+	if self.clearColor != nil || !self.clearScreenEachFrame {
+		fillColor := self.clearColor
+		if fillColor == nil {
+			fillColor = color.Black
+		}
+		screen.Fill(fillColor)
 	}
 
 	self.renderer.Begin(screen)

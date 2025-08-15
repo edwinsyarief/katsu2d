@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"math/rand/v2"
 	"reflect"
 	"time"
 
@@ -345,4 +346,13 @@ func AdjustDestinationPixel(x float32) float32 {
 	default:
 		return ix + 1
 	}
+}
+
+// GetInterpolatedColor returns a color between min and max
+func GetInterpolatedColor(min, max color.RGBA) color.RGBA {
+	r := uint8(float64(min.R) + rand.Float64()*float64(max.R-min.R))
+	g := uint8(float64(min.G) + rand.Float64()*float64(max.G-min.G))
+	b := uint8(float64(min.B) + rand.Float64()*float64(max.B-min.B))
+	a := uint8(float64(min.A) + rand.Float64()*float64(max.A-min.A))
+	return color.RGBA{R: r, G: g, B: b, A: a}
 }

@@ -3,12 +3,26 @@ package katsu2d
 import (
 	"image"
 	"image/color"
+	"sync"
+	"time"
 
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/text/language"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 )
+
+// TagComponent is a component that provides a simple string tag for an entity.
+// This can be used for querying and grouping.
+type TagComponent struct {
+	Tag string
+}
+
+// Make a new instance of TagComponent.
+func NewTagComponent(tag string) *TagComponent {
+	return &TagComponent{Tag: tag}
+}
 
 // TransformComponent component defines position, offset, origin, scale, rotation, and z-index.
 type TransformComponent struct {
@@ -205,4 +219,98 @@ func (self *TextComponent) SetOpacity(opacity float64) *TextComponent {
 	self.SetColor(col)
 
 	return self
+}
+
+// ParticleComponent holds the dynamic state of a single particle.
+type ParticleComponent struct {
+	Velocity        ebimath.Vector
+	Lifetime        float64
+	TotalLifetime   float64
+	InitialColor    color.RGBA
+	TargetColor     color.RGBA
+	InitialScale    float64
+	TargetScale     float64
+	InitialRotation float64
+	TargetRotation  float64
+}
+
+// ParticleEmitterComponent holds the configuration for a particle effect.
+type ParticleEmitterComponent struct {
+	Active                                           bool // If true, continuously spawns particles
+	BurstCount                                       int  // If > 0, spawns this many particles in one burst, then resets to 0
+	EmitRate                                         float64
+	MaxParticles                                     int
+	ParticleLifetime                                 float64
+	ParticleSpawnOffset                              ebimath.Vector // Random offset from emitter position
+	InitialParticleSpeedMin, InitialParticleSpeedMax float64
+	InitialColorMin, InitialColorMax                 color.RGBA
+	TargetColorMin, TargetColorMax                   color.RGBA
+	FadeOut                                          bool
+	Gravity                                          ebimath.Vector
+	TextureIDs                                       []int
+	BlendMode                                        ebiten.Blend
+	MinScale, MaxScale                               float64 // Initial scale range
+	TargetScaleMin, TargetScaleMax                   float64 // Target scale range at end of life
+	MinRotation, MaxRotation                         float64 // Initial rotation range
+	EndRotationMin, EndRotationMax                   float64 // Target rotation range at end of life
+
+	// Internal state
+	lastEmitTime time.Time
+	spawnCounter float64
+}
+
+// NewParticleEmitterComponent creates and returns a new ParticleEmitterComponent with a texture ID.
+func NewParticleEmitterComponent(textureIDs []int) *ParticleEmitterComponent {
+	return &ParticleEmitterComponent{
+		TextureIDs:      textureIDs,
+		lastEmitTime:    time.Now(),
+		InitialColorMin: color.RGBA{255, 255, 255, 255},
+		InitialColorMax: color.RGBA{255, 255, 255, 255},
+		TargetColorMin:  color.RGBA{255, 255, 255, 255},
+		TargetColorMax:  color.RGBA{255, 255, 255, 255},
+		BlendMode:       ebiten.BlendSourceOver,
+		MinScale:        1.0,
+		MaxScale:        1.0,
+		TargetScaleMin:  1.0,
+		TargetScaleMax:  1.0,
+		MinRotation:     0,
+		MaxRotation:     0,
+		EndRotationMin:  0,
+		EndRotationMax:  0,
+	}
+}
+
+// particlePool caches ParticleComponent instances to reduce garbage collection.
+var particlePool = sync.Pool{
+	New: func() interface{} {
+		return &ParticleComponent{}
+	},
+}
+
+// GetParticleComponent retrieves a ParticleComponent from the pool.
+func GetParticleComponent() *ParticleComponent {
+	return particlePool.Get().(*ParticleComponent)
+}
+
+// PutParticleComponent returns a ParticleComponent to the pool.
+func PutParticleComponent(c *ParticleComponent) {
+	particlePool.Put(c)
+}
+
+// transformPool caches TransformComponent instances.
+var transformPool = sync.Pool{
+	New: func() interface{} {
+		return NewTransformComponent()
+	},
+}
+
+// GetTransformComponent retrieves a TransformComponent from the pool.
+func GetTransformComponent() *TransformComponent {
+	return transformPool.Get().(*TransformComponent)
+}
+
+// PutTransformComponent returns a TransformComponent to the pool.
+func PutTransformComponent(c *TransformComponent) {
+	c.Transform = ebimath.T()
+	transformPool.Put(c)
 }

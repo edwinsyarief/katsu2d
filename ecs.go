@@ -50,6 +50,9 @@ var (
 	CTText             ComponentID
 	CTCooldown         ComponentID
 	CTDelayer          ComponentID
+	CTParticleEmitter  ComponentID
+	CTParticle         ComponentID
+	CTTag              ComponentID
 )
 
 func init() {
@@ -63,6 +66,9 @@ func init() {
 	CTText = RegisterComponent[*TextComponent]()
 	CTCooldown = RegisterComponent[*managers.CooldownManager]()
 	CTDelayer = RegisterComponent[*managers.DelayManager]()
+	CTParticleEmitter = RegisterComponent[*ParticleEmitterComponent]()
+	CTParticle = RegisterComponent[*ParticleComponent]()
+	CTTag = RegisterComponent[*TagComponent]()
 }
 
 // Entity is a unique identifier for an entity, including a version for safety.
@@ -141,7 +147,7 @@ func (self *World) getOrCreateArchetype(mask uint64) *Archetype {
 
 	// Populate the new archetype with component data slices based on the mask.
 	compIDs := make([]ComponentID, 0)
-	for id, _ := range componentTypes {
+	for id := range componentTypes {
 		if (mask>>uint64(id))&1 == 1 {
 			compIDs = append(compIDs, id)
 		}
