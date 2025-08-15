@@ -117,36 +117,49 @@ type AnimationComponent struct {
 type TextAlignment int
 
 const (
-	TextAlignmentTopLeft TextAlignment = iota
-	TextAlignmentMiddleLeft
-	TextAlignmentBottomLeft
-	TextAlignmentTopCenter
-	TextAlignmentMiddleCenter
-	TextAlignmentBottomCenter
-	TextAlignmentTopRight
+	TextAlignmentBottomRight TextAlignment = iota
 	TextAlignmentMiddleRight
-	TextAlignmentBottomRight
+	TextAlignmentTopRight
+
+	TextAlignmentBottomCenter
+	TextAlignmentMiddleCenter
+	TextAlignmentTopCenter
+
+	TextAlignmentBottomLeft
+	TextAlignmentMiddleLeft
+	TextAlignmentTopLeft
 )
 
-// alignmentOffsets stores pre-calculated offset functions
+// alignmentOffsets stores pre-calculated offset functions.
+// Each function takes the text's width (w) and height (h) and returns
+// the (x, y) coordinates of the top-left corner of the text's bounding box.
+// These coordinates are relative to the desired alignment point.
 var alignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
-	TextAlignmentMiddleLeft:   func(w, h float64) (float64, float64) { return 0, -h / 2 },
-	TextAlignmentBottomLeft:   func(w, h float64) (float64, float64) { return 0, -h },
-	TextAlignmentTopCenter:    func(w, h float64) (float64, float64) { return -w / 2, 0 },
-	TextAlignmentMiddleCenter: func(w, h float64) (float64, float64) { return -w / 2, -h / 2 },
-	TextAlignmentBottomCenter: func(w, h float64) (float64, float64) { return -w / 2, -h },
-	TextAlignmentTopRight:     func(w, h float64) (float64, float64) { return -w, 0 },
-	TextAlignmentMiddleRight:  func(w, h float64) (float64, float64) { return -w, -h / 2 },
-	TextAlignmentBottomRight:  func(w, h float64) (float64, float64) { return -w, -h },
-	TextAlignmentTopLeft:      func(w, h float64) (float64, float64) { return 0, 0 },
+	// Right-aligned offsets: the x-coordinate of the bounding box is a negative offset from the alignment point.
+	// Y-offsets are calculated from the bottom of the bounding box to the alignment point.
+	TextAlignmentTopRight:    func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentMiddleRight: func(w, h float64) (float64, float64) { return 0, -h / 2 },
+	TextAlignmentBottomRight: func(w, h float64) (float64, float64) { return 0, -h },
+
+	// Center-aligned offsets: the x-coordinate of the bounding box is offset by half its width.
+	// Y-offsets are calculated from the top, middle, or bottom of the bounding box.
+	TextAlignmentTopCenter:    func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentMiddleCenter: func(w, h float64) (float64, float64) { return 0, -h / 2 },
+	TextAlignmentBottomCenter: func(w, h float64) (float64, float64) { return 0, -h },
+
+	// Left-aligned offsets: the x-coordinate of the bounding box is the same as the alignment point.
+	// Y-offsets are calculated from the top, middle, or bottom of the bounding box.
+	TextAlignmentTopLeft:    func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentMiddleLeft: func(w, h float64) (float64, float64) { return 0, -h / 2 },
+	TextAlignmentBottomLeft: func(w, h float64) (float64, float64) { return 0, -h },
 }
 
 // TextComponent component for drawing text.
 type TextComponent struct {
-	Alignment TextAlignment
-	Caption   string
-	Size      float64
-	Color     color.RGBA
+	Alignment         TextAlignment
+	Caption           string
+	Size, lineSpacing float64
+	Color             color.RGBA
 
 	fontFace *text.GoTextFace
 
@@ -176,15 +189,35 @@ func NewTextComponent(source *text.GoTextFaceSource, caption string, size float6
 // updateCache updates the cached measurements for the text if the caption has changed.
 func (self *TextComponent) updateCache() {
 	if self.cachedText != self.Caption {
-		self.cachedWidth, self.cachedHeight = text.Measure(self.Caption, self.fontFace, 0)
+		self.cachedWidth, self.cachedHeight = text.Measure(self.Caption, self.fontFace, self.lineSpacing)
 		self.cachedText = self.Caption
 	}
+}
+
+func (self *TextComponent) LineSpacing() float64 {
+	return self.lineSpacing
+}
+
+// SetLineSpacing sets the line spacing for the text and returns the text for chaining.
+func (self *TextComponent) SetLineSpacing(spacing float64) *TextComponent {
+	self.lineSpacing = spacing
+	self.updateCache()
+	return self
 }
 
 // SetAlignment sets the alignment for the text and returns the Text for chaining.
 func (self *TextComponent) SetAlignment(alignment TextAlignment) *TextComponent {
 	self.Alignment = alignment
 	return self
+}
+
+func (self *TextComponent) GetOffset() (float64, float64) {
+	if offsetFunc, ok := alignmentOffsets[self.Alignment]; ok {
+		offsetX, offsetY := offsetFunc(self.cachedWidth, self.cachedHeight)
+		return offsetX, offsetY
+	}
+
+	return 0, 0
 }
 
 // SetText sets the caption for the text and returns the Text for chaining.

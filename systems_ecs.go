@@ -216,11 +216,24 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		renderer.Flush()
 		textComp.updateCache()
 		op := &text.DrawOptions{}
-		op.GeoM = t.Transform.Matrix()
-		if offsetFunc, ok := alignmentOffsets[textComp.Alignment]; ok {
-			offsetX, offsetY := offsetFunc(textComp.cachedWidth, textComp.cachedHeight)
-			op.GeoM.Translate(offsetX, offsetY)
+		op.LineSpacing = textComp.LineSpacing()
+
+		switch textComp.Alignment {
+		case TextAlignmentTopRight:
+		case TextAlignmentMiddleRight:
+		case TextAlignmentBottomRight:
+			op.PrimaryAlign = text.AlignStart
+		case TextAlignmentTopCenter:
+		case TextAlignmentMiddleCenter:
+		case TextAlignmentBottomCenter:
+			op.PrimaryAlign = text.AlignCenter
+		default:
+			op.PrimaryAlign = text.AlignStart
 		}
+
+		op.GeoM = t.Transform.Matrix()
+		offsetX, offsetY := textComp.GetOffset()
+		op.GeoM.Translate(offsetX, offsetY)
 		op.ColorScale = utils.RGBAToColorScale(textComp.Color)
 		text.Draw(renderer.screen, textComp.Caption, textComp.fontFace, op)
 	}
