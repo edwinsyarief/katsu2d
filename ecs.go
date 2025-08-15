@@ -95,6 +95,7 @@ type World struct {
 	// A map to store component pools for each component type to reduce GC.
 	componentPools sync.Map
 	toRemove       []Entity
+	zSortNeeded    bool
 }
 
 // Archetype is a contiguous block of memory for a specific set of components.
@@ -413,4 +414,15 @@ func (self *World) Query(componentIDs ...ComponentID) []Entity {
 		}
 	}
 	return res
+}
+
+// MarkZDirty sets the flag that signals the SpriteRenderSystem
+// that a Z-sort is required.
+func (self *World) MarkZDirty() {
+	self.zSortNeeded = true
+}
+
+// ResetZDirty is called by the SpriteRenderSystem after sorting.
+func (self *World) ResetZDirty() {
+	self.zSortNeeded = false
 }

@@ -3,7 +3,6 @@ package katsu2d
 import (
 	"image"
 	"image/color"
-	"sync"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -34,6 +33,17 @@ type TransformComponent struct {
 func NewTransformComponent() *TransformComponent {
 	return &TransformComponent{
 		Transform: ebimath.T(),
+	}
+}
+
+// SetZ safely updates the Z value of a transform.
+// If the Z value changes, it marks the world as "dirty"
+// to signal that a sort is needed.
+func (self *TransformComponent) SetZ(world *World, z float64) {
+	if self.Z != z {
+		self.Z = z
+		// Signal the world that the Z-order is no longer valid.
+		world.MarkZDirty()
 	}
 }
 
@@ -223,15 +233,15 @@ func (self *TextComponent) SetOpacity(opacity float64) *TextComponent {
 
 // ParticleComponent holds the dynamic state of a single particle.
 type ParticleComponent struct {
-	Velocity        ebimath.Vector
-	Lifetime        float64
-	TotalLifetime   float64
-	InitialColor    color.RGBA
-	TargetColor     color.RGBA
-	InitialScale    float64
-	TargetScale     float64
-	InitialRotation float64
-	TargetRotation  float64
+	Gravity, Velocity ebimath.Vector
+	Lifetime          float64
+	TotalLifetime     float64
+	InitialColor      color.RGBA
+	TargetColor       color.RGBA
+	InitialScale      float64
+	TargetScale       float64
+	InitialRotation   float64
+	TargetRotation    float64
 }
 
 // ParticleEmitterComponent holds the configuration for a particle effect.
@@ -280,7 +290,7 @@ func NewParticleEmitterComponent(textureIDs []int) *ParticleEmitterComponent {
 	}
 }
 
-// particlePool caches ParticleComponent instances to reduce garbage collection.
+/* // particlePool caches ParticleComponent instances to reduce garbage collection.
 var particlePool = sync.Pool{
 	New: func() interface{} {
 		return &ParticleComponent{}
@@ -314,3 +324,4 @@ func PutTransformComponent(c *TransformComponent) {
 	c.Transform = ebimath.T()
 	transformPool.Put(c)
 }
+*/

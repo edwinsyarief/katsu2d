@@ -1,5 +1,7 @@
 package katsu2d
 
+import "github.com/hajimehoshi/ebiten/v2"
+
 // Scene represents a game scene. It is a self-contained unit
 // with its own World, systems, and lifecycle hooks.
 type Scene struct {
@@ -8,6 +10,8 @@ type Scene struct {
 	DrawSystems   []DrawSystem
 	OnEnter       func(*Engine)
 	OnExit        func(*Engine)
+	OnUpdate      func(float64)
+	OnDraw        func(*ebiten.Image)
 }
 
 // NewScene creates a new scene with its own dedicated World.

@@ -233,6 +233,10 @@ func (self *Engine) Update() error {
 	// Then, update the active scene's systems.
 	if self.sm.current != nil {
 		self.sm.current.Update(self.sm.current.World, dt)
+
+		if self.sm.current.OnUpdate != nil {
+			self.sm.current.OnUpdate(dt)
+		}
 	}
 
 	return nil
@@ -258,6 +262,10 @@ func (self *Engine) Draw(screen *ebiten.Image) {
 	// Draw the active scene's content (the main game world).
 	if self.sm.current != nil {
 		self.sm.current.Draw(self.sm.current.World, self.renderer)
+
+		if self.sm.current.OnDraw != nil {
+			self.sm.current.OnDraw(screen)
+		}
 	}
 
 	// Draw the engine's overlay systems (UI, HUD, FPS counter - top-most layer).

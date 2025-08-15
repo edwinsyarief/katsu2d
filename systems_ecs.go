@@ -229,33 +229,71 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 // SpriteRenderSystem renders sprite components.
 type SpriteRenderSystem struct {
 	tm *TextureManager
+	// The `drawableEntities` slice holds the pre-sorted list of entities.
+	drawableEntities []Entity
+	// A map to quickly track the entities from the last frame.
+	lastFrameEntities map[Entity]struct{}
 }
 
 // NewSpriteRenderSystem creates a new SpriteRenderSystem with the given texture manager.
 func NewSpriteRenderSystem(tm *TextureManager) *SpriteRenderSystem {
-	return &SpriteRenderSystem{tm: tm}
+	return &SpriteRenderSystem{
+		tm:                tm,
+		lastFrameEntities: make(map[Entity]struct{}),
+	}
 }
 
-// Draw renders all sprites in the world, sorted by Z-index for draw order.
+// Update checks if a re-sort is needed for the drawables list.
+// This should be run before the Draw method.
+func (self *SpriteRenderSystem) Update(world *World, dt float64) {
+	// Query for the current set of entities.
+	currentEntities := world.Query(CTSprite, CTTransform)
+
+	// A sort is needed if the world has been explicitly marked as dirty,
+	// or if the number of entities has changed.
+	// We no longer need to loop through all entities to check for dirty flags.
+	zSortNeeded := world.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
+
+	// If the lengths are the same, we still need to check if the set of
+	// entities has changed (e.g., one was destroyed, another was created).
+	if !zSortNeeded && len(currentEntities) == len(self.lastFrameEntities) {
+		for _, entity := range currentEntities {
+			if _, ok := self.lastFrameEntities[entity]; !ok {
+				zSortNeeded = true
+				break
+			}
+		}
+	}
+
+	if zSortNeeded {
+		// Rebuild the drawableEntities slice from the current world state.
+		self.drawableEntities = currentEntities
+
+		// Sort the slice based on Z-index.
+		sort.SliceStable(self.drawableEntities, func(i, j int) bool {
+			t1Any, _ := world.GetComponent(self.drawableEntities[i], CTTransform)
+			t1 := t1Any.(*TransformComponent)
+			t2Any, _ := world.GetComponent(self.drawableEntities[j], CTTransform)
+			t2 := t2Any.(*TransformComponent)
+			return t1.Z < t2.Z
+		})
+
+		// Reset the world's sort needed flag since we just sorted.
+		world.zSortNeeded = false
+	}
+
+	// Update the entity map for the next frame's check.
+	// We do this unconditionally so that entity adds/removes are tracked correctly.
+	self.lastFrameEntities = make(map[Entity]struct{}, len(currentEntities))
+	for _, entity := range currentEntities {
+		self.lastFrameEntities[entity] = struct{}{}
+	}
+}
+
+// Draw renders all sprites in the world, using the pre-sorted list.
 func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
-	entitiesWithSprite := world.Query(CTSprite, CTTransform)
-	type drawableEntity struct {
-		Entity Entity
-		Z      float64
-	}
-	drawables := make([]drawableEntity, 0, len(entitiesWithSprite))
-	for _, entity := range entitiesWithSprite {
-		tx, _ := world.GetComponent(entity, CTTransform)
-		t := tx.(*TransformComponent)
-		drawables = append(drawables, drawableEntity{Entity: entity, Z: t.Z})
-	}
-
-	sort.SliceStable(drawables, func(i, j int) bool {
-		return drawables[i].Z < drawables[j].Z
-	})
-
-	for _, drawable := range drawables {
-		entity := drawable.Entity
+	// The drawableEntities list is already sorted by the Update method.
+	for _, entity := range self.drawableEntities {
 		tx, _ := world.GetComponent(entity, CTTransform)
 		t := tx.(*TransformComponent)
 		sprite, _ := world.GetComponent(entity, CTSprite)
@@ -299,19 +337,19 @@ type Action string
 // -----------------------------------------------------
 // You can add as many as you need.
 /* const (
-	ActionMoveUp    Action = "move-up"
-	ActionMoveDown  Action = "move-down"
-	ActionMoveLeft  Action = "move-left"
+	ActionMoveUp 	Action = "move-up"
+	ActionMoveDown 	Action = "move-down"
+	ActionMoveLeft 	Action = "move-left"
 	ActionMoveRight Action = "move-right"
-	ActionJump      Action = "jump"
-	ActionShoot     Action = "shoot"
-	ActionPause     Action = "pause"
+	ActionJump 		Action = "jump"
+	ActionShoot 	Action = "shoot"
+	ActionPause 	Action = "pause"
 ) */
 
 // Define your game's key bindings.
 /* var platformerBindings = map[katsu2d.Action][]katsu2d.KeyConfig{
 	// Movement
-	katsu2d.ActionMoveUp:    {{Key: ebiten.KeyW}},
+	katsu2d.ActionMoveUp: 	 {{Key: ebiten.KeyW}},
 	katsu2d.ActionMoveDown:  {{Key: ebiten.KeyS}},
 	katsu2d.ActionMoveLeft:  {{Key: ebiten.KeyA}},
 	katsu2d.ActionMoveRight: {{Key: ebiten.KeyD}},
@@ -552,12 +590,17 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterTransform 
 	// Create a new entity and retrieve components from the pool for efficiency.
 	newParticle := world.CreateEntity()
 	particleTransform := GetTransformComponent()
-	particleSprite := NewSpriteComponent(texID, width, height) // Sprites are not pooled for simplicity in this example
+	particleSprite := GetSpriteComponent()
 	particleData := GetParticleComponent()
 
+	// Particle must have the same Z with the emitter
+	particleTransform.Z = emitterTransform.Z
+
 	// Randomize particle properties based on the emitter's configuration.
-	randAngle := self.r.Float64() * 2 * math.Pi                                                      // 0 to 2*pi
-	randSpeed := self.r.FloatRange(emitter.InitialParticleSpeedMin, emitter.InitialParticleSpeedMax) //emitter.InitialParticleSpeedMin + rand.Float64()*(emitter.InitialParticleSpeedMax-emitter.InitialParticleSpeedMin)
+	randAngle := self.r.Float64() * 2 * math.Pi // 0 to 2*pi
+	randSpeed := self.r.FloatRange(
+		emitter.InitialParticleSpeedMin,
+		emitter.InitialParticleSpeedMax)
 	randOffset := ebimath.V(self.r.Float64()*emitter.ParticleSpawnOffset.X, self.r.Float64()*emitter.ParticleSpawnOffset.Y)
 
 	// Set initial particle state.
@@ -580,9 +623,13 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterTransform 
 	particleData.InitialRotation = particleTransform.Rotation()
 	particleData.TargetRotation = ebimath.Lerp(emitter.EndRotationMin, emitter.EndRotationMax, self.r.Float64())
 
+	particleData.Gravity = emitter.Gravity
+
 	// Configure the sprite component.
 	particleSprite.TextureID = texID
 	particleSprite.Color = particleData.InitialColor
+	particleSprite.SrcW = float32(width)
+	particleSprite.SrcH = float32(height)
 
 	world.AddComponent(newParticle, particleTransform)
 	world.AddComponent(newParticle, particleSprite)
@@ -613,6 +660,7 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		s := sprite.(*SpriteComponent)
 
 		// Update position and velocity.
+		p.Velocity = p.Velocity.Add(p.Gravity.MulF(dt))
 		t.SetPosition(t.Position().Add(p.Velocity.MulF(dt)))
 		p.Lifetime -= dt
 
@@ -636,9 +684,12 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		t := transform.(*TransformComponent)
 		particle, _ := world.GetComponent(entity, CTParticle)
 		p := particle.(*ParticleComponent)
+		sprite, _ := world.GetComponent(entity, CTSprite)
+		s := sprite.(*SpriteComponent)
 
 		PutTransformComponent(t)
 		PutParticleComponent(p)
+		PutSpriteComponent(s) // Return the sprite component to the pool!
 	}
 
 	// Batch remove expired particles
