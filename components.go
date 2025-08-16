@@ -3,6 +3,7 @@ package katsu2d
 import (
 	"image"
 	"image/color"
+	"sync"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -11,7 +12,13 @@ import (
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/ease"
+	"github.com/edwinsyarief/katsu2d/managers"
 	"github.com/edwinsyarief/katsu2d/tween"
+)
+
+const (
+	// SpotlightOvershootFactor is the additional scaling factor for the spotlight effect.
+	SpotlightOvershootFactor = 0.25
 )
 
 // TagComponent is a component that provides a simple string tag for an entity.
@@ -338,7 +345,7 @@ type FadeOverlayComponent struct {
 	Overlay     *ebiten.Image
 	Tween       *tween.Tween
 	CurrentFade float32
-	IsFinished  bool
+	Finished    bool
 	Callback    func()
 }
 
@@ -357,6 +364,7 @@ func NewFadeOverlayComponent(fadeType FadeType, fadeColor color.RGBA, duration f
 	return &FadeOverlayComponent{
 		FadeType:  fadeType,
 		FadeColor: fadeColor,
+		Overlay:   overlay,
 		Tween:     tween.New(begin, end, float32(duration), easing),
 		Callback:  callback,
 	}
@@ -364,4 +372,153 @@ func NewFadeOverlayComponent(fadeType FadeType, fadeColor color.RGBA, duration f
 
 func (self *FadeOverlayComponent) SetDelay(delay float64) {
 	self.Tween.SetDelay(float32(delay))
+}
+
+// CinematicType defines the type of cinematic effect.
+type CinematicType int
+
+const (
+	CinematicMovie     CinematicType = iota // Letterbox-style effect
+	CinematicSpotlight                      // Circular spotlight effect
+)
+
+// CinematicOverlayType defines the transition direction.
+type CinematicOverlayType int
+
+const (
+	CinematicTransitionIn  CinematicOverlayType = iota // Fade in
+	CinematicTransitionOut                             // Fade out
+)
+
+// CinematicOverlayComponent manages a visual overlay for cinematic effects in a game.
+type CinematicOverlayComponent struct {
+	CinematicType                                          CinematicType
+	StartType, EndType                                     CinematicOverlayType
+	StartFade, EndFade                                     bool
+	AutoFinish, CinematicFinished, DelayFinished, Finished bool
+	Radius, StartSpeed, EndSpeed, CinematicDelay           float64
+	CinematicAlphaValue                                    float64
+	TransitionValue                                        float64
+	Width, Height                                          int
+	SpotlightMaxValue                                      float64 // Precomputed max value for spotlight
+
+	Offset               ebimath.Vector
+	OverlayColor         color.RGBA
+	OverlayOpacity       float64
+	Overlay, Placeholder *ebiten.Image
+	RenderTarget         *ebiten.Image // Renamed from temp for clarity
+
+	Tween   *tween.Sequence
+	Delayer *managers.DelayManager
+
+	lastStepOnce sync.Once
+
+	Callback func()
+}
+
+// NewCinematicOverlayComponent creates a new cinematic overlay with the specified parameters.
+func NewCinematicOverlayComponent(width, height int, col color.RGBA, opacity float64, cinematicType CinematicType,
+	startType, endType CinematicOverlayType, startFade, endFade, autoFinish bool,
+	cinematicDelay, radius, startSpeed, endSpeed float64, offset ebimath.Vector, callback func()) *CinematicOverlayComponent {
+	result := &CinematicOverlayComponent{
+		OverlayColor:   col,
+		OverlayOpacity: opacity,
+		Width:          width,
+		Height:         height,
+		CinematicType:  cinematicType,
+		StartType:      startType,
+		EndType:        endType,
+		StartFade:      startFade,
+		EndFade:        endFade,
+		AutoFinish:     autoFinish,
+		CinematicDelay: cinematicDelay,
+		Radius:         radius,
+		StartSpeed:     startSpeed,
+		EndSpeed:       endSpeed,
+		Offset:         offset,
+		Delayer:        managers.NewDelayManager(),
+		Callback:       callback,
+	}
+
+	// Configure delayer for cinematic delay
+	result.Delayer.Add("cinematic_delay", cinematicDelay, func() {
+		result.DelayFinished = true
+	})
+
+	// Initialize image buffers
+	result.RenderTarget = ebiten.NewImage(width, height)
+	result.Overlay = ebiten.NewImage(1, 1)
+	result.Placeholder = ebiten.NewImage(1, 1)
+	result.Overlay.Fill(result.OverlayColor)
+	result.Placeholder.Fill(color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	result.CinematicAlphaValue = 1.0
+
+	// Precompute spotlight max value if applicable
+	if result.CinematicType == CinematicSpotlight {
+		result.SpotlightMaxValue = float64(height) * (1 + SpotlightOvershootFactor)
+	}
+
+	// Initialize the starting tween
+	result.Tween = result.createStartTween()
+
+	return result
+}
+
+// createStartTween generates the initial tween sequence based on cinematic type and start type.
+func (self *CinematicOverlayComponent) createStartTween() *tween.Sequence {
+	if self.CinematicType == CinematicMovie {
+		if self.StartType == CinematicTransitionIn {
+			self.TransitionValue = 0.0
+			maxValue := self.Radius / float64(self.Height)
+			return tween.NewSequence(
+				tween.New(0.0, float32(maxValue), float32(self.StartSpeed), ease.QuadInOut),
+			)
+		}
+		self.TransitionValue = 1.0
+		return tween.NewSequence(
+			tween.New(1.0, float32(self.Radius/float64(self.Height)), float32(self.StartSpeed), ease.QuadInOut),
+		)
+	}
+
+	// Spotlight type
+	if self.StartType == CinematicTransitionIn {
+		self.TransitionValue = 0.0
+		return tween.NewSequence(
+			tween.New(0.0, float32(self.Radius), float32(self.StartSpeed), ease.QuadInOut),
+		)
+	}
+	self.TransitionValue = self.SpotlightMaxValue
+	return tween.NewSequence(
+		tween.New(float32(self.SpotlightMaxValue), float32(self.Radius), float32(self.StartSpeed), ease.QuadInOut),
+	)
+}
+
+// createEndTween generates the tween for the end phase.
+func (self *CinematicOverlayComponent) createEndTween() *tween.Tween {
+	if self.CinematicType == CinematicMovie {
+		if self.EndType == CinematicTransitionIn {
+			return tween.New(float32(self.Radius)/float32(self.Height), 1.0, float32(self.EndSpeed), ease.QuadIn)
+		}
+		return tween.New(float32(self.Radius)/float32(self.Height), 0.0, float32(self.EndSpeed), ease.QuadOut)
+	}
+	// Spotlight type
+	if self.EndType == CinematicTransitionIn {
+		return tween.New(float32(self.Radius), float32(self.SpotlightMaxValue), float32(self.EndSpeed), ease.BackIn)
+	}
+	return tween.New(float32(self.Radius), 0.0, float32(self.EndSpeed), ease.BackOut)
+}
+
+// setupLastStep configures the end phase tween.
+func (self *CinematicOverlayComponent) setupLastStep() {
+	self.Tween.Remove(0)
+	self.Tween.Add(self.createEndTween())
+	self.Tween.Reset()
+}
+
+// EndCinematic manually triggers the end phase if not auto-finished.
+func (self *CinematicOverlayComponent) EndCinematic() {
+	if self.AutoFinish || !self.CinematicFinished {
+		return
+	}
+	self.Delayer.Activate("cinematic_delay")
 }

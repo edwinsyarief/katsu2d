@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/edwinsyarief/katsu2d/managers"
-	"github.com/edwinsyarief/katsu2d/overlays"
 	"github.com/edwinsyarief/katsu2d/tween"
 )
 
@@ -62,7 +61,7 @@ func init() {
 	CTTween = RegisterComponent[*tween.Tween]()
 	CTSequence = RegisterComponent[*tween.Sequence]()
 	CTFadeOverlay = RegisterComponent[*FadeOverlayComponent]()
-	CTCinematicOverlay = RegisterComponent[*overlays.CinematicOverlay]()
+	CTCinematicOverlay = RegisterComponent[*CinematicOverlayComponent]()
 	CTText = RegisterComponent[*TextComponent]()
 	CTCooldown = RegisterComponent[*managers.CooldownManager]()
 	CTDelayer = RegisterComponent[*managers.DelayManager]()
