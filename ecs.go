@@ -61,7 +61,7 @@ func init() {
 	CTAnimation = RegisterComponent[*AnimationComponent]()
 	CTTween = RegisterComponent[*tween.Tween]()
 	CTSequence = RegisterComponent[*tween.Sequence]()
-	CTFadeOverlay = RegisterComponent[*overlays.FadeOverlay]()
+	CTFadeOverlay = RegisterComponent[*FadeOverlayComponent]()
 	CTCinematicOverlay = RegisterComponent[*overlays.CinematicOverlay]()
 	CTText = RegisterComponent[*TextComponent]()
 	CTCooldown = RegisterComponent[*managers.CooldownManager]()

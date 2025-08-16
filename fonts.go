@@ -43,7 +43,7 @@ func (self *FontManager) fromByte(content []byte) int {
 	return id
 }
 
-// Get retrieves a texture by ID, falling back to white if invalid.
+// Get retrieves a font by ID, falling back to white if invalid.
 func (self *FontManager) Get(id int) *text.GoTextFaceSource {
 	if id < 0 || id >= len(self.fonts) {
 		return self.fonts[0] // Fallback to white

@@ -261,10 +261,14 @@ func (self *Engine) Draw(screen *ebiten.Image) {
 
 	// Draw the active scene's content (the main game world).
 	if self.sm.current != nil {
+		if self.sm.current.OnBeforeDraw != nil {
+			self.sm.current.OnBeforeDraw(screen)
+		}
+
 		self.sm.current.Draw(self.sm.current.World, self.renderer)
 
-		if self.sm.current.OnDraw != nil {
-			self.sm.current.OnDraw(screen)
+		if self.sm.current.OnAfterDraw != nil {
+			self.sm.current.OnAfterDraw(screen)
 		}
 	}
 

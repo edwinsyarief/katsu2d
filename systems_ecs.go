@@ -115,22 +115,31 @@ func NewFadeOverlaySystem() *FadeOverlaySystem {
 
 // Update updates all fade overlays in the world.
 func (self *FadeOverlaySystem) Update(world *World, dt float64) {
-	entities := world.Query(CTFadeOverlay)
+	toRemove := []Entity{}
+	entities := world.Query(CTFadeOverlay, CTSprite)
 	for _, e := range entities {
 		fadeAny, _ := world.GetComponent(e, CTFadeOverlay)
-		fade := fadeAny.(*overlays.FadeOverlay)
-		fade.Update(dt)
-	}
-}
+		fade := fadeAny.(*FadeOverlayComponent)
+		if fade.IsFinished {
+			if fade.FadeType == FadeTypeIn {
+				toRemove = append(toRemove, e)
+			}
+			continue
+		}
 
-// Draw renders all fade overlays to the screen.
-func (self *FadeOverlaySystem) Draw(world *World, renderer *BatchRenderer) {
-	entities := world.Query(CTFadeOverlay)
-	for _, e := range entities {
-		fadeAny, _ := world.GetComponent(e, CTFadeOverlay)
-		fade := fadeAny.(*overlays.FadeOverlay)
-		fade.Draw(renderer.screen)
+		spriteAny, _ := world.GetComponent(e, CTSprite)
+		sprite := spriteAny.(*SpriteComponent)
+
+		fade.CurrentFade, fade.IsFinished = fade.Tween.Update(float32(dt))
+		fadeColor := fade.FadeColor
+		fadeColor.A = uint8(255 * fade.CurrentFade)
+		sprite.Color = fadeColor
+
+		if fade.IsFinished && fade.Callback != nil {
+			fade.Callback()
+		}
 	}
+	world.BatchRemoveEntities(toRemove...)
 }
 
 // CinematicOverlaySystem manages cinematic overlays.

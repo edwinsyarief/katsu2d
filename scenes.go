@@ -11,7 +11,8 @@ type Scene struct {
 	OnEnter       func(*Engine)
 	OnExit        func(*Engine)
 	OnUpdate      func(float64)
-	OnDraw        func(*ebiten.Image)
+	OnBeforeDraw  func(*ebiten.Image)
+	OnAfterDraw   func(*ebiten.Image)
 }
 
 // NewScene creates a new scene with its own dedicated World.

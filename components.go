@@ -10,6 +10,8 @@ import (
 	"golang.org/x/text/language"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/edwinsyarief/katsu2d/ease"
+	"github.com/edwinsyarief/katsu2d/tween"
 )
 
 // TagComponent is a component that provides a simple string tag for an entity.
@@ -143,9 +145,9 @@ var alignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
 
 	// Center-aligned offsets: the x-coordinate of the bounding box is offset by half its width.
 	// Y-offsets are calculated from the top, middle, or bottom of the bounding box.
-	TextAlignmentTopCenter:    func(w, h float64) (float64, float64) { return 0, 0 },
-	TextAlignmentMiddleCenter: func(w, h float64) (float64, float64) { return 0, -h / 2 },
-	TextAlignmentBottomCenter: func(w, h float64) (float64, float64) { return 0, -h },
+	TextAlignmentTopCenter:    func(w, h float64) (float64, float64) { return -w / 2, 0 },
+	TextAlignmentMiddleCenter: func(w, h float64) (float64, float64) { return -w / 2, -h / 2 },
+	TextAlignmentBottomCenter: func(w, h float64) (float64, float64) { return -w / 2, -h },
 
 	// Left-aligned offsets: the x-coordinate of the bounding box is the same as the alignment point.
 	// Y-offsets are calculated from the top, middle, or bottom of the bounding box.
@@ -323,38 +325,43 @@ func NewParticleEmitterComponent(textureIDs []int) *ParticleEmitterComponent {
 	}
 }
 
-/* // particlePool caches ParticleComponent instances to reduce garbage collection.
-var particlePool = sync.Pool{
-	New: func() interface{} {
-		return &ParticleComponent{}
-	},
+type FadeType int
+
+const (
+	FadeTypeOut FadeType = iota
+	FadeTypeIn
+)
+
+type FadeOverlayComponent struct {
+	FadeType    FadeType
+	FadeColor   color.RGBA
+	Overlay     *ebiten.Image
+	Tween       *tween.Tween
+	CurrentFade float32
+	IsFinished  bool
+	Callback    func()
 }
 
-// GetParticleComponent retrieves a ParticleComponent from the pool.
-func GetParticleComponent() *ParticleComponent {
-	return particlePool.Get().(*ParticleComponent)
+func NewFadeOverlayComponent(fadeType FadeType, fadeColor color.RGBA, duration float64, callback func()) *FadeOverlayComponent {
+	begin, end := float32(0.0), float32(1.0)
+	easing := ease.CubicInOut
+
+	if fadeType == FadeTypeIn {
+		begin, end = 1.0, 0.0
+		easing = ease.QuadInOut
+	}
+
+	overlay := ebiten.NewImage(1, 1)
+	overlay.Fill(fadeColor)
+
+	return &FadeOverlayComponent{
+		FadeType:  fadeType,
+		FadeColor: fadeColor,
+		Tween:     tween.New(begin, end, float32(duration), easing),
+		Callback:  callback,
+	}
 }
 
-// PutParticleComponent returns a ParticleComponent to the pool.
-func PutParticleComponent(c *ParticleComponent) {
-	particlePool.Put(c)
+func (self *FadeOverlayComponent) SetDelay(delay float64) {
+	self.Tween.SetDelay(float32(delay))
 }
-
-// transformPool caches TransformComponent instances.
-var transformPool = sync.Pool{
-	New: func() interface{} {
-		return NewTransformComponent()
-	},
-}
-
-// GetTransformComponent retrieves a TransformComponent from the pool.
-func GetTransformComponent() *TransformComponent {
-	return transformPool.Get().(*TransformComponent)
-}
-
-// PutTransformComponent returns a TransformComponent to the pool.
-func PutTransformComponent(c *TransformComponent) {
-	c.Transform = ebimath.T()
-	transformPool.Put(c)
-}
-*/
