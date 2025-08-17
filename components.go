@@ -522,3 +522,106 @@ func (self *CinematicOverlayComponent) EndCinematic() {
 	}
 	self.Delayer.Activate("cinematic_delay")
 }
+
+// Define an Action type to represent custom game actions.
+// This is more robust than using strings directly as it prevents typos.
+type Action string
+
+// Example List your custom game actions here.
+// -----------------------------------------------------
+// You can add as many as you need.
+/* const (
+	ActionMoveUp 	Action = "move-up"
+	ActionMoveDown 	Action = "move-down"
+	ActionMoveLeft 	Action = "move-left"
+	ActionMoveRight Action = "move-right"
+	ActionJump 		Action = "jump"
+	ActionShoot 	Action = "shoot"
+	ActionPause 	Action = "pause"
+) */
+
+// Define your game's key bindings.
+/* var platformerBindings = map[katsu2d.Action][]katsu2d.KeyConfig{
+	// Movement
+	katsu2d.ActionMoveUp: 	 {{Key: ebiten.KeyW}},
+	katsu2d.ActionMoveDown:  {{Key: ebiten.KeyS}},
+	katsu2d.ActionMoveLeft:  {{Key: ebiten.KeyA}},
+	katsu2d.ActionMoveRight: {{Key: ebiten.KeyD}},
+
+	// Basic attack with the left mouse button
+	katsu2d.ActionAttack: {
+		{MouseButton: ebiten.MouseButtonLeft},
+	},
+
+	// Aiming is a continuous action, so we check if the right mouse button is held down
+	katsu2d.ActionAim: {
+		{MouseButton: ebiten.MouseButtonRight},
+	},
+
+	// The "advanced" action: firing an arrow
+	// This happens when the left mouse button is pressed while the right mouse button is held down
+	katsu2d.ActionFireArrow: {
+		{
+			MouseButton: ebiten.MouseButtonLeft,
+			MouseButtonModifiers: []ebiten.MouseButton{ebiten.MouseButtonRight},
+		},
+	},
+} */
+// -----------------------------------------------------------------
+
+// KeyConfig defines a single key or a combination of a key and modifiers,
+// a gamepad button, or a mouse button.
+type KeyConfig struct {
+	Key ebiten.Key
+	// Modifiers are optional keyboard keys like `ebiten.KeyShiftLeft` or `ebiten.KeyControl`.
+	Modifiers []ebiten.Key
+	// GamepadButton is a button on a gamepad (optional).
+	GamepadButton ebiten.GamepadButton
+	// GamepadModifiers are optional buttons like `ebiten.GamepadButtonRightShoulder`.
+	GamepadModifiers []ebiten.GamepadButton
+	// MouseButton is a button on a mouse (optional).
+	MouseButton ebiten.MouseButton
+	// MouseButtonModifiers are optional mouse buttons that must be held down.
+	MouseButtonModifiers []ebiten.MouseButton
+}
+
+type InputComponent struct {
+	// A map to store the key bindings for each action.
+	// An action can be bound to one or more key configurations.
+	bindings map[Action][]KeyConfig
+
+	// These maps store the current state of each action.
+	// They are updated once per frame for consistent input.
+	actionState   map[Action]bool
+	justPressed   map[Action]bool
+	justReleased  map[Action]bool
+	previousState map[Action]bool
+}
+
+func NewInputComponent(bindings map[Action][]KeyConfig) *InputComponent {
+	return &InputComponent{
+		bindings:      bindings,
+		actionState:   make(map[Action]bool),
+		justPressed:   make(map[Action]bool),
+		justReleased:  make(map[Action]bool),
+		previousState: make(map[Action]bool),
+	}
+}
+
+// IsPressed returns true if the specified action is currently being held down.
+// This is a fast map lookup, suitable for movement or continuous actions.
+func (self *InputComponent) IsPressed(action Action) bool {
+	return self.actionState[action]
+}
+
+// IsJustPressed returns true if the specified action was pressed for the first time
+// in the current frame. This is ideal for single-event actions like jumping or shooting.
+func (self *InputComponent) IsJustPressed(action Action) bool {
+	return self.justPressed[action]
+}
+
+// IsJustReleased returns true if the specified action was released in the current frame.
+// This is ideal for triggering an action when a key is no longer held down.
+func (self *InputComponent) IsJustReleased(action Action) bool {
+	return self.justReleased[action]
+}

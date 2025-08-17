@@ -551,200 +551,109 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	}
 }
 
-// Define an Action type to represent custom game actions.
-// This is more robust than using strings directly as it prevents typos.
-type Action string
-
-// Example List your custom game actions here.
-// -----------------------------------------------------
-// You can add as many as you need.
-/* const (
-	ActionMoveUp 	Action = "move-up"
-	ActionMoveDown 	Action = "move-down"
-	ActionMoveLeft 	Action = "move-left"
-	ActionMoveRight Action = "move-right"
-	ActionJump 		Action = "jump"
-	ActionShoot 	Action = "shoot"
-	ActionPause 	Action = "pause"
-) */
-
-// Define your game's key bindings.
-/* var platformerBindings = map[katsu2d.Action][]katsu2d.KeyConfig{
-	// Movement
-	katsu2d.ActionMoveUp: 	 {{Key: ebiten.KeyW}},
-	katsu2d.ActionMoveDown:  {{Key: ebiten.KeyS}},
-	katsu2d.ActionMoveLeft:  {{Key: ebiten.KeyA}},
-	katsu2d.ActionMoveRight: {{Key: ebiten.KeyD}},
-
-	// Basic attack with the left mouse button
-	katsu2d.ActionAttack: {
-		{MouseButton: ebiten.MouseButtonLeft},
-	},
-
-	// Aiming is a continuous action, so we check if the right mouse button is held down
-	katsu2d.ActionAim: {
-		{MouseButton: ebiten.MouseButtonRight},
-	},
-
-	// The "advanced" action: firing an arrow
-	// This happens when the left mouse button is pressed while the right mouse button is held down
-	katsu2d.ActionFireArrow: {
-		{
-			MouseButton: ebiten.MouseButtonLeft,
-			MouseButtonModifiers: []ebiten.MouseButton{ebiten.MouseButtonRight},
-		},
-	},
-} */
-// -----------------------------------------------------------------
-
-// KeyConfig defines a single key or a combination of a key and modifiers,
-// a gamepad button, or a mouse button.
-type KeyConfig struct {
-	Key ebiten.Key
-	// Modifiers are optional keyboard keys like `ebiten.KeyShiftLeft` or `ebiten.KeyControl`.
-	Modifiers []ebiten.Key
-	// GamepadButton is a button on a gamepad (optional).
-	GamepadButton ebiten.GamepadButton
-	// GamepadModifiers are optional buttons like `ebiten.GamepadButtonRightShoulder`.
-	GamepadModifiers []ebiten.GamepadButton
-	// MouseButton is a button on a mouse (optional).
-	MouseButton ebiten.MouseButton
-	// MouseButtonModifiers are optional mouse buttons that must be held down.
-	MouseButtonModifiers []ebiten.MouseButton
-}
-
 // InputSystem is an UpdateSystem that handles all game input.
-type InputSystem struct {
-	// A map to store the key bindings for each action.
-	// An action can be bound to one or more key configurations.
-	bindings map[Action][]KeyConfig
+type InputSystem struct{}
 
-	// These maps store the current state of each action.
-	// They are updated once per frame for consistent input.
-	actionState   map[Action]bool
-	justPressed   map[Action]bool
-	justReleased  map[Action]bool
-	previousState map[Action]bool
-}
-
-// NewInputSystem creates a new input system with a given set of bindings.
-// This is a much more flexible approach than hardcoding them.
-func NewInputSystem(bindings map[Action][]KeyConfig) *InputSystem {
-	return &InputSystem{
-		bindings:      bindings,
-		actionState:   make(map[Action]bool),
-		justPressed:   make(map[Action]bool),
-		justReleased:  make(map[Action]bool),
-		previousState: make(map[Action]bool),
-	}
+// NewInputSystem creates a new input system
+func NewInputSystem() *InputSystem {
+	return &InputSystem{}
 }
 
 // Update implements the UpdateSystem interface. It polls the keyboard
 // and gamepad and updates the internal state of all actions. This should be run
 // once per game tick.
 func (self *InputSystem) Update(world *World, dt float64) {
-	// First, copy the current state to the previous state.
-	for action, isPressed := range self.actionState {
-		self.previousState[action] = isPressed
-	}
+	entities := world.Query(CTInput)
+	for _, e := range entities {
+		comp, _ := world.GetComponent(e, CTInput)
+		inputComp := comp.(*InputComponent)
 
-	// Then, clear the current state to be re-evaluated.
-	for action := range self.actionState {
-		self.actionState[action] = false
-	}
+		// First, copy the current state to the previous state.
+		for action, isPressed := range inputComp.actionState {
+			inputComp.previousState[action] = isPressed
+		}
 
-	// Iterate through all defined actions and their bindings to check for key presses.
-	for action, configs := range self.bindings {
-		for _, config := range configs {
-			isPressed := false
+		// Then, clear the current state to be re-evaluated.
+		for action := range inputComp.actionState {
+			inputComp.actionState[action] = false
+		}
 
-			// Check for keyboard input if a key is defined.
-			if config.Key != ebiten.Key(-1) {
-				isPressed = ebiten.IsKeyPressed(config.Key)
-				// If the main key is pressed, check for modifiers.
-				if isPressed && len(config.Modifiers) > 0 {
-					for _, mod := range config.Modifiers {
-						if !ebiten.IsKeyPressed(mod) {
-							isPressed = false
-							break
+		// Iterate through all defined actions and their bindings to check for key presses.
+		for action, configs := range inputComp.bindings {
+			for _, config := range configs {
+				isPressed := false
+
+				// Check for keyboard input if a key is defined.
+				if config.Key != ebiten.Key(-1) {
+					isPressed = ebiten.IsKeyPressed(config.Key)
+					// If the main key is pressed, check for modifiers.
+					if isPressed && len(config.Modifiers) > 0 {
+						for _, mod := range config.Modifiers {
+							if !ebiten.IsKeyPressed(mod) {
+								isPressed = false
+								break
+							}
 						}
 					}
 				}
-			}
 
-			// Check for gamepad input if a button is defined.
-			if config.GamepadButton != ebiten.GamepadButton(-1) {
-				// We assume the first detected gamepad is the one being used.
-				// A more advanced system could handle multiple gamepads.
-				for _, gID := range ebiten.AppendGamepadIDs(nil) {
-					isGamepadButtonDown := ebiten.IsGamepadButtonPressed(gID, config.GamepadButton)
-					// If the main button is pressed, check for modifiers.
-					if isGamepadButtonDown {
+				// Check for gamepad input if a button is defined.
+				if config.GamepadButton != ebiten.GamepadButton(-1) {
+					// We assume the first detected gamepad is the one being used.
+					// A more advanced system could handle multiple gamepads.
+					for _, gID := range ebiten.AppendGamepadIDs(nil) {
+						isGamepadButtonDown := ebiten.IsGamepadButtonPressed(gID, config.GamepadButton)
+						// If the main button is pressed, check for modifiers.
+						if isGamepadButtonDown {
+							hasAllModifiers := true
+							for _, mod := range config.GamepadModifiers {
+								if !ebiten.IsGamepadButtonPressed(gID, mod) {
+									hasAllModifiers = false
+									break
+								}
+							}
+							if hasAllModifiers {
+								isPressed = true
+								break // Found a valid gamepad binding, exit this inner loop
+							}
+						}
+					}
+				}
+
+				// Check for mouse input if a button is defined.
+				if config.MouseButton != ebiten.MouseButton(-1) {
+					isMouseButtonDown := ebiten.IsMouseButtonPressed(config.MouseButton)
+					// If the main mouse button is pressed, check for modifiers.
+					if isMouseButtonDown {
 						hasAllModifiers := true
-						for _, mod := range config.GamepadModifiers {
-							if !ebiten.IsGamepadButtonPressed(gID, mod) {
+						for _, mod := range config.MouseButtonModifiers {
+							if !ebiten.IsMouseButtonPressed(mod) {
 								hasAllModifiers = false
 								break
 							}
 						}
 						if hasAllModifiers {
 							isPressed = true
-							break // Found a valid gamepad binding, exit this inner loop
+							break // Found a valid mouse binding, exit this inner loop
 						}
 					}
 				}
-			}
 
-			// Check for mouse input if a button is defined.
-			if config.MouseButton != ebiten.MouseButton(-1) {
-				isMouseButtonDown := ebiten.IsMouseButtonPressed(config.MouseButton)
-				// If the main mouse button is pressed, check for modifiers.
-				if isMouseButtonDown {
-					hasAllModifiers := true
-					for _, mod := range config.MouseButtonModifiers {
-						if !ebiten.IsMouseButtonPressed(mod) {
-							hasAllModifiers = false
-							break
-						}
-					}
-					if hasAllModifiers {
-						isPressed = true
-						break // Found a valid mouse binding, exit this inner loop
-					}
+				// If any binding for this action is pressed, mark the action as active.
+				if isPressed {
+					inputComp.actionState[action] = true
+					break // Stop checking other key configs for this action.
 				}
 			}
 
-			// If any binding for this action is pressed, mark the action as active.
-			if isPressed {
-				self.actionState[action] = true
-				break // Stop checking other key configs for this action.
-			}
+			// Update the "just pressed" and "just released" states.
+			// An action is "just pressed" if it's currently pressed but was not pressed last frame.
+			// An action is "just released" if it's currently not pressed but was pressed last frame.
+			inputComp.justPressed[action] = inputComp.actionState[action] && !inputComp.previousState[action]
+			inputComp.justReleased[action] = !inputComp.actionState[action] && inputComp.previousState[action]
 		}
-
-		// Update the "just pressed" and "just released" states.
-		// An action is "just pressed" if it's currently pressed but was not pressed last frame.
-		// An action is "just released" if it's currently not pressed but was pressed last frame.
-		self.justPressed[action] = self.actionState[action] && !self.previousState[action]
-		self.justReleased[action] = !self.actionState[action] && self.previousState[action]
 	}
-}
 
-// IsPressed returns true if the specified action is currently being held down.
-// This is a fast map lookup, suitable for movement or continuous actions.
-func (self *InputSystem) IsPressed(action Action) bool {
-	return self.actionState[action]
-}
-
-// IsJustPressed returns true if the specified action was pressed for the first time
-// in the current frame. This is ideal for single-event actions like jumping or shooting.
-func (self *InputSystem) IsJustPressed(action Action) bool {
-	return self.justPressed[action]
-}
-
-// IsJustReleased returns true if the specified action was released in the current frame.
-// This is ideal for triggering an action when a key is no longer held down.
-func (self *InputSystem) IsJustReleased(action Action) bool {
-	return self.justReleased[action]
 }
 
 // ParticleEmitterSystem is an UpdateSystem that handles spawning new particles.

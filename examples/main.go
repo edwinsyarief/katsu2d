@@ -3,11 +3,9 @@ package main
 import (
 	"image/color"
 	"log"
-	"os"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d"
-	"github.com/edwinsyarief/katsu2d/dualgrid"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -28,16 +26,13 @@ var keybindings = map[katsu2d.Action][]katsu2d.KeyConfig{
 const PlayerTag = "player"
 
 // PlayerSystem is a simple system to move the player.
-type PlayerSystem struct {
-	input *katsu2d.InputSystem
-}
+type PlayerSystem struct{}
 
 func (self *PlayerSystem) Update(world *katsu2d.World, dt float64) {
-	self.input.Update(world, dt)
 	// Find the player entity using its tag.
 	var player katsu2d.Entity
 	found := false
-	for _, e := range world.Query(katsu2d.CTTag, katsu2d.CTTransform) {
+	for _, e := range world.Query(katsu2d.CTTag, katsu2d.CTTransform, katsu2d.CTInput) {
 		tag, _ := world.GetComponent(e, katsu2d.CTTag)
 		if tag.(*katsu2d.TagComponent).Tag == PlayerTag {
 			player = e
@@ -53,18 +48,21 @@ func (self *PlayerSystem) Update(world *katsu2d.World, dt float64) {
 	t, _ := world.GetComponent(player, katsu2d.CTTransform)
 	transform := t.(*katsu2d.TransformComponent)
 
+	i, _ := world.GetComponent(player, katsu2d.CTInput)
+	input := i.(*katsu2d.InputComponent)
+
 	speed := 60.0 // pixels per second
 	var velocity ebimath.Vector
-	if self.input.IsPressed(ActionMoveUp) {
+	if input.IsPressed(ActionMoveUp) {
 		velocity.Y = -1
 	}
-	if self.input.IsPressed(ActionMoveDown) {
+	if input.IsPressed(ActionMoveDown) {
 		velocity.Y = 1
 	}
-	if self.input.IsPressed(ActionMoveLeft) {
+	if input.IsPressed(ActionMoveLeft) {
 		velocity.X = -1
 	}
-	if self.input.IsPressed(ActionMoveRight) {
+	if input.IsPressed(ActionMoveRight) {
 		velocity.X = 1
 	}
 
@@ -83,12 +81,10 @@ func NewGame() *Game {
 	g := &Game{}
 
 	// --- Engine Setup ---
-	inputSystem := katsu2d.NewInputSystem(keybindings)
-
 	g.engine = katsu2d.NewEngine(
 		katsu2d.WithWindowSize(320, 240),
 		katsu2d.WithWindowTitle("Y-Sorting Example"),
-		katsu2d.WithUpdateSystem(inputSystem),
+		katsu2d.WithUpdateSystem(katsu2d.NewInputSystem()),
 	)
 
 	tm := g.engine.TextureManager()
@@ -112,20 +108,6 @@ func NewGame() *Game {
 	playerImg.Fill(color.White)
 	playerTexID := tm.Add(playerImg) // ID 4: Player
 
-	// --- Tilemap Setup ---
-	data, err := os.ReadFile("./testdata/map.json")
-	if err != nil {
-		log.Fatalf("Failed to read map data: %v", err)
-	}
-	tilemap, err := dualgrid.LoadFromJSON(data)
-	if err != nil {
-		log.Fatalf("Failed to load tilemap: %v", err)
-	}
-	tilemapComp := katsu2d.NewTileMapComponent(tilemap)
-	tilemapComp.SetZ(0, 1) // Lower grid at Z=0, Upper grid at Z=1
-	tilemapEntity := world.CreateEntity()
-	world.AddComponent(tilemapEntity, tilemapComp)
-
 	// --- Player Setup ---
 	playerEntity := world.CreateEntity()
 	playerTransform := katsu2d.NewTransformComponent()
@@ -134,15 +116,14 @@ func NewGame() *Game {
 	world.AddComponent(playerEntity, playerTransform)
 	world.AddComponent(playerEntity, katsu2d.NewSpriteComponent(playerTexID, 16, 16))
 	world.AddComponent(playerEntity, katsu2d.NewTagComponent(PlayerTag))
+	world.AddComponent(playerEntity, katsu2d.NewInputComponent(keybindings))
 
 	// --- System Setup ---
 	// The order of these systems is important for this rendering technique.
-	g.engine.AddUpdateSystem(&PlayerSystem{input: inputSystem})
+	g.engine.AddUpdateSystem(&PlayerSystem{})
 
 	// 1. TileMapRenderSystem draws the background (lower grid).
-	g.engine.AddBackgroundDrawSystem(katsu2d.NewTileMapRenderSystem(tm))
-	// 2. YSortedRenderSystem collects sprites and upper tiles, sorts them, and draws them.
-	g.engine.AddBackgroundDrawSystem(katsu2d.NewYSortedRenderSystem(tm))
+	g.engine.AddBackgroundDrawSystem(katsu2d.NewSpriteRenderSystem(tm))
 
 	return g
 }
