@@ -52,6 +52,7 @@ var (
 	CTParticleEmitter  ComponentID
 	CTParticle         ComponentID
 	CTTag              ComponentID
+	CTTileMap          ComponentID
 )
 
 func init() {
@@ -68,6 +69,7 @@ func init() {
 	CTParticleEmitter = RegisterComponent[*ParticleEmitterComponent]()
 	CTParticle = RegisterComponent[*ParticleComponent]()
 	CTTag = RegisterComponent[*TagComponent]()
+	CTTileMap = RegisterComponent[*TileMapComponent]()
 }
 
 // Entity is a unique identifier for an entity, including a version for safety.
