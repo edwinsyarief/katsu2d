@@ -33,6 +33,7 @@ type PlayerSystem struct {
 }
 
 func (self *PlayerSystem) Update(world *katsu2d.World, dt float64) {
+	self.input.Update(world, dt)
 	// Find the player entity using its tag.
 	var player katsu2d.Entity
 	found := false
@@ -112,7 +113,7 @@ func NewGame() *Game {
 	playerTexID := tm.Add(playerImg) // ID 4: Player
 
 	// --- Tilemap Setup ---
-	data, err := os.ReadFile("../testdata/map.json")
+	data, err := os.ReadFile("./testdata/map.json")
 	if err != nil {
 		log.Fatalf("Failed to read map data: %v", err)
 	}
