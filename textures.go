@@ -69,3 +69,10 @@ func (self *TextureManager) Get(id int) *ebiten.Image {
 	}
 	return self.textures[id]
 }
+
+// Add adds a pre-existing *ebiten.Image to the manager and returns its new ID.
+func (self *TextureManager) Add(img *ebiten.Image) int {
+	id := len(self.textures)
+	self.textures = append(self.textures, img)
+	return id
+}
