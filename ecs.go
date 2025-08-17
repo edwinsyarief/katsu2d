@@ -54,6 +54,10 @@ var (
 	CTTag              ComponentID
 	CTTileMap          ComponentID
 	CTInput            ComponentID
+	CTBasicCamera      ComponentID
+	CTCamera           ComponentID
+	CTGrass            ComponentID
+	CTGrassController  ComponentID
 )
 
 func init() {
@@ -71,6 +75,8 @@ func init() {
 	CTParticle = RegisterComponent[*ParticleComponent]()
 	CTTag = RegisterComponent[*TagComponent]()
 	CTInput = RegisterComponent[*InputComponent]()
+	CTBasicCamera = RegisterComponent[*BasicCameraComponent]()
+	CTCamera = RegisterComponent[*CameraComponent]()
 }
 
 // Entity is a unique identifier for an entity, including a version for safety.

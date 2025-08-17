@@ -3,6 +3,7 @@ module github.com/edwinsyarief/katsu2d
 go 1.24.6
 
 require (
+	github.com/aquilax/go-perlin v1.1.0
 	github.com/edwinsyarief/assetpacker v1.0.0
 	github.com/edwinsyarief/ebi-math v1.1.1
 	github.com/hajimehoshi/ebiten/v2 v2.8.8

@@ -834,6 +834,34 @@ type ParticleRenderSystem struct {
 	tm *TextureManager
 }
 
+type BasicCameraSystem struct{}
+
+func (s *BasicCameraSystem) Update(world *World, deltaTime float64) {
+	entities := world.Query(CTBasicCamera)
+	for _, entity := range entities {
+		comp, ok := world.GetComponent(entity, CTBasicCamera)
+		if !ok {
+			continue
+		}
+		camera := comp.(*BasicCameraComponent)
+		camera.Update(deltaTime)
+	}
+}
+
+type CameraSystem struct{}
+
+func (s *CameraSystem) Update(world *World, deltaTime float64) {
+	entities := world.Query(CTCamera)
+	for _, entity := range entities {
+		comp, ok := world.GetComponent(entity, CTCamera)
+		if !ok {
+			continue
+		}
+		camera := comp.(*CameraComponent)
+		camera.Update(deltaTime)
+	}
+}
+
 // NewParticleRenderSystem creates a new system for rendering particles.
 // It requires a TextureManager to access particle textures.
 func NewParticleRenderSystem(tm *TextureManager) *ParticleRenderSystem {
