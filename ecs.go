@@ -5,73 +5,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
-
-	"github.com/edwinsyarief/katsu2d/managers"
-	"github.com/edwinsyarief/katsu2d/tween"
 )
-
-// --- ECS CORE ---
-
-// Global component registry
-var (
-	nextComponentID ComponentID
-	typeToID        = make(map[reflect.Type]ComponentID)
-	componentTypes  = make(map[ComponentID]reflect.Type)
-)
-
-// ComponentID is a unique identifier for a component type.
-type ComponentID uint32
-
-// RegisterComponent registers a component type and returns its unique ID.
-// This should be called once for each component type at the beginning of the program.
-func RegisterComponent[T any]() ComponentID {
-	var t T
-	compType := reflect.TypeOf(t)
-	if id, ok := typeToID[compType]; ok {
-		return id
-	}
-	id := nextComponentID
-	nextComponentID++
-	typeToID[compType] = id
-	componentTypes[id] = compType
-	return id
-}
-
-// Built-in component IDs. Registered once at init.
-var (
-	CTTransform        ComponentID
-	CTSprite           ComponentID
-	CTAnimation        ComponentID
-	CTTween            ComponentID
-	CTSequence         ComponentID
-	CTFadeOverlay      ComponentID
-	CTCinematicOverlay ComponentID
-	CTText             ComponentID
-	CTCooldown         ComponentID
-	CTDelayer          ComponentID
-	CTParticleEmitter  ComponentID
-	CTParticle         ComponentID
-	CTTag              ComponentID
-	CTTileMap          ComponentID
-	CTInput            ComponentID
-)
-
-func init() {
-	CTTransform = RegisterComponent[*TransformComponent]()
-	CTSprite = RegisterComponent[*SpriteComponent]()
-	CTAnimation = RegisterComponent[*AnimationComponent]()
-	CTTween = RegisterComponent[*tween.Tween]()
-	CTSequence = RegisterComponent[*tween.Sequence]()
-	CTFadeOverlay = RegisterComponent[*FadeOverlayComponent]()
-	CTCinematicOverlay = RegisterComponent[*CinematicOverlayComponent]()
-	CTText = RegisterComponent[*TextComponent]()
-	CTCooldown = RegisterComponent[*managers.CooldownManager]()
-	CTDelayer = RegisterComponent[*managers.DelayManager]()
-	CTParticleEmitter = RegisterComponent[*ParticleEmitterComponent]()
-	CTParticle = RegisterComponent[*ParticleComponent]()
-	CTTag = RegisterComponent[*TagComponent]()
-	CTInput = RegisterComponent[*InputComponent]()
-}
 
 // Entity is a unique identifier for an entity, including a version for safety.
 type Entity struct {

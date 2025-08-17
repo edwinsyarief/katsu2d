@@ -7,8 +7,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// --- ENGINE ---
-
 // Engine manages the game loop, global state, and scene transitions.
 type Engine struct {
 	// Managers
