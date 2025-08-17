@@ -50,23 +50,23 @@ func NewYSortedRenderSystem(tm *TextureManager) *YSortedRenderSystem {
 }
 
 // Draw collects, sorts, and draws sprites and upper-layer tiles.
-func (s *YSortedRenderSystem) Draw(world *World, renderer *BatchRenderer) {
+func (self *YSortedRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	// 1. Clear the list from the previous frame.
-	s.sortableObjects = s.sortableObjects[:0]
+	self.sortableObjects = self.sortableObjects[:0]
 
 	// 2. Collect sprites.
-	s.collectSprites(world)
+	self.collectSprites(world)
 
 	// 3. Collect upper-layer tiles.
-	s.collectUpperTiles(world)
+	self.collectUpperTiles(world)
 
 	// 4. Sort the combined list.
-	sort.SliceStable(s.sortableObjects, func(i, j int) bool {
-		return s.sortableObjects[i].sortKey < s.sortableObjects[j].sortKey
+	sort.SliceStable(self.sortableObjects, func(i, j int) bool {
+		return self.sortableObjects[i].sortKey < self.sortableObjects[j].sortKey
 	})
 
 	// 5. Draw the sorted objects.
-	for _, obj := range s.sortableObjects {
+	for _, obj := range self.sortableObjects {
 		renderer.DrawQuad(
 			obj.position,
 			obj.scale,
@@ -79,14 +79,14 @@ func (s *YSortedRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	}
 }
 
-func (s *YSortedRenderSystem) collectSprites(world *World) {
+func (self *YSortedRenderSystem) collectSprites(world *World) {
 	for _, entity := range world.Query(CTSprite, CTTransform) {
 		tx, _ := world.GetComponent(entity, CTTransform)
 		t := tx.(*TransformComponent)
 		sprite, _ := world.GetComponent(entity, CTSprite)
 		spr := sprite.(*SpriteComponent)
 
-		img := s.tm.Get(spr.TextureID)
+		img := self.tm.Get(spr.TextureID)
 		if img == nil {
 			continue
 		}
@@ -103,7 +103,7 @@ func (s *YSortedRenderSystem) collectSprites(world *World) {
 			realPos = realPos.Sub(t.Origin())
 		}
 
-		s.sortableObjects = append(s.sortableObjects, sortableObject{
+		self.sortableObjects = append(self.sortableObjects, sortableObject{
 			texture:    img,
 			position:   realPos,
 			scale:      t.Scale(),
@@ -120,7 +120,7 @@ func (s *YSortedRenderSystem) collectSprites(world *World) {
 	}
 }
 
-func (s *YSortedRenderSystem) collectUpperTiles(world *World) {
+func (self *YSortedRenderSystem) collectUpperTiles(world *World) {
 	entities := world.Query(CTTileMap)
 	if len(entities) == 0 {
 		return
@@ -130,8 +130,8 @@ func (s *YSortedRenderSystem) collectUpperTiles(world *World) {
 	mapComp := mapCompAny.(*TileMapComponent)
 	tilemap := mapComp.TileMap
 
-	s.cacheTileSize(tilemap)
-	if s.tileWidth == 0 || s.tileHeight == 0 {
+	self.cacheTileSize(tilemap)
+	if self.tileWidth == 0 || self.tileHeight == 0 {
 		return // No tiles to draw
 	}
 
@@ -139,15 +139,15 @@ func (s *YSortedRenderSystem) collectUpperTiles(world *World) {
 		for x := 0; x < tilemap.Width; x++ {
 			tile := tilemap.UpperGrid.Get(x, y)
 			if tile != nil {
-				texture := s.tm.Get(tile.ID)
+				texture := self.tm.Get(tile.ID)
 				if texture == nil {
 					continue
 				}
 
-				drawX := float64(x * s.tileWidth)
-				drawY := float64(y * s.tileHeight)
+				drawX := float64(x * self.tileWidth)
+				drawY := float64(y * self.tileHeight)
 
-				s.sortableObjects = append(s.sortableObjects, sortableObject{
+				self.sortableObjects = append(self.sortableObjects, sortableObject{
 					texture:    texture,
 					position:   ebimath.V(drawX, drawY),
 					scale:      ebimath.V(1, 1),
@@ -155,10 +155,10 @@ func (s *YSortedRenderSystem) collectUpperTiles(world *World) {
 					color:      color.RGBA{255, 255, 255, 255},
 					srcX0:      0,
 					srcY0:      0,
-					srcX1:      float32(s.tileWidth),
-					srcY1:      float32(s.tileHeight),
-					destWidth:  float64(s.tileWidth),
-					destHeight: float64(s.tileHeight),
+					srcX1:      float32(self.tileWidth),
+					srcY1:      float32(self.tileHeight),
+					destWidth:  float64(self.tileWidth),
+					destHeight: float64(self.tileHeight),
 					sortKey:    (mapComp.UpperGridZ * zLayerMultiplier) + drawY,
 				})
 			}
@@ -167,17 +167,17 @@ func (s *YSortedRenderSystem) collectUpperTiles(world *World) {
 }
 
 // cacheTileSize determines the tile dimensions from the first available tile texture.
-func (s *YSortedRenderSystem) cacheTileSize(tilemap *dualgrid.DualGridTileMap) {
-	if s.tileWidth != 0 && s.tileHeight != 0 {
+func (self *YSortedRenderSystem) cacheTileSize(tilemap *dualgrid.DualGridTileMap) {
+	if self.tileWidth != 0 && self.tileHeight != 0 {
 		return // Already cached
 	}
 	tileset := tilemap.Tileset()
 	for id := range tileset {
-		texture := s.tm.Get(id)
+		texture := self.tm.Get(id)
 		if texture != nil {
 			bounds := texture.Bounds()
-			s.tileWidth = bounds.Dx()
-			s.tileHeight = bounds.Dy()
+			self.tileWidth = bounds.Dx()
+			self.tileHeight = bounds.Dy()
 			return
 		}
 	}

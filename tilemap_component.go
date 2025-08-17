@@ -20,8 +20,8 @@ func NewTileMapComponent(tileMap *dualgrid.DualGridTileMap) *TileMapComponent {
 }
 
 // SetZ sets the Z-layers for the tilemap grids and returns the component for chaining.
-func (c *TileMapComponent) SetZ(lower, upper float64) *TileMapComponent {
-	c.LowerGridZ = lower
-	c.UpperGridZ = upper
-	return c
+func (self *TileMapComponent) SetZ(lower, upper float64) *TileMapComponent {
+	self.LowerGridZ = lower
+	self.UpperGridZ = upper
+	return self
 }

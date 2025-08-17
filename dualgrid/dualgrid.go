@@ -25,20 +25,20 @@ func NewGrid(width, height int) *Grid {
 
 // Get returns the tile at the given coordinates.
 // It returns nil if the coordinates are out of bounds.
-func (g *Grid) Get(x, y int) *Tile {
-	if x < 0 || x >= g.Width || y < 0 || y >= g.Height {
+func (self *Grid) Get(x, y int) *Tile {
+	if x < 0 || x >= self.Width || y < 0 || y >= self.Height {
 		return nil
 	}
-	return g.Tiles[y*g.Width+x]
+	return self.Tiles[y*self.Width+x]
 }
 
 // Set sets the tile at the given coordinates.
 // It does nothing if the coordinates are out of bounds.
-func (g *Grid) Set(x, y int, tile *Tile) {
-	if x < 0 || x >= g.Width || y < 0 || y >= g.Height {
+func (self *Grid) Set(x, y int, tile *Tile) {
+	if x < 0 || x >= self.Width || y < 0 || y >= self.Height {
 		return
 	}
-	g.Tiles[y*g.Width+x] = tile
+	self.Tiles[y*self.Width+x] = tile
 }
 
 // DualGridTileMap is the main component.
@@ -130,11 +130,11 @@ func LoadFromJSON(data []byte) (*DualGridTileMap, error) {
 
 // GetTileFromTileset retrieves a tile prototype from the tileset by its ID.
 // This is useful for getting tile information without accessing a specific grid cell.
-func (tm *DualGridTileMap) GetTileFromTileset(id int) *Tile {
-	return tm.tileset[id]
+func (self *DualGridTileMap) GetTileFromTileset(id int) *Tile {
+	return self.tileset[id]
 }
 
 // Tileset returns the entire tileset map.
-func (tm *DualGridTileMap) Tileset() map[int]*Tile {
-	return tm.tileset
+func (self *DualGridTileMap) Tileset() map[int]*Tile {
+	return self.tileset
 }

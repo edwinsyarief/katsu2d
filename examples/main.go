@@ -32,7 +32,7 @@ type PlayerSystem struct {
 	input *katsu2d.InputSystem
 }
 
-func (s *PlayerSystem) Update(world *katsu2d.World, dt float64) {
+func (self *PlayerSystem) Update(world *katsu2d.World, dt float64) {
 	// Find the player entity using its tag.
 	var player katsu2d.Entity
 	found := false
@@ -54,16 +54,16 @@ func (s *PlayerSystem) Update(world *katsu2d.World, dt float64) {
 
 	speed := 60.0 // pixels per second
 	var velocity ebimath.Vector
-	if s.input.IsPressed(ActionMoveUp) {
+	if self.input.IsPressed(ActionMoveUp) {
 		velocity.Y = -1
 	}
-	if s.input.IsPressed(ActionMoveDown) {
+	if self.input.IsPressed(ActionMoveDown) {
 		velocity.Y = 1
 	}
-	if s.input.IsPressed(ActionMoveLeft) {
+	if self.input.IsPressed(ActionMoveLeft) {
 		velocity.X = -1
 	}
-	if s.input.IsPressed(ActionMoveRight) {
+	if self.input.IsPressed(ActionMoveRight) {
 		velocity.X = 1
 	}
 
@@ -146,16 +146,16 @@ func NewGame() *Game {
 	return g
 }
 
-func (g *Game) Update() error {
-	return g.engine.Update()
+func (self *Game) Update() error {
+	return self.engine.Update()
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
-	g.engine.Draw(screen)
+func (self *Game) Draw(screen *ebiten.Image) {
+	self.engine.Draw(screen)
 }
 
-func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return g.engine.Layout(outsideWidth, outsideHeight)
+func (self *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
+	return self.engine.Layout(outsideWidth, outsideHeight)
 }
 
 func main() {

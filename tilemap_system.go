@@ -23,7 +23,7 @@ func NewTileMapRenderSystem(tm *TextureManager) *TileMapRenderSystem {
 
 // Draw draws the lower grid directly to the screen. The upper grid is handled
 // by the YSortedRenderSystem for proper sorting with other game objects.
-func (s *TileMapRenderSystem) Draw(world *World, renderer *BatchRenderer) {
+func (self *TileMapRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	entities := world.Query(CTTileMap)
 	if len(entities) == 0 {
 		return
@@ -38,19 +38,19 @@ func (s *TileMapRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	tilemap := mapComp.TileMap
 
 	// Cache tile size if not already cached
-	if s.tileWidth == 0 || s.tileHeight == 0 {
+	if self.tileWidth == 0 || self.tileHeight == 0 {
 		tileset := tilemap.Tileset()
 		for id := range tileset {
-			texture := s.tm.Get(id)
+			texture := self.tm.Get(id)
 			if texture != nil {
 				bounds := texture.Bounds()
-				s.tileWidth = bounds.Dx()
-				s.tileHeight = bounds.Dy()
+				self.tileWidth = bounds.Dx()
+				self.tileHeight = bounds.Dy()
 				break
 			}
 		}
 		// If still no size, can't draw
-		if s.tileWidth == 0 || s.tileHeight == 0 {
+		if self.tileWidth == 0 || self.tileHeight == 0 {
 			return
 		}
 	}
@@ -60,7 +60,7 @@ func (s *TileMapRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		for x := 0; x < tilemap.Width; x++ {
 			tile := tilemap.LowerGrid.Get(x, y)
 			if tile != nil {
-				s.drawTile(renderer, tile, x, y)
+				self.drawTile(renderer, tile, x, y)
 			}
 		}
 	}
@@ -68,17 +68,17 @@ func (s *TileMapRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 
 // drawTile is a helper to draw a single tile directly to the batch renderer.
 // This is used for the lower grid, which does not need to be sorted with sprites.
-func (s *TileMapRenderSystem) drawTile(renderer *BatchRenderer, tile *dualgrid.Tile, x, y int) {
-	texture := s.tm.Get(tile.ID)
+func (self *TileMapRenderSystem) drawTile(renderer *BatchRenderer, tile *dualgrid.Tile, x, y int) {
+	texture := self.tm.Get(tile.ID)
 	if texture == nil {
 		return
 	}
 
-	drawX := float64(x * s.tileWidth)
-	drawY := float64(y * s.tileHeight)
+	drawX := float64(x * self.tileWidth)
+	drawY := float64(y * self.tileHeight)
 
-	srcW := float32(s.tileWidth)
-	srcH := float32(s.tileHeight)
+	srcW := float32(self.tileWidth)
+	srcH := float32(self.tileHeight)
 
 	renderer.DrawQuad(
 		ebimath.V(drawX, drawY),
@@ -87,6 +87,6 @@ func (s *TileMapRenderSystem) drawTile(renderer *BatchRenderer, tile *dualgrid.T
 		texture,
 		color.RGBA{255, 255, 255, 255},
 		0, 0, srcW, srcH,
-		float64(s.tileWidth), float64(s.tileHeight),
+		float64(self.tileWidth), float64(self.tileHeight),
 	)
 }
