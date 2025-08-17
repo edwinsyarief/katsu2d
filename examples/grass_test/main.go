@@ -7,7 +7,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"github.com/edwinsyarief/katsu2d"
-	"github.com/edwinsyarief/katsu2d/grass"
 )
 
 type Game struct {
@@ -32,8 +31,6 @@ func main() {
 	ebiten.SetWindowSize(800, 600)
 	ebiten.SetWindowTitle("Grass Test")
 
-	grass.RegisterComponents()
-
 	engine := katsu2d.NewEngine()
 
 	world := engine.World()
@@ -43,10 +40,10 @@ func main() {
 	tm := engine.TextureManager()
 	textureID := tm.Add(grassImage)
 
-	grassController := grass.NewGrassControllerComponent(world, tm, 800, 600, textureID, 0)
+	grassController := katsu2d.NewGrassControllerComponent(world, tm, 800, 600, textureID, 0)
 	grassControllerEntity := world.CreateEntity()
 	world.AddComponent(grassControllerEntity, grassController)
-	engine.AddUpdateSystem(&grass.GrassControllerSystem{})
+	engine.AddUpdateSystem(&katsu2d.GrassControllerSystem{})
 
 	cameraEntity := world.CreateEntity()
 	cameraComponent := katsu2d.NewCameraComponent(800, 600)
