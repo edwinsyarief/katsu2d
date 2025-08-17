@@ -222,12 +222,8 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					transform.Z = self.Z
 
 					textureID := self.TextureID
-					if area.TexturesIDs != nil && len(area.TexturesIDs) > 0 {
-						if len(area.TexturesIDs) > 1 {
-							textureID = area.TexturesIDs[rand.Intn(len(area.TexturesIDs))]
-						} else {
-							textureID = area.TexturesIDs[0]
-						}
+					if len(area.TexturesIDs) > 0 {
+						textureID = area.TexturesIDs[rand.Intn(len(area.TexturesIDs))]
 					}
 
 					img := self.tm.Get(textureID)
