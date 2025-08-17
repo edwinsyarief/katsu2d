@@ -659,7 +659,7 @@ func (self *InputSystem) Update(world *World, dt float64) {
 			isPressed := false
 
 			// Check for keyboard input if a key is defined.
-			if config.Key != ebiten.Key(0) {
+			if config.Key != ebiten.Key(-1) {
 				isPressed = ebiten.IsKeyPressed(config.Key)
 				// If the main key is pressed, check for modifiers.
 				if isPressed && len(config.Modifiers) > 0 {
@@ -673,7 +673,7 @@ func (self *InputSystem) Update(world *World, dt float64) {
 			}
 
 			// Check for gamepad input if a button is defined.
-			if config.GamepadButton != ebiten.GamepadButton(0) {
+			if config.GamepadButton != ebiten.GamepadButton(-1) {
 				// We assume the first detected gamepad is the one being used.
 				// A more advanced system could handle multiple gamepads.
 				for _, gID := range ebiten.AppendGamepadIDs(nil) {
@@ -696,7 +696,7 @@ func (self *InputSystem) Update(world *World, dt float64) {
 			}
 
 			// Check for mouse input if a button is defined.
-			if config.MouseButton != ebiten.MouseButton(0) {
+			if config.MouseButton != ebiten.MouseButton(-1) {
 				isMouseButtonDown := ebiten.IsMouseButtonPressed(config.MouseButton)
 				// If the main mouse button is pressed, check for modifiers.
 				if isMouseButtonDown {
