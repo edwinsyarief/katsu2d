@@ -40,6 +40,8 @@ var (
 	CTCamera           ComponentID // Advanced camera component
 	CTGrass            ComponentID // Individual grass element component
 	CTGrassController  ComponentID // Controls grass field behavior
+	CTParent           ComponentID // Parent component for scene graph hierarchy
+	CTOrderable        ComponentID // Orderable component for render sorting
 )
 
 // RegisterComponent registers a component type and returns its unique ID.
@@ -81,4 +83,6 @@ func init() {
 	CTCamera = RegisterComponent[*CameraComponent]()
 	CTGrass = RegisterComponent[*GrassComponent]()
 	CTGrassController = RegisterComponent[*GrassControllerComponent]()
+	CTParent = RegisterComponent[*ParentComponent]()
+	CTOrderable = RegisterComponent[*OrderableComponent]()
 }

@@ -52,14 +52,14 @@ func (self *ParticleEmitterSystem) Update(world *World, dt float64) {
 				if currentParticles+i >= em.MaxParticles {
 					break
 				}
-				self.spawnParticle(world, t, em)
+				self.spawnParticle(world, entity, t, em)
 			}
 		}
 	}
 }
 
 // spawnParticle creates a single new particle entity and configures its components.
-func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterTransform *TransformComponent, emitter *ParticleEmitterComponent) {
+func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Entity, emitterTransform *TransformComponent, emitter *ParticleEmitterComponent) {
 	texID := 0
 	if len(emitter.TextureIDs) > 1 {
 		ebimath.RandomChoose(self.r, emitter.TextureIDs)
@@ -74,6 +74,14 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterTransform 
 	particleTransform := GetTransformComponent()
 	particleSprite := GetSpriteComponent()
 	particleData := GetParticleComponent()
+	parentComponent := NewParentComponent(emitterEntity)
+	particleOrderable := &OrderableComponent{}
+
+	// Set the particle's sorting index to the parent's current index.
+	if parentOrderableAny, ok := world.GetComponent(emitterEntity, CTOrderable); ok {
+		parentOrderable := parentOrderableAny.(*OrderableComponent)
+		particleOrderable.SetIndex(parentOrderable.Index())
+	}
 
 	// Particle must have the same Z with the emitter
 	particleTransform.Z = emitterTransform.Z
@@ -116,6 +124,8 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterTransform 
 	world.AddComponent(newParticle, particleTransform)
 	world.AddComponent(newParticle, particleSprite)
 	world.AddComponent(newParticle, particleData)
+	world.AddComponent(newParticle, parentComponent)
+	world.AddComponent(newParticle, particleOrderable)
 }
 
 // ParticleUpdateSystem is an UpdateSystem that handles the movement and lifecycle of particles.
@@ -149,6 +159,7 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		// Interpolate color, scale, and rotation.
 		tp := 1.0 - (p.Lifetime / p.TotalLifetime) // normalized time from 0 to 1
 		s.Color = utils.LerpPremultipliedRGBA(p.InitialColor, p.TargetColor, tp)
+		
 		t.SetScale(ebimath.V(
 			ebimath.Lerp(p.InitialScale, p.TargetScale, tp),
 			ebimath.Lerp(p.InitialScale, p.TargetScale, tp),
