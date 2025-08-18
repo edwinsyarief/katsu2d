@@ -22,13 +22,7 @@ var spriteComponentPool = sync.Pool{
 // GetSpriteComponent retrieves a SpriteComponent from the pool
 // Returns: A recycled or new SpriteComponent instance
 func GetSpriteComponent() *SpriteComponent {
-	return spriteComponentPool.Get().(*SpriteComponent)
-}
-
-// PutSpriteComponent returns a SpriteComponent to the pool for reuse
-// Parameters:
-//   - s: The SpriteComponent to be recycled
-func PutSpriteComponent(s *SpriteComponent) {
+	s := spriteComponentPool.Get().(*SpriteComponent)
 	// Reset all component properties to default values
 	s.TextureID = 0
 	s.SrcX = 0
@@ -39,6 +33,13 @@ func PutSpriteComponent(s *SpriteComponent) {
 	s.DstH = 0
 	s.Color = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	s.Opacity = 1.0
+	return s
+}
+
+// PutSpriteComponent returns a SpriteComponent to the pool for reuse
+// Parameters:
+//   - s: The SpriteComponent to be recycled
+func PutSpriteComponent(s *SpriteComponent) {
 	spriteComponentPool.Put(s)
 }
 
@@ -89,7 +90,7 @@ func GetParticleComponent() *ParticleComponent {
 //   - p: The ParticleComponent to be recycled
 func PutParticleComponent(p *ParticleComponent) {
 	// Reset all particle properties to default values
-	p.Velocity = ebimath.Vector{}
+	p.Velocity = ebimath.ZeroVector
 	p.Lifetime = 0
 	p.TotalLifetime = 0
 	p.InitialColor = color.RGBA{}
@@ -98,5 +99,6 @@ func PutParticleComponent(p *ParticleComponent) {
 	p.TargetScale = 0
 	p.InitialRotation = 0
 	p.TargetRotation = 0
+	p.Gravity = ebimath.ZeroVector
 	particleComponentPool.Put(p)
 }

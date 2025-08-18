@@ -12,23 +12,24 @@ import (
 func FirePreset(textureID int) *ParticleEmitterComponent {
 	return &ParticleEmitterComponent{
 		Active:                  true,
-		EmitRate:                50,
-		MaxParticles:            500,
-		ParticleLifetime:        1.5,
-		InitialParticleSpeedMin: 10,
-		InitialParticleSpeedMax: 20,
-		ParticleSpawnOffset:     ebimath.V(5, 5),
+		EmitRate:                500,
+		MaxParticles:            1000,
+		ParticleLifetime:        1.0,
+		InitialParticleSpeedMin: 3,
+		InitialParticleSpeedMax: 5,
+		ParticleSpawnOffset:     ebimath.V(8, 8),
 		InitialColorMin:         color.RGBA{255, 255, 0, 255}, // Yellow
 		InitialColorMax:         color.RGBA{255, 128, 0, 255}, // Orange
 		TargetColorMin:          color.RGBA{255, 0, 0, 0},     // Red, transparent
 		TargetColorMax:          color.RGBA{255, 0, 0, 0},     // Red, transparent
 		FadeOut:                 true,
 		BlendMode:               ebiten.BlendLighter, // Additive blending for a glowing effect
-		MinScale:                0.5,
-		MaxScale:                1.5,
+		MinScale:                3,
+		MaxScale:                3.5,
 		MinRotation:             0,
-		MaxRotation:             2 * math.Pi,
+		MaxRotation:             1.5 * math.Pi,
 		TextureIDs:              []int{textureID},
+		Gravity:                 ebimath.V(0, -100),
 	}
 }
 
@@ -51,6 +52,7 @@ func RainPreset(textureID int) *ParticleEmitterComponent {
 		BlendMode:               ebiten.BlendSourceOver,
 		MinScale:                0.2,
 		MaxScale:                0.5,
+		EnableScaling:           false,
 		MinRotation:             0,
 		MaxRotation:             0,
 		TextureIDs:              []int{textureID},

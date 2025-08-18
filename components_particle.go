@@ -48,6 +48,7 @@ type ParticleEmitterComponent struct {
 	// Scale ranges for particles
 	MinScale, MaxScale             float64 // Initial scale range
 	TargetScaleMin, TargetScaleMax float64 // Final scale range
+	EnableScaling                  bool    // Whether particles should scale out over lifetime
 
 	// Rotation ranges for particles (in radians)
 	MinRotation, MaxRotation       float64 // Initial rotation range

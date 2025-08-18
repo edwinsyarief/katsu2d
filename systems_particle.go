@@ -109,7 +109,11 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 
 	// Correctly setting the initial and target scale and rotation based on the emitter's ranges.
 	particleData.InitialScale = particleTransform.Scale().X
-	particleData.TargetScale = ebimath.Lerp(emitter.TargetScaleMin, emitter.TargetScaleMax, self.r.Float64())
+	if emitter.EnableScaling {
+		particleData.TargetScale = ebimath.Lerp(emitter.TargetScaleMin, emitter.TargetScaleMax, self.r.Float64())
+	} else {
+		particleData.TargetScale = particleData.InitialScale
+	}
 	particleData.InitialRotation = particleTransform.Rotation()
 	particleData.TargetRotation = ebimath.Lerp(emitter.EndRotationMin, emitter.EndRotationMax, self.r.Float64())
 
@@ -159,7 +163,7 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		// Interpolate color, scale, and rotation.
 		tp := 1.0 - (p.Lifetime / p.TotalLifetime) // normalized time from 0 to 1
 		s.Color = utils.LerpPremultipliedRGBA(p.InitialColor, p.TargetColor, tp)
-		
+
 		t.SetScale(ebimath.V(
 			ebimath.Lerp(p.InitialScale, p.TargetScale, tp),
 			ebimath.Lerp(p.InitialScale, p.TargetScale, tp),
@@ -204,7 +208,7 @@ func NewParticleRenderSystem(tm *TextureManager) *ParticleRenderSystem {
 func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	// Query for all entities that have a Transform and a Sprite, and are also particles.
 	// This ensures we only render active particles.
-	for _, entity := range world.QueryExact(CTTransform, CTSprite, CTParticle) {
+	for _, entity := range world.Query(CTTransform, CTSprite, CTParticle) {
 		// Use the correct component retrieval pattern
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)

@@ -25,11 +25,19 @@ func NewScene() *Scene {
 // AddSystem adds an update and/or draw system to the scene.
 func (self *Scene) AddSystem(sys any) {
 	if us, ok := sys.(UpdateSystem); ok {
-		self.UpdateSystems = append(self.UpdateSystems, us)
+		self.AddUpdateSystem(us)
 	}
 	if ds, ok := sys.(DrawSystem); ok {
-		self.DrawSystems = append(self.DrawSystems, ds)
+		self.AddDrawSystem(ds)
 	}
+}
+
+func (self *Scene) AddUpdateSystem(us UpdateSystem) {
+	self.UpdateSystems = append(self.UpdateSystems, us)
+}
+
+func (self *Scene) AddDrawSystem(ds DrawSystem) {
+	self.DrawSystems = append(self.DrawSystems, ds)
 }
 
 // Update runs all the scene's update systems.
