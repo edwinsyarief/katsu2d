@@ -7,24 +7,29 @@ import (
 	ebimath "github.com/edwinsyarief/ebi-math"
 )
 
-// This file contains the component pooling logic for efficiency.
-// It's a good practice to keep this separate from the core systems.
+// ComponentPool implements object pooling for game components to reduce memory allocations
+// and garbage collection overhead. Each component type has its own sync.Pool implementation
+// with appropriate creation and reset logic.
 
 // --- SpriteComponent Pool ---
+// spriteComponentPool maintains a pool of reusable SpriteComponents
 var spriteComponentPool = sync.Pool{
 	New: func() interface{} {
 		return NewSpriteComponent(0, 0, 0)
 	},
 }
 
-// GetSpriteComponent retrieves a SpriteComponent from the pool.
+// GetSpriteComponent retrieves a SpriteComponent from the pool
+// Returns: A recycled or new SpriteComponent instance
 func GetSpriteComponent() *SpriteComponent {
 	return spriteComponentPool.Get().(*SpriteComponent)
 }
 
-// PutSpriteComponent returns a SpriteComponent to the pool.
+// PutSpriteComponent returns a SpriteComponent to the pool for reuse
+// Parameters:
+//   - s: The SpriteComponent to be recycled
 func PutSpriteComponent(s *SpriteComponent) {
-	// Reset the component to its default state before returning it to the pool.
+	// Reset all component properties to default values
 	s.TextureID = 0
 	s.SrcX = 0
 	s.SrcY = 0
@@ -38,16 +43,18 @@ func PutSpriteComponent(s *SpriteComponent) {
 }
 
 // --- TransformComponent Pool ---
-// (Dummy implementation, assuming it exists elsewhere)
+// transformComponentPool maintains a pool of reusable TransformComponents
 var transformComponentPool = sync.Pool{
 	New: func() interface{} {
 		return NewTransformComponent()
 	},
 }
 
+// GetTransformComponent retrieves a TransformComponent from the pool and resets its state
+// Returns: A recycled or new TransformComponent instance with default values
 func GetTransformComponent() *TransformComponent {
 	t := transformComponentPool.Get().(*TransformComponent)
-	// Reset to default
+	// Reset transform to default state
 	t.SetPosition(ebimath.Vector{})
 	t.SetScale(ebimath.Vector{X: 1, Y: 1})
 	t.SetRotation(0)
@@ -56,24 +63,32 @@ func GetTransformComponent() *TransformComponent {
 	return t
 }
 
+// PutTransformComponent returns a TransformComponent to the pool for reuse
+// Parameters:
+//   - t: The TransformComponent to be recycled
 func PutTransformComponent(t *TransformComponent) {
 	transformComponentPool.Put(t)
 }
 
 // --- ParticleComponent Pool ---
-// (Dummy implementation, assuming it exists elsewhere)
+// particleComponentPool maintains a pool of reusable ParticleComponents
 var particleComponentPool = sync.Pool{
 	New: func() interface{} {
 		return &ParticleComponent{}
 	},
 }
 
+// GetParticleComponent retrieves a ParticleComponent from the pool
+// Returns: A recycled or new ParticleComponent instance
 func GetParticleComponent() *ParticleComponent {
 	return particleComponentPool.Get().(*ParticleComponent)
 }
 
+// PutParticleComponent returns a ParticleComponent to the pool for reuse
+// Parameters:
+//   - p: The ParticleComponent to be recycled
 func PutParticleComponent(p *ParticleComponent) {
-	// Reset component to default state
+	// Reset all particle properties to default values
 	p.Velocity = ebimath.Vector{}
 	p.Lifetime = 0
 	p.TotalLifetime = 0

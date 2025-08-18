@@ -123,7 +123,7 @@ func NewGame() *Game {
 	g.engine.AddUpdateSystem(&PlayerSystem{})
 
 	// 1. TileMapRenderSystem draws the background (lower grid).
-	g.engine.AddBackgroundDrawSystem(katsu2d.NewSpriteRenderSystem(tm))
+	g.engine.AddBackgroundDrawSystem(katsu2d.NewSpriteRenderSystem(world, tm))
 
 	return g
 }

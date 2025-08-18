@@ -3,7 +3,6 @@ package katsu2d
 import (
 	"math"
 	"math/rand"
-	"time"
 
 	"github.com/aquilax/go-perlin"
 	ebimath "github.com/edwinsyarief/ebi-math"
@@ -159,7 +158,6 @@ type GrassControllerComponent struct {
 
 // NewGrassControllerComponent creates and initializes a new grass controller component.
 func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, worldHeight int, textureID int, z float64, opts ...GrassOption) *GrassControllerComponent {
-	rand.Seed(time.Now().UnixNano())
 	self := &GrassControllerComponent{
 		worldWidth:            worldWidth,
 		worldHeight:           worldHeight,
@@ -220,6 +218,8 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					transform := NewTransformComponent()
 					transform.SetPosition(ebimath.V(posX, posY))
 					transform.Z = self.Z
+
+					self.quadtree.Insert(transform)
 
 					textureID := self.TextureID
 					if len(area.TexturesIDs) > 0 {

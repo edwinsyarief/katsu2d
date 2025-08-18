@@ -193,7 +193,7 @@ func NewParticleRenderSystem(tm *TextureManager) *ParticleRenderSystem {
 func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	// Query for all entities that have a Transform and a Sprite, and are also particles.
 	// This ensures we only render active particles.
-	for _, entity := range world.Query(CTTransform, CTSprite, CTParticle) {
+	for _, entity := range world.QueryExact(CTTransform, CTSprite, CTParticle) {
 		// Use the correct component retrieval pattern
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)

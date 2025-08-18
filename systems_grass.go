@@ -67,15 +67,11 @@ func (self *GrassControllerSystem) Update(world *World, delta float64) {
 	}
 	controller.strongWindGusts = newGusts
 
-	controller.quadtree.Clear()
 	grassEntities := world.Query(CTGrass, CTTransform)
 	for _, entity := range grassEntities {
 		grassComp, _ := world.GetComponent(entity, CTGrass)
 		grass := grassComp.(*GrassComponent)
 		grass.AccumulatedForce = 0.0
-		transformComp, _ := world.GetComponent(entity, CTTransform)
-		transform := transformComp.(*TransformComponent)
-		controller.quadtree.Insert(transform)
 	}
 
 	for _, fs := range currentFrameForceSources {

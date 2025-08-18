@@ -30,13 +30,9 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		op.LineSpacing = textComp.LineSpacing()
 
 		switch textComp.Alignment {
-		case TextAlignmentTopRight:
-		case TextAlignmentMiddleRight:
-		case TextAlignmentBottomRight:
+		case TextAlignmentTopRight, TextAlignmentMiddleRight, TextAlignmentBottomRight:
 			op.PrimaryAlign = text.AlignStart
-		case TextAlignmentTopCenter:
-		case TextAlignmentMiddleCenter:
-		case TextAlignmentBottomCenter:
+		case TextAlignmentTopCenter, TextAlignmentMiddleCenter, TextAlignmentBottomCenter:
 			op.PrimaryAlign = text.AlignCenter
 		default:
 			op.PrimaryAlign = text.AlignStart
@@ -115,37 +111,82 @@ func (self *AnimationSystem) Update(world *World, dt float64) {
 	}
 }
 
+type SpriteRenderOption func(*SpriteRenderSystem)
+
+func WithInclude(componentId ComponentID) SpriteRenderOption {
+	return func(sr *SpriteRenderSystem) {
+		sr.includes = append(sr.includes, componentId)
+	}
+}
+
+func WithExclude(componentId ComponentID) SpriteRenderOption {
+	return func(sr *SpriteRenderSystem) {
+		sr.excludes = append(sr.excludes, componentId)
+	}
+}
+
 // SpriteRenderSystem renders sprite components.
 type SpriteRenderSystem struct {
-	tm *TextureManager
+	world *World
+	tm    *TextureManager
 	// The `drawableEntities` slice holds the pre-sorted list of entities.
 	drawableEntities []Entity
 	// A map to quickly track the entities from the last frame.
 	lastFrameEntities map[Entity]struct{}
+	includes          []ComponentID
+	excludes          []ComponentID
 }
 
 // NewSpriteRenderSystem creates a new SpriteRenderSystem with the given texture manager.
-func NewSpriteRenderSystem(tm *TextureManager) *SpriteRenderSystem {
-	return &SpriteRenderSystem{
+func NewSpriteRenderSystem(world *World, tm *TextureManager, opts ...SpriteRenderOption) *SpriteRenderSystem {
+	srs := &SpriteRenderSystem{
+		world:             world,
 		tm:                tm,
 		lastFrameEntities: make(map[Entity]struct{}),
+		includes:          make([]ComponentID, 0),
+		excludes:          make([]ComponentID, 0),
 	}
+
+	for _, opt := range opts {
+		opt(srs)
+	}
+
+	return srs
 }
 
 // Update checks if a re-sort is needed for the drawables list.
 // This should be run before the Draw method.
+//
+// This function is optimized by only performing the expensive entity
+// query and sort operations when a change in the world state requires it.
 func (self *SpriteRenderSystem) Update(world *World, dt float64) {
-	// Query for the current set of entities.
-	currentEntities := world.Query(CTSprite, CTTransform)
+	// 1. Determine the set of entities to query.
+	// Start with the base components, then add any includes.
+	includeComponents := make([]ComponentID, 0, len(self.includes)+2)
+	includeComponents = append(includeComponents, CTSprite, CTTransform)
+	for _, comp := range self.includes {
+		// Avoid adding duplicates
+		if comp != CTSprite && comp != CTTransform {
+			includeComponents = append(includeComponents, comp)
+		}
+	}
 
-	// A sort is needed if the world has been explicitly marked as dirty,
-	// or if the number of entities has changed.
-	// We no longer need to loop through all entities to check for dirty flags.
+	var currentEntities []Entity
+	if len(self.excludes) == 0 {
+		currentEntities = world.Query(includeComponents...)
+	} else {
+		// The original code uses pre-allocated arrays, but dynamic slices
+		// are often more readable and the performance overhead is minimal
+		// for typical use cases.
+		currentEntities = world.QueryWithExclusion(includeComponents, self.excludes)
+	}
+
+	// 2. Check if a re-sort is required.
+	// A re-sort is needed if the world is explicitly marked as dirty,
+	// or if the set of drawable entities has changed since the last frame.
 	zSortNeeded := world.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
-
-	// If the lengths are the same, we still need to check if the set of
-	// entities has changed (e.g., one was destroyed, another was created).
-	if !zSortNeeded && len(currentEntities) == len(self.lastFrameEntities) {
+	if !zSortNeeded && len(currentEntities) > 0 {
+		// If the number of entities is the same, check for changes in the set of entities.
 		for _, entity := range currentEntities {
 			if _, ok := self.lastFrameEntities[entity]; !ok {
 				zSortNeeded = true
@@ -154,11 +195,9 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 		}
 	}
 
+	// 3. Perform the sort if needed.
 	if zSortNeeded {
-		// Rebuild the drawableEntities slice from the current world state.
 		self.drawableEntities = currentEntities
-
-		// Sort the slice based on Z-index.
 		sort.SliceStable(self.drawableEntities, func(i, j int) bool {
 			t1Any, _ := world.GetComponent(self.drawableEntities[i], CTTransform)
 			t1 := t1Any.(*TransformComponent)
@@ -166,13 +205,10 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 			t2 := t2Any.(*TransformComponent)
 			return t1.Z < t2.Z
 		})
-
-		// Reset the world's sort needed flag since we just sorted.
 		world.zSortNeeded = false
 	}
 
-	// Update the entity map for the next frame's check.
-	// We do this unconditionally so that entity adds/removes are tracked correctly.
+	// 4. Update the entity map for the next frame's change detection.
 	self.lastFrameEntities = make(map[Entity]struct{}, len(currentEntities))
 	for _, entity := range currentEntities {
 		self.lastFrameEntities[entity] = struct{}{}
