@@ -1,6 +1,7 @@
 package katsu2d
 
 import (
+	"image"
 	"image/color"
 	"sync"
 
@@ -13,7 +14,7 @@ import (
 // --- SpriteComponent Pool ---
 var spriteComponentPool = sync.Pool{
 	New: func() interface{} {
-		return NewSpriteComponent(0, 0, 0)
+		return NewSpriteComponent(0, image.Rect(0, 0, 1, 1))
 	},
 }
 

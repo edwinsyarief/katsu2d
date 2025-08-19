@@ -227,8 +227,7 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					}
 
 					img := self.tm.Get(textureID)
-					width, height := img.Bounds().Dx(), img.Bounds().Dy()
-					sprite := NewSpriteComponent(textureID, width, height)
+					sprite := NewSpriteComponent(textureID, img.Bounds())
 
 					world.AddComponent(entity, grassComp)
 					world.AddComponent(entity, transform)

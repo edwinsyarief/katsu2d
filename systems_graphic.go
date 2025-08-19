@@ -224,8 +224,8 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			}
 			renderer.AddVertices(worldVertices, s.Indices, img)
 		} else {
-			imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
-			srcRect := s.GetSourceRect(imgW, imgH)
+			//imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
+			srcRect := s.GetSourceRect()
 			effColor := s.Color
 			effColor.A = uint8(float32(s.Color.A) * s.Opacity)
 			realPos := ebimath.V2(0).Apply(t.Matrix())

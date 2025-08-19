@@ -49,11 +49,12 @@ type SpriteComponent struct {
 }
 
 // NewSpriteComponent creates a new sprite component for a simple quad.
-func NewSpriteComponent(textureID, width, height int) *SpriteComponent {
+func NewSpriteComponent(textureID int, bounds image.Rectangle) *SpriteComponent {
 	s := &SpriteComponent{
 		TextureID: textureID,
-		DstW:      float32(width),
-		DstH:      float32(height),
+		DstW:      float32(bounds.Dx()),
+		DstH:      float32(bounds.Dy()),
+		SrcRect:   &bounds,
 		Color:     color.RGBA{255, 255, 255, 255},
 		Opacity:   1.0,
 		Rows:      1,
@@ -66,54 +67,54 @@ func NewSpriteComponent(textureID, width, height int) *SpriteComponent {
 }
 
 // SetGrid sets the number of rows and columns for the mesh.
-func (s *SpriteComponent) SetGrid(rows, cols int) *SpriteComponent {
+func (self *SpriteComponent) SetGrid(rows, cols int) *SpriteComponent {
 	if rows < 1 {
 		rows = 1
 	}
 	if cols < 1 {
 		cols = 1
 	}
-	if s.Rows != rows || s.Cols != cols {
-		s.Rows = rows
-		s.Cols = cols
+	if self.Rows != rows || self.Cols != cols {
+		self.Rows = rows
+		self.Cols = cols
 		if rows > 1 || cols > 1 {
-			s.MeshType = SpriteMeshTypeGrid
+			self.MeshType = SpriteMeshTypeGrid
 		} else {
-			s.MeshType = SpriteMeshTypeQuad
+			self.MeshType = SpriteMeshTypeQuad
 		}
-		s.dirty = true
+		self.dirty = true
 	}
-	return s
+	return self
 }
 
 // GetSourceRect returns the source rectangle for drawing.
-func (s *SpriteComponent) GetSourceRect(textureWidth, textureHeight int) image.Rectangle {
-	if s.SrcRect != nil {
-		return *s.SrcRect
+func (self *SpriteComponent) GetSourceRect() image.Rectangle {
+	if self.SrcRect != nil {
+		return *self.SrcRect
 	}
-	return image.Rect(0, 0, textureWidth, textureHeight)
+	return image.Rect(0, 0, int(self.DstW), int(self.DstH))
 }
 
 // GenerateMesh creates the vertices and indices for the sprite's mesh.
-func (s *SpriteComponent) GenerateMesh() {
-	if !s.dirty {
+func (self *SpriteComponent) GenerateMesh() {
+	if !self.dirty {
 		return
 	}
-	
-	srcRect := s.GetSourceRect(int(s.DstW), int(s.DstH))
 
-	numVertices := (s.Rows + 1) * (s.Cols + 1)
-	s.Vertices = make([]ebiten.Vertex, numVertices)
+	srcRect := self.GetSourceRect()
 
-	for r := 0; r <= s.Rows; r++ {
-		for c := 0; c <= s.Cols; c++ {
-			idx := r*(s.Cols+1) + c
-			vx := float32(s.DstW * (float32(c) / float32(s.Cols)))
-			vy := float32(s.DstH * (float32(r) / float32(s.Rows)))
-			u := float32(srcRect.Min.X) + float32(srcRect.Dx())*(float32(c)/float32(s.Cols))
-			v := float32(srcRect.Min.Y) + float32(srcRect.Dy())*(float32(r)/float32(s.Rows))
+	numVertices := (self.Rows + 1) * (self.Cols + 1)
+	self.Vertices = make([]ebiten.Vertex, numVertices)
 
-			s.Vertices[idx] = ebiten.Vertex{
+	for r := 0; r <= self.Rows; r++ {
+		for c := 0; c <= self.Cols; c++ {
+			idx := r*(self.Cols+1) + c
+			vx := float32(self.DstW * (float32(c) / float32(self.Cols)))
+			vy := float32(self.DstH * (float32(r) / float32(self.Rows)))
+			u := float32(srcRect.Min.X) + float32(srcRect.Dx())*(float32(c)/float32(self.Cols))
+			v := float32(srcRect.Min.Y) + float32(srcRect.Dy())*(float32(r)/float32(self.Rows))
+
+			self.Vertices[idx] = ebiten.Vertex{
 				DstX:   vx,
 				DstY:   vy,
 				SrcX:   u,
@@ -126,25 +127,25 @@ func (s *SpriteComponent) GenerateMesh() {
 		}
 	}
 
-	numQuads := s.Rows * s.Cols
-	s.Indices = make([]uint16, numQuads*6)
+	numQuads := self.Rows * self.Cols
+	self.Indices = make([]uint16, numQuads*6)
 	i := 0
-	for r := 0; r < s.Rows; r++ {
-		for c := 0; c < s.Cols; c++ {
-			topLeft := uint16(r*(s.Cols+1) + c)
+	for r := 0; r < self.Rows; r++ {
+		for c := 0; c < self.Cols; c++ {
+			topLeft := uint16(r*(self.Cols+1) + c)
 			topRight := topLeft + 1
-			bottomLeft := uint16((r+1)*(s.Cols+1) + c)
+			bottomLeft := uint16((r+1)*(self.Cols+1) + c)
 			bottomRight := bottomLeft + 1
-			s.Indices[i] = topLeft
-			s.Indices[i+1] = topRight
-			s.Indices[i+2] = bottomLeft
-			s.Indices[i+3] = bottomLeft
-			s.Indices[i+4] = topRight
-			s.Indices[i+5] = bottomRight
+			self.Indices[i] = topLeft
+			self.Indices[i+1] = topRight
+			self.Indices[i+2] = bottomLeft
+			self.Indices[i+3] = bottomLeft
+			self.Indices[i+4] = topRight
+			self.Indices[i+5] = bottomRight
 			i += 6
 		}
 	}
-	s.dirty = false
+	self.dirty = false
 }
 
 type AnimMode int

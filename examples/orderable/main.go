@@ -110,7 +110,7 @@ func NewGame() *Game {
 		treeTransform := katsu2d.NewTransformComponent()
 		treeTransform.SetPosition(ebimath.V(float64(i*40+20), 100))
 		world.AddComponent(treeEntity, treeTransform)
-		treeSprite := katsu2d.NewSpriteComponent(treeTexID, 25, 50)
+		treeSprite := katsu2d.NewSpriteComponent(treeTexID, treeImg.Bounds())
 		world.AddComponent(treeEntity, treeSprite)
 		world.AddComponent(treeEntity, katsu2d.NewOrderableComponent(func() float64 {
 			return treeTransform.Position().Y + float64(treeSprite.DstH)
@@ -121,7 +121,7 @@ func NewGame() *Game {
 		treeTransform := katsu2d.NewTransformComponent()
 		treeTransform.SetPosition(ebimath.V(float64(i*40+40), 200))
 		world.AddComponent(treeEntity, treeTransform)
-		treeSprite := katsu2d.NewSpriteComponent(treeTexID, 25, 50)
+		treeSprite := katsu2d.NewSpriteComponent(treeTexID, treeImg.Bounds())
 		world.AddComponent(treeEntity, treeSprite)
 		world.AddComponent(treeEntity, katsu2d.NewOrderableComponent(func() float64 {
 			return treeTransform.Position().Y + float64(treeSprite.DstH)
@@ -133,7 +133,7 @@ func NewGame() *Game {
 	playerTransform := katsu2d.NewTransformComponent()
 	playerTransform.SetPosition(ebimath.V(160, 120))
 	world.AddComponent(playerEntity, playerTransform)
-	playerSprite := katsu2d.NewSpriteComponent(playerTexID, 25, 25)
+	playerSprite := katsu2d.NewSpriteComponent(playerTexID, playerImg.Bounds())
 	world.AddComponent(playerEntity, playerSprite)
 	world.AddComponent(playerEntity, katsu2d.NewTagComponent(PlayerTag))
 	world.AddComponent(playerEntity, katsu2d.NewInputComponent(keybindings))

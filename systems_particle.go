@@ -62,7 +62,6 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 	}
 
 	tex := self.tm.Get(texID)
-	width, height := tex.Bounds().Dx(), tex.Bounds().Dy()
 	newParticle := world.CreateEntity()
 	particleTransform := GetTransformComponent()
 	particleSprite := GetSpriteComponent()
@@ -106,8 +105,10 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 
 	particleSprite.TextureID = texID
 	particleSprite.Color = particleData.InitialColor
-	particleSprite.DstW = float32(width)
-	particleSprite.DstH = float32(height)
+	bounds := tex.Bounds()
+	particleSprite.SrcRect = &bounds
+	particleSprite.DstW = float32(tex.Bounds().Dx())
+	particleSprite.DstH = float32(tex.Bounds().Dy())
 
 	world.AddComponent(newParticle, particleTransform)
 	world.AddComponent(newParticle, particleSprite)
@@ -191,8 +192,8 @@ func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			continue
 		}
 
-		imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
-		srcRect := s.GetSourceRect(imgW, imgH)
+		//imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
+		srcRect := s.GetSourceRect()
 		effColor := s.Color
 		effColor.A = uint8(float32(s.Color.A) * s.Opacity)
 		realPos := ebimath.V2(0).Apply(t.Matrix())

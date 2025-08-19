@@ -114,7 +114,7 @@ func NewGame() *Game {
 	playerTransform.SetPosition(ebimath.V(80, 60))
 	playerTransform.Z = 1 // Set player's Z to the same layer as the upper grid tiles
 	world.AddComponent(playerEntity, playerTransform)
-	world.AddComponent(playerEntity, katsu2d.NewSpriteComponent(playerTexID, 16, 16))
+	world.AddComponent(playerEntity, katsu2d.NewSpriteComponent(playerTexID, playerImg.Bounds()))
 	world.AddComponent(playerEntity, katsu2d.NewTagComponent(PlayerTag))
 	world.AddComponent(playerEntity, katsu2d.NewInputComponent(keybindings))
 
