@@ -206,7 +206,7 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		}
 
 		if s.dirty {
-			s.GenerateMesh(img)
+			s.GenerateMesh()
 		}
 
 		if s.MeshType == SpriteMeshTypeGrid {

@@ -95,13 +95,12 @@ func (s *SpriteComponent) GetSourceRect(textureWidth, textureHeight int) image.R
 }
 
 // GenerateMesh creates the vertices and indices for the sprite's mesh.
-func (s *SpriteComponent) GenerateMesh(texture *ebiten.Image) {
+func (s *SpriteComponent) GenerateMesh() {
 	if !s.dirty {
 		return
 	}
-
-	texWidth, texHeight := texture.Size()
-	srcRect := s.GetSourceRect(texWidth, texHeight)
+	
+	srcRect := s.GetSourceRect(int(s.DstW), int(s.DstH))
 
 	numVertices := (s.Rows + 1) * (s.Cols + 1)
 	s.Vertices = make([]ebiten.Vertex, numVertices)
