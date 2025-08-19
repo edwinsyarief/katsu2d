@@ -143,9 +143,6 @@ func NewGame() *Game {
 
 	// Particle Emitter
 	firePreset := katsu2d.FirePreset(particleTexID)
-	firePreset.MaxParticles = 1000
-	firePreset.EmitRate = 700
-	firePreset.Gravity = ebimath.V(0, -200)
 	world.AddComponent(playerEntity, firePreset)
 
 	// --- Systems ---

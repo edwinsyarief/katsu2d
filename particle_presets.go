@@ -12,8 +12,8 @@ import (
 func FirePreset(textureID int) *ParticleEmitterComponent {
 	return &ParticleEmitterComponent{
 		Active:                  true,
-		EmitRate:                500,
-		MaxParticles:            1000,
+		EmitRate:                200,
+		MaxParticles:            500,
 		ParticleLifetime:        1.0,
 		InitialParticleSpeedMin: 3,
 		InitialParticleSpeedMax: 5,
@@ -24,8 +24,8 @@ func FirePreset(textureID int) *ParticleEmitterComponent {
 		TargetColorMax:          color.RGBA{255, 0, 0, 0},     // Red, transparent
 		FadeOut:                 true,
 		BlendMode:               ebiten.BlendLighter, // Additive blending for a glowing effect
-		MinScale:                3,
-		MaxScale:                3.5,
+		MinScale:                1,
+		MaxScale:                1.5,
 		MinRotation:             0,
 		MaxRotation:             1.5 * math.Pi,
 		TextureIDs:              []int{textureID},

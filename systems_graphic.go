@@ -5,6 +5,7 @@ import (
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -82,7 +83,6 @@ func (self *AnimationSystem) Update(world *World, dt float64) {
 				anim.Current++
 				anim.Current %= nf
 			case AnimBoomerang:
-				// --- FIX: Handle single-frame boomerang gracefully ---
 				if nf > 1 {
 					if anim.Direction {
 						anim.Current++
@@ -103,10 +103,7 @@ func (self *AnimationSystem) Update(world *World, dt float64) {
 				}
 			}
 			frame := anim.Frames[anim.Current]
-			spr.SrcX = float32(frame.Min.X)
-			spr.SrcY = float32(frame.Min.Y)
-			spr.SrcW = float32(frame.Dx())
-			spr.SrcH = float32(frame.Dy())
+			spr.SrcRect = &frame
 		}
 	}
 }
@@ -127,11 +124,9 @@ func WithExclude(componentId ComponentID) SpriteRenderOption {
 
 // SpriteRenderSystem renders sprite components.
 type SpriteRenderSystem struct {
-	world *World
-	tm    *TextureManager
-	// The `drawableEntities` slice holds the pre-sorted list of entities.
-	drawableEntities []Entity
-	// A map to quickly track the entities from the last frame.
+	world             *World
+	tm                *TextureManager
+	drawableEntities  []Entity
 	lastFrameEntities map[Entity]struct{}
 	includes          []ComponentID
 	excludes          []ComponentID
@@ -146,26 +141,17 @@ func NewSpriteRenderSystem(world *World, tm *TextureManager, opts ...SpriteRende
 		includes:          make([]ComponentID, 0),
 		excludes:          make([]ComponentID, 0),
 	}
-
 	for _, opt := range opts {
 		opt(srs)
 	}
-
 	return srs
 }
 
 // Update checks if a re-sort is needed for the drawables list.
-// This should be run before the Draw method.
-//
-// This function is optimized by only performing the expensive entity
-// query and sort operations when a change in the world state requires it.
 func (self *SpriteRenderSystem) Update(world *World, dt float64) {
-	// 1. Determine the set of entities to query.
-	// Start with the base components, then add any includes.
 	includeComponents := make([]ComponentID, 0, len(self.includes)+2)
 	includeComponents = append(includeComponents, CTSprite, CTTransform)
 	for _, comp := range self.includes {
-		// Avoid adding duplicates
 		if comp != CTSprite && comp != CTTransform {
 			includeComponents = append(includeComponents, comp)
 		}
@@ -175,18 +161,11 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 	if len(self.excludes) == 0 {
 		currentEntities = world.Query(includeComponents...)
 	} else {
-		// The original code uses pre-allocated arrays, but dynamic slices
-		// are often more readable and the performance overhead is minimal
-		// for typical use cases.
 		currentEntities = world.QueryWithExclusion(includeComponents, self.excludes)
 	}
 
-	// 2. Check if a re-sort is required.
-	// A re-sort is needed if the world is explicitly marked as dirty,
-	// or if the set of drawable entities has changed since the last frame.
 	zSortNeeded := world.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
 	if !zSortNeeded && len(currentEntities) > 0 {
-		// If the number of entities is the same, check for changes in the set of entities.
 		for _, entity := range currentEntities {
 			if _, ok := self.lastFrameEntities[entity]; !ok {
 				zSortNeeded = true
@@ -195,7 +174,6 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 		}
 	}
 
-	// 3. Perform the sort if needed.
 	if zSortNeeded {
 		self.drawableEntities = currentEntities
 		sort.SliceStable(self.drawableEntities, func(i, j int) bool {
@@ -208,7 +186,6 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 		world.zSortNeeded = false
 	}
 
-	// 4. Update the entity map for the next frame's change detection.
 	self.lastFrameEntities = make(map[Entity]struct{}, len(currentEntities))
 	for _, entity := range currentEntities {
 		self.lastFrameEntities[entity] = struct{}{}
@@ -217,7 +194,6 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 
 // Draw renders all sprites in the world, using the pre-sorted list.
 func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
-	// The drawableEntities list is already sorted by the Update method.
 	for _, entity := range self.drawableEntities {
 		tx, _ := world.GetComponent(entity, CTTransform)
 		t := tx.(*TransformComponent)
@@ -229,27 +205,42 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			continue
 		}
 
-		imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
-		srcX, srcY, srcW, srcH := s.GetSourceRect(float32(imgW), float32(imgH))
-		destW32, destH32 := s.GetDestSize(srcW, srcH)
-		destW, destH := float64(destW32), float64(destH32)
-
-		effColor := s.Color
-		effColor.A = uint8(float32(s.Color.A) * s.Opacity)
-
-		realPos := ebimath.V2(0).Apply(t.Matrix())
-		if !t.Origin().IsZero() {
-			realPos = realPos.Sub(t.Origin())
+		if s.dirty {
+			s.GenerateMesh(img)
 		}
 
-		renderer.DrawQuad(
-			realPos,
-			t.Scale(),
-			t.Rotation(),
-			img,
-			effColor,
-			srcX, srcY, srcX+srcW, srcY+srcH,
-			destW, destH,
-		)
+		if s.MeshType == SpriteMeshTypeGrid {
+			worldVertices := make([]ebiten.Vertex, len(s.Vertices))
+			transformMatrix := t.Matrix()
+			for i, v := range s.Vertices {
+				v.ColorR = float32(s.Color.R) / 255
+				v.ColorG = float32(s.Color.G) / 255
+				v.ColorB = float32(s.Color.B) / 255
+				v.ColorA = float32(s.Color.A) / 255 * s.Opacity
+				vx, vy := (&transformMatrix).Apply(float64(v.DstX), float64(v.DstY))
+				v.DstX = float32(vx)
+				v.DstY = float32(vy)
+				worldVertices[i] = v
+			}
+			renderer.AddVertices(worldVertices, s.Indices, img)
+		} else {
+			imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
+			srcRect := s.GetSourceRect(imgW, imgH)
+			effColor := s.Color
+			effColor.A = uint8(float32(s.Color.A) * s.Opacity)
+			realPos := ebimath.V2(0).Apply(t.Matrix())
+			if !t.Origin().IsZero() {
+				realPos = realPos.Sub(t.Origin())
+			}
+			renderer.DrawQuad(
+				realPos,
+				t.Scale(),
+				t.Rotation(),
+				img,
+				effColor,
+				float32(srcRect.Min.X), float32(srcRect.Min.Y), float32(srcRect.Max.X), float32(srcRect.Max.Y),
+				float64(s.DstW), float64(s.DstH),
+			)
+		}
 	}
 }

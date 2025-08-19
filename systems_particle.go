@@ -23,28 +23,22 @@ func NewParticleEmitterSystem(tm *TextureManager) *ParticleEmitterSystem {
 
 // Update implements the UpdateSystem interface to handle particle spawning.
 func (self *ParticleEmitterSystem) Update(world *World, dt float64) {
-	// Loop over all entities that have a Transform and an Emitter component.
 	for _, entity := range world.Query(CTTransform, CTParticleEmitter) {
-		// Use the correct component retrieval pattern
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)
 		emitter, _ := world.GetComponent(entity, CTParticleEmitter)
 		em := emitter.(*ParticleEmitterComponent)
 
-		// Determine the number of particles to spawn this frame.
 		particlesToSpawn := 0
 		if em.Active {
-			// Continuous emission
 			em.spawnCounter += em.EmitRate * dt
 			particlesToSpawn = int(em.spawnCounter)
 			em.spawnCounter -= float64(particlesToSpawn)
 		} else if em.BurstCount > 0 {
-			// One-time burst
 			particlesToSpawn = em.BurstCount
-			em.BurstCount = 0 // Reset burst count after spawning
+			em.BurstCount = 0
 		}
 
-		// Spawn new particles, respecting the max particle limit.
 		if particlesToSpawn > 0 {
 			ptEntities := world.Query(CTParticle)
 			currentParticles := len(ptEntities)
@@ -69,7 +63,6 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 
 	tex := self.tm.Get(texID)
 	width, height := tex.Bounds().Dx(), tex.Bounds().Dy()
-	// Create a new entity and retrieve components from the pool for efficiency.
 	newParticle := world.CreateEntity()
 	particleTransform := GetTransformComponent()
 	particleSprite := GetSpriteComponent()
@@ -77,23 +70,18 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 	parentComponent := NewParentComponent(emitterEntity)
 	particleOrderable := &OrderableComponent{}
 
-	// Set the particle's sorting index to the parent's current index.
 	if parentOrderableAny, ok := world.GetComponent(emitterEntity, CTOrderable); ok {
 		parentOrderable := parentOrderableAny.(*OrderableComponent)
 		particleOrderable.SetIndex(parentOrderable.Index())
 	}
 
-	// Particle must have the same Z with the emitter
 	particleTransform.Z = emitterTransform.Z
-
-	// Randomize particle properties based on the emitter's configuration.
-	randAngle := self.r.Float64() * 2 * math.Pi // 0 to 2*pi
+	randAngle := self.r.Float64() * 2 * math.Pi
 	randSpeed := self.r.FloatRange(
 		emitter.InitialParticleSpeedMin,
 		emitter.InitialParticleSpeedMax)
 	randOffset := ebimath.V(self.r.Float64()*emitter.ParticleSpawnOffset.X, self.r.Float64()*emitter.ParticleSpawnOffset.Y)
 
-	// Set initial particle state.
 	particleTransform.SetPosition(emitterTransform.Position().Add(randOffset))
 	particleTransform.SetRotation(ebimath.Lerp(emitter.MinRotation, emitter.MaxRotation, self.r.Float64()))
 	particleTransform.SetScale(ebimath.V(
@@ -106,8 +94,6 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 	particleData.TotalLifetime = emitter.ParticleLifetime
 	particleData.InitialColor = utils.GetInterpolatedColor(emitter.InitialColorMin, emitter.InitialColorMax)
 	particleData.TargetColor = utils.GetInterpolatedColor(emitter.TargetColorMin, emitter.TargetColorMax)
-
-	// Correctly setting the initial and target scale and rotation based on the emitter's ranges.
 	particleData.InitialScale = particleTransform.Scale().X
 	if emitter.EnableScaling {
 		particleData.TargetScale = ebimath.Lerp(emitter.TargetScaleMin, emitter.TargetScaleMax, self.r.Float64())
@@ -116,14 +102,12 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 	}
 	particleData.InitialRotation = particleTransform.Rotation()
 	particleData.TargetRotation = ebimath.Lerp(emitter.EndRotationMin, emitter.EndRotationMax, self.r.Float64())
-
 	particleData.Gravity = emitter.Gravity
 
-	// Configure the sprite component.
 	particleSprite.TextureID = texID
 	particleSprite.Color = particleData.InitialColor
-	particleSprite.SrcW = float32(width)
-	particleSprite.SrcH = float32(height)
+	particleSprite.DstW = float32(width)
+	particleSprite.DstH = float32(height)
 
 	world.AddComponent(newParticle, particleTransform)
 	world.AddComponent(newParticle, particleSprite)
@@ -133,21 +117,17 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 }
 
 // ParticleUpdateSystem is an UpdateSystem that handles the movement and lifecycle of particles.
-type ParticleUpdateSystem struct {
-}
+type ParticleUpdateSystem struct{}
 
 // NewParticleUpdateSystem creates a new system for updating particles.
 func NewParticleUpdateSystem() *ParticleUpdateSystem {
 	return &ParticleUpdateSystem{}
 }
 
-// Update implements the UpdateSystem interface. It moves particles, handles fading, and removes expired particles.
+// Update implements the UpdateSystem interface.
 func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
-	// A list to hold entities that should be removed at the end of the frame.
 	var toRemove []Entity
-
 	for _, entity := range world.Query(CTTransform, CTParticle, CTSprite) {
-		// Use the correct component retrieval pattern
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)
 		particle, _ := world.GetComponent(entity, CTParticle)
@@ -155,13 +135,11 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		sprite, _ := world.GetComponent(entity, CTSprite)
 		s := sprite.(*SpriteComponent)
 
-		// Update position and velocity.
 		p.Velocity = p.Velocity.Add(p.Gravity.MulF(dt))
 		t.SetPosition(t.Position().Add(p.Velocity.MulF(dt)))
 		p.Lifetime -= dt
 
-		// Interpolate color, scale, and rotation.
-		tp := 1.0 - (p.Lifetime / p.TotalLifetime) // normalized time from 0 to 1
+		tp := 1.0 - (p.Lifetime / p.TotalLifetime)
 		s.Color = utils.LerpPremultipliedRGBA(p.InitialColor, p.TargetColor, tp)
 
 		t.SetScale(ebimath.V(
@@ -175,7 +153,6 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		}
 	}
 
-	// Remove expired particles and return components to the pool.
 	for _, entity := range toRemove {
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)
@@ -186,10 +163,8 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 
 		PutTransformComponent(t)
 		PutParticleComponent(p)
-		PutSpriteComponent(s) // Return the sprite component to the pool!
+		PutSpriteComponent(s)
 	}
-
-	// Batch remove expired particles
 	world.BatchRemoveEntities(toRemove...)
 }
 
@@ -199,17 +174,13 @@ type ParticleRenderSystem struct {
 }
 
 // NewParticleRenderSystem creates a new system for rendering particles.
-// It requires a TextureManager to access particle textures.
 func NewParticleRenderSystem(tm *TextureManager) *ParticleRenderSystem {
 	return &ParticleRenderSystem{tm: tm}
 }
 
-// Draw implements the DrawSystem interface. It renders all particles using the BatchRenderer.
+// Draw implements the DrawSystem interface.
 func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
-	// Query for all entities that have a Transform and a Sprite, and are also particles.
-	// This ensures we only render active particles.
 	for _, entity := range world.Query(CTTransform, CTSprite, CTParticle) {
-		// Use the correct component retrieval pattern
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)
 		sprite, _ := world.GetComponent(entity, CTSprite)
@@ -221,26 +192,21 @@ func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		}
 
 		imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
-		srcX, srcY, srcW, srcH := s.GetSourceRect(float32(imgW), float32(imgH))
-		destW32, destH32 := s.GetDestSize(srcW, srcH)
-		destW, destH := float64(destW32), float64(destH32)
-
+		srcRect := s.GetSourceRect(imgW, imgH)
 		effColor := s.Color
 		effColor.A = uint8(float32(s.Color.A) * s.Opacity)
-
 		realPos := ebimath.V2(0).Apply(t.Matrix())
 		if !t.Origin().IsZero() {
 			realPos = realPos.Sub(t.Origin())
 		}
-
 		renderer.DrawQuad(
 			realPos,
 			t.Scale(),
 			t.Rotation(),
 			img,
 			effColor,
-			srcX, srcY, srcX+srcW, srcY+srcH,
-			destW, destH,
+			float32(srcRect.Min.X), float32(srcRect.Min.Y), float32(srcRect.Max.X), float32(srcRect.Max.Y),
+			float64(s.DstW), float64(s.DstH),
 		)
 	}
 }
