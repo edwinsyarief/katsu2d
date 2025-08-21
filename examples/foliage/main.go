@@ -3,7 +3,6 @@ package main
 import (
 	_ "image/png"
 	"log"
-	"math/rand"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d"
@@ -17,8 +16,12 @@ type Game struct {
 	img    *ebiten.Image
 }
 
+var rand *ebimath.Rand
+
 // NewGame creates a new Game object and sets up the engine.
 func NewGame() *Game {
+	rand = ebimath.Random()
+
 	g := &Game{}
 
 	g.engine = katsu2d.NewEngine(
@@ -41,9 +44,9 @@ func NewGame() *Game {
 	// --- Foliage Controller ---
 	foliageControllerEntity := world.CreateEntity()
 	foliageController := katsu2d.NewFoliageControllerComponent(
-		katsu2d.WithFoliageWindForce(70), // Radians
-		katsu2d.WithFoliageWindSpeed(1.5),
-		katsu2d.WithFoliageRippleStrength(80.0),
+		katsu2d.WithFoliageWindForce(50), // Radians
+		katsu2d.WithFoliageWindSpeed(1.0),
+		katsu2d.WithFoliageRippleStrength(50.0),
 	)
 	world.AddComponent(foliageControllerEntity, foliageController)
 
@@ -90,7 +93,7 @@ func createFoliage(world *katsu2d.World, tm *katsu2d.TextureManager, textureID i
 	// Foliage
 	foliage := &katsu2d.FoliageComponent{
 		TextureID: textureID,
-		SwaySeed:  rand.Float64() * 100,
+		SwaySeed:  rand.FloatRange(0, 100),
 		Pivot:     pivot,
 	}
 	world.AddComponent(entity, foliage)
