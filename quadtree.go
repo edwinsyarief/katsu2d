@@ -7,44 +7,44 @@ const (
 	MaxDepth          = 8
 )
 
-type QuadtreeECS struct {
-	root  *quadtreeECSNode
+type Quadtree struct {
+	root  *quadtreeNode
 	world *World
 }
 
-func NewQuadtreeECS(world *World, bounds ebimath.Rectangle) *QuadtreeECS {
-	return &QuadtreeECS{
+func NewQuadtree(world *World, bounds ebimath.Rectangle) *Quadtree {
+	return &Quadtree{
 		world: world,
-		root:  newQuadtreeECSNode(world, bounds, 0),
+		root:  newQuadtreeNode(world, bounds, 0),
 	}
 }
 
-func (self *QuadtreeECS) Insert(obj Entity) {
+func (self *Quadtree) Insert(obj Entity) {
 	self.root.insert(obj)
 }
 
-func (self *QuadtreeECS) Query(bounds ebimath.Rectangle) []Entity {
+func (self *Quadtree) Query(bounds ebimath.Rectangle) []Entity {
 	return self.root.query(bounds)
 }
 
-func (self *QuadtreeECS) QueryCircle(center ebimath.Vector, radius float64) []Entity {
+func (self *Quadtree) QueryCircle(center ebimath.Vector, radius float64) []Entity {
 	return self.root.queryCircle(center, radius)
 }
 
-func (self *QuadtreeECS) Clear() {
-	self.root = newQuadtreeECSNode(self.world, self.root.bounds, 0)
+func (self *Quadtree) Clear() {
+	self.root = newQuadtreeNode(self.world, self.root.bounds, 0)
 }
 
-type quadtreeECSNode struct {
+type quadtreeNode struct {
 	world    *World
 	bounds   ebimath.Rectangle
 	objects  []Entity
-	children [4]*quadtreeECSNode
+	children [4]*quadtreeNode
 	depth    int
 }
 
-func newQuadtreeECSNode(world *World, bounds ebimath.Rectangle, depth int) *quadtreeECSNode {
-	return &quadtreeECSNode{
+func newQuadtreeNode(world *World, bounds ebimath.Rectangle, depth int) *quadtreeNode {
+	return &quadtreeNode{
 		world:   world,
 		bounds:  bounds,
 		objects: make([]Entity, 0),
@@ -52,7 +52,7 @@ func newQuadtreeECSNode(world *World, bounds ebimath.Rectangle, depth int) *quad
 	}
 }
 
-func (self *quadtreeECSNode) insert(e Entity) {
+func (self *quadtreeNode) insert(e Entity) {
 	transform, ok := self.world.GetComponent(e, CTTransform)
 	if !ok {
 		panic("Entity doesn't have TransformComponent")
@@ -95,17 +95,17 @@ func (self *quadtreeECSNode) insert(e Entity) {
 	}
 }
 
-func (self *quadtreeECSNode) subdivide() {
+func (self *quadtreeNode) subdivide() {
 	midX := (self.bounds.Min.X + self.bounds.Max.X) / 2
 	midY := (self.bounds.Min.Y + self.bounds.Max.Y) / 2
 
-	self.children[0] = newQuadtreeECSNode(self.world, ebimath.Rectangle{Min: self.bounds.Min, Max: ebimath.Vector{X: midX, Y: midY}}, self.depth+1)
-	self.children[1] = newQuadtreeECSNode(self.world, ebimath.Rectangle{Min: ebimath.Vector{X: midX, Y: self.bounds.Min.Y}, Max: ebimath.Vector{X: self.bounds.Max.X, Y: midY}}, self.depth+1)
-	self.children[2] = newQuadtreeECSNode(self.world, ebimath.Rectangle{Min: ebimath.Vector{X: self.bounds.Min.X, Y: midY}, Max: ebimath.Vector{X: midX, Y: self.bounds.Max.Y}}, self.depth+1)
-	self.children[3] = newQuadtreeECSNode(self.world, ebimath.Rectangle{Min: ebimath.Vector{X: midX, Y: midY}, Max: self.bounds.Max}, self.depth+1)
+	self.children[0] = newQuadtreeNode(self.world, ebimath.Rectangle{Min: self.bounds.Min, Max: ebimath.Vector{X: midX, Y: midY}}, self.depth+1)
+	self.children[1] = newQuadtreeNode(self.world, ebimath.Rectangle{Min: ebimath.Vector{X: midX, Y: self.bounds.Min.Y}, Max: ebimath.Vector{X: self.bounds.Max.X, Y: midY}}, self.depth+1)
+	self.children[2] = newQuadtreeNode(self.world, ebimath.Rectangle{Min: ebimath.Vector{X: self.bounds.Min.X, Y: midY}, Max: ebimath.Vector{X: midX, Y: self.bounds.Max.Y}}, self.depth+1)
+	self.children[3] = newQuadtreeNode(self.world, ebimath.Rectangle{Min: ebimath.Vector{X: midX, Y: midY}, Max: self.bounds.Max}, self.depth+1)
 }
 
-func (self *quadtreeECSNode) query(bounds ebimath.Rectangle) []Entity {
+func (self *quadtreeNode) query(bounds ebimath.Rectangle) []Entity {
 	var result []Entity
 
 	if !self.bounds.Intersects(bounds) {
@@ -129,7 +129,7 @@ func (self *quadtreeECSNode) query(bounds ebimath.Rectangle) []Entity {
 	return result
 }
 
-func (self *quadtreeECSNode) queryCircle(center ebimath.Vector, radius float64) []Entity {
+func (self *quadtreeNode) queryCircle(center ebimath.Vector, radius float64) []Entity {
 	var result []Entity
 
 	if !intersectsCircle(self.bounds, center, radius) {

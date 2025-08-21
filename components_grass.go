@@ -134,7 +134,7 @@ type GrassControllerComponent struct {
 	worldHeight           int
 	tileSize              int
 	grassDensity          int
-	quadtree              *QuadtreeECS
+	quadtree              *Quadtree
 	tm                    *TextureManager
 	externalForceSources  []ForceSource
 	strongWindGusts       []*StrongWindGust
@@ -183,7 +183,7 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 		Min: ebimath.Vector{X: 0, Y: 0},
 		Max: ebimath.Vector{X: float64(worldWidth), Y: float64(worldHeight)},
 	}
-	self.quadtree = NewQuadtreeECS(world, bounds)
+	self.quadtree = NewQuadtree(world, bounds)
 	return self
 }
 
