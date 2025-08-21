@@ -128,6 +128,12 @@ func WithGrassAreas(areas []Area) GrassOption {
 	}
 }
 
+func WithGrassOrderable(orderable bool) GrassOption {
+	return func(self *GrassControllerComponent) {
+		self.orderable = orderable
+	}
+}
+
 // GrassControllerComponent holds the configuration and state of the grass system.
 type GrassControllerComponent struct {
 	worldWidth            int
@@ -152,6 +158,7 @@ type GrassControllerComponent struct {
 	windForce             float64
 	windSpeed             float64
 	TextureID             int
+	orderable             bool
 	Z                     float64
 }
 
@@ -163,13 +170,13 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 		tileSize:              32,
 		grassDensity:          20,
 		tm:                    tm,
-		noiseMapSize:          128,
-		noiseFrequency:        20.0,
-		swaySpringStrength:    10.0,
-		swayDamping:           0.88,
-		forceBaseAcceleration: 1800.0,
+		noiseMapSize:          512,
+		noiseFrequency:        100.0,
+		swaySpringStrength:    0.5,
+		swayDamping:           0.5,
+		forceBaseAcceleration: 800.0,
 		windDirection:         ebimath.Vector{X: 1.0, Y: 0.0},
-		windForce:             0.8,
+		windForce:             0.3,
 		windSpeed:             0.5,
 		TextureID:             textureID,
 		Z:                     z,
@@ -220,12 +227,20 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					transform.SetPosition(ebimath.V(posX, posY))
 					transform.Z = self.Z
 
+					if self.orderable {
+						orderable := NewOrderableComponent(nil)
+						orderable.SetIndex(transform.Position().Y)
+						world.AddComponent(entity, orderable)
+					}
+
 					textureID := self.TextureID
 					if len(area.TexturesIDs) > 0 {
 						textureID = area.TexturesIDs[rand.Intn(len(area.TexturesIDs))]
 					}
 
 					img := self.tm.Get(textureID)
+					transform.SetOffset(ebimath.V(float64(img.Bounds().Dx())/2, float64(img.Bounds().Dy())))
+
 					sprite := NewSpriteComponent(textureID, img.Bounds())
 
 					world.AddComponent(entity, grassComp)

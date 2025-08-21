@@ -9,6 +9,10 @@ import (
 // GrassControllerSystem is an update system that simulates the grass physics.
 type GrassControllerSystem struct{}
 
+func NewGrassControllerSystem() *GrassControllerSystem {
+	return &GrassControllerSystem{}
+}
+
 // Update simulates the grass physics, applying forces and wind effects.
 func (self *GrassControllerSystem) Update(world *World, delta float64) {
 	grassControllerEntities := world.Query(CTGrassController)
