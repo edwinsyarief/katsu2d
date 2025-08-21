@@ -21,27 +21,29 @@ var (
 // Built-in component IDs are registered during initialization.
 // These constants provide quick access to commonly used component types.
 var (
-	CTTransform        ComponentID // Transform component for position, rotation, and scale
-	CTSprite           ComponentID // Sprite component for rendering images
-	CTAnimation        ComponentID // Animation component for sprite animations
-	CTTween            ComponentID // Tween component for smooth value interpolation
-	CTSequence         ComponentID // Sequence component for chaining animations
-	CTFadeOverlay      ComponentID // Fade overlay for screen transitions
-	CTCinematicOverlay ComponentID // Cinematic overlay for cutscenes
-	CTText             ComponentID // Text rendering component
-	CTCooldown         ComponentID // Cooldown management for timed actions
-	CTDelayer          ComponentID // Delay manager for delayed actions
-	CTParticleEmitter  ComponentID // Particle system emitter
-	CTParticle         ComponentID // Individual particle component
-	CTTag              ComponentID // Tag component for entity identification
-	CTTileMap          ComponentID // Tilemap component for level layouts
-	CTInput            ComponentID // Input handling component
-	CTBasicCamera      ComponentID // Simple camera component
-	CTCamera           ComponentID // Advanced camera component
-	CTGrass            ComponentID // Individual grass element component
-	CTGrassController  ComponentID // Controls grass field behavior
-	CTParent           ComponentID // Parent component for scene graph hierarchy
-	CTOrderable        ComponentID // Orderable component for render sorting
+	CTTransform         ComponentID // Transform component for position, rotation, and scale
+	CTSprite            ComponentID // Sprite component for rendering images
+	CTAnimation         ComponentID // Animation component for sprite animations
+	CTTween             ComponentID // Tween component for smooth value interpolation
+	CTSequence          ComponentID // Sequence component for chaining animations
+	CTFadeOverlay       ComponentID // Fade overlay for screen transitions
+	CTCinematicOverlay  ComponentID // Cinematic overlay for cutscenes
+	CTText              ComponentID // Text rendering component
+	CTCooldown          ComponentID // Cooldown management for timed actions
+	CTDelayer           ComponentID // Delay manager for delayed actions
+	CTParticleEmitter   ComponentID // Particle system emitter
+	CTParticle          ComponentID // Individual particle component
+	CTTag               ComponentID // Tag component for entity identification
+	CTTileMap           ComponentID // Tilemap component for level layouts
+	CTInput             ComponentID // Input handling component
+	CTBasicCamera       ComponentID // Simple camera component
+	CTCamera            ComponentID // Advanced camera component
+	CTGrass             ComponentID // Individual grass element component
+	CTGrassController   ComponentID // Controls grass field behavior
+	CTParent            ComponentID // Parent component for scene graph hierarchy
+	CTOrderable         ComponentID // Orderable component for render sorting
+	CTFoliage           ComponentID // Foliage component for vegetation
+	CTFoliageController ComponentID // Controller for foliage behavior
 )
 
 // RegisterComponent registers a component type and returns its unique ID.
@@ -85,4 +87,6 @@ func init() {
 	CTGrassController = RegisterComponent[*GrassControllerComponent]()
 	CTParent = RegisterComponent[*ParentComponent]()
 	CTOrderable = RegisterComponent[*OrderableComponent]()
+	CTFoliage = RegisterComponent[*FoliageComponent]()
+	CTFoliageController = RegisterComponent[*FoliageControllerComponent]()
 }

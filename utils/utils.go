@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/aquilax/go-perlin"
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -355,4 +356,21 @@ func GetInterpolatedColor(min, max color.RGBA) color.RGBA {
 	b := uint8(float64(min.B) + rand.Float64()*float64(max.B-min.B))
 	a := uint8(float64(min.A) + rand.Float64()*float64(max.A-min.A))
 	return color.RGBA{R: r, G: g, B: b, A: a}
+}
+
+// generatePerlinNoiseImage generates a Perlin noise image for wind simulation.
+func GeneratePerlinNoiseImage(width, height int, frequency float64) *ebiten.Image {
+	img := ebiten.NewImage(width, height)
+	p := perlin.NewPerlin(2, 2, 3, rand.Int64())
+	pixels := make([]byte, width*height*4)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			noiseVal := p.Noise2D(float64(x)/frequency, float64(y)/frequency)
+			gray := byte((noiseVal + 1) * 127.5)
+			idx := (y*width + x) * 4
+			pixels[idx], pixels[idx+1], pixels[idx+2], pixels[idx+3] = gray, gray, gray, 255
+		}
+	}
+	img.WritePixels(pixels)
+	return img
 }

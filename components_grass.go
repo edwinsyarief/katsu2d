@@ -4,9 +4,9 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/aquilax/go-perlin"
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/quadtree"
+	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -52,8 +52,8 @@ type activeGustFrameData struct {
 // Option is a function type for configuring GrassControllerComponent.
 type GrassOption func(*GrassControllerComponent)
 
-// WithTileSize sets the size of the grid cells for grass placement.
-func WithTileSize(size int) GrassOption {
+// WithGrassTileSize sets the size of the grid cells for grass placement.
+func WithGrassTileSize(size int) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.tileSize = size
 	}
@@ -66,57 +66,57 @@ func WithGrassDensity(density int) GrassOption {
 	}
 }
 
-// WithWindForce sets the maximum amplitude of wind-induced sway.
-func WithWindForce(force float64) GrassOption {
+// WithGrassWindForce sets the maximum amplitude of wind-induced sway.
+func WithGrassWindForce(force float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.windForce = force
 	}
 }
 
-// WithWindSpeed sets how fast the grass sways due to wind.
-func WithWindSpeed(speed float64) GrassOption {
+// WithGrassWindSpeed sets how fast the grass sways due to wind.
+func WithGrassWindSpeed(speed float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.windSpeed = speed
 	}
 }
 
-// WithWindDirection sets the dominant direction of the wind. The vector will be normalized.
-func WithWindDirection(x, y float64) GrassOption {
+// WithGrassWindDirection sets the dominant direction of the wind. The vector will be normalized.
+func WithGrassWindDirection(x, y float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.windDirection = ebimath.Vector{X: x, Y: y}.Normalized()
 	}
 }
 
-// WithNoiseMapSize sets the dimension of the generated wind noise map.
-func WithNoiseMapSize(size int) GrassOption {
+// WithGrassNoiseMapSize sets the dimension of the generated wind noise map.
+func WithGrassNoiseMapSize(size int) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.noiseMapSize = size
 	}
 }
 
-// WithNoiseFrequency controls the "zoom" of the Perlin noise for wind.
-func WithNoiseFrequency(freq float64) GrassOption {
+// WithGrassNoiseFrequency controls the "zoom" of the Perlin noise for wind.
+func WithGrassNoiseFrequency(freq float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.noiseFrequency = freq
 	}
 }
 
-// WithForceBaseAcceleration sets how quickly the grass reacts to external forces.
-func WithForceBaseAcceleration(accel float64) GrassOption {
+// WithGrassForceBaseAcceleration sets how quickly the grass reacts to external forces.
+func WithGrassForceBaseAcceleration(accel float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.forceBaseAcceleration = accel
 	}
 }
 
-// WithSwaySpringStrength sets how strongly grass tries to return to 0 (like a spring constant).
-func WithSwaySpringStrength(strength float64) GrassOption {
+// WithGrassSwaySpringStrength sets how strongly grass tries to return to 0 (like a spring constant).
+func WithGrassSwaySpringStrength(strength float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.swaySpringStrength = strength
 	}
 }
 
-// WithSwayDamping sets the damping factor for grass recovery.
-func WithSwayDamping(damping float64) GrassOption {
+// WithGrassSwayDamping sets the damping factor for grass recovery.
+func WithGrassSwayDamping(damping float64) GrassOption {
 	return func(self *GrassControllerComponent) {
 		self.swayDamping = damping
 	}
@@ -178,7 +178,7 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 	for _, opt := range opts {
 		opt(self)
 	}
-	self.noiseImage = self.generatePerlinNoiseImage(self.noiseMapSize, self.noiseMapSize, self.noiseFrequency)
+	self.noiseImage = utils.GeneratePerlinNoiseImage(self.noiseMapSize, self.noiseMapSize, self.noiseFrequency)
 	self.initGrass(world)
 	bounds := ebimath.Rectangle{
 		Min: ebimath.Vector{X: 0, Y: 0},
@@ -236,23 +236,6 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 			}
 		}
 	}
-}
-
-// generatePerlinNoiseImage generates a Perlin noise image for wind simulation.
-func (self *GrassControllerComponent) generatePerlinNoiseImage(width, height int, frequency float64) *ebiten.Image {
-	img := ebiten.NewImage(width, height)
-	p := perlin.NewPerlin(2, 2, 3, rand.Int63())
-	pixels := make([]byte, width*height*4)
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			noiseVal := p.Noise2D(float64(x)/frequency, float64(y)/frequency)
-			gray := byte((noiseVal + 1) * 127.5)
-			idx := (y*width + x) * 4
-			pixels[idx], pixels[idx+1], pixels[idx+2], pixels[idx+3] = gray, gray, gray, 255
-		}
-	}
-	img.WritePixels(pixels)
-	return img
 }
 
 // getWindForceAt samples the wind force at a given position from the noise map.
