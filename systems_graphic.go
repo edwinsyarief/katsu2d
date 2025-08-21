@@ -3,7 +3,6 @@ package katsu2d
 import (
 	"sort"
 
-	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -209,38 +208,18 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			s.GenerateMesh()
 		}
 
-		if s.MeshType == SpriteMeshTypeGrid {
-			worldVertices := make([]ebiten.Vertex, len(s.Vertices))
-			transformMatrix := t.Matrix()
-			for i, v := range s.Vertices {
-				v.ColorR = float32(s.Color.R) / 255
-				v.ColorG = float32(s.Color.G) / 255
-				v.ColorB = float32(s.Color.B) / 255
-				v.ColorA = float32(s.Color.A) / 255 * s.Opacity
-				vx, vy := (&transformMatrix).Apply(float64(v.DstX), float64(v.DstY))
-				v.DstX = float32(vx)
-				v.DstY = float32(vy)
-				worldVertices[i] = v
-			}
-			renderer.AddVertices(worldVertices, s.Indices, img)
-		} else {
-			//imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
-			srcRect := s.GetSourceRect()
-			effColor := s.Color
-			effColor.A = uint8(float32(s.Color.A) * s.Opacity)
-			realPos := ebimath.V2(0).Apply(t.Matrix())
-			if !t.Origin().IsZero() {
-				realPos = realPos.Sub(t.Origin())
-			}
-			renderer.DrawQuad(
-				realPos,
-				t.Scale(),
-				t.Rotation(),
-				img,
-				effColor,
-				float32(srcRect.Min.X), float32(srcRect.Min.Y), float32(srcRect.Max.X), float32(srcRect.Max.Y),
-				float64(s.DstW), float64(s.DstH),
-			)
+		worldVertices := make([]ebiten.Vertex, len(s.Vertices))
+		transformMatrix := t.Matrix()
+		for i, v := range s.Vertices {
+			v.ColorR = float32(s.Color.R) / 255
+			v.ColorG = float32(s.Color.G) / 255
+			v.ColorB = float32(s.Color.B) / 255
+			v.ColorA = float32(s.Color.A) / 255 * s.Opacity
+			vx, vy := (&transformMatrix).Apply(float64(v.DstX), float64(v.DstY))
+			v.DstX = float32(vx)
+			v.DstY = float32(vy)
+			worldVertices[i] = v
 		}
+		renderer.AddVertices(worldVertices, s.Indices, img)
 	}
 }

@@ -10,14 +10,15 @@ import (
 	"golang.org/x/text/language"
 )
 
-// SpriteMeshType defines the primitive type for rendering the sprite mesh.
 type SpriteMeshType int
 
 const (
-	// SpriteMeshTypeQuad renders the sprite as a single quad. This is the default.
+	// SpriteMeshTypeQuad represents a simple quad mesh.
 	SpriteMeshTypeQuad SpriteMeshType = iota
-	// SpriteMeshTypeGrid renders the sprite as a grid of quads, defined by Rows and Cols.
+	// SpriteMeshTypeGrid represents a grid mesh.
 	SpriteMeshTypeGrid
+	// SpriteMeshTypeCustom represents a custom mesh defined by the user.
+	SpriteMeshTypeCustom
 )
 
 // SpriteTextureMode defines how the texture is applied to the mesh.
@@ -39,13 +40,14 @@ type SpriteComponent struct {
 	Opacity   float32
 
 	// Mesh properties
-	Rows     int
-	Cols     int
-	MeshType SpriteMeshType
-	TexMode  SpriteTextureMode
-	Vertices []ebiten.Vertex
-	Indices  []uint16
-	dirty    bool
+	Rows         int
+	Cols         int
+	MeshType     SpriteMeshType
+	TexMode      SpriteTextureMode
+	Vertices     []ebiten.Vertex
+	baseVertices []ebiten.Vertex // Base vertices for the mesh
+	Indices      []uint16
+	dirty        bool
 }
 
 // NewSpriteComponent creates a new sprite component for a simple quad.
@@ -77,11 +79,15 @@ func (self *SpriteComponent) SetGrid(rows, cols int) *SpriteComponent {
 	if self.Rows != rows || self.Cols != cols {
 		self.Rows = rows
 		self.Cols = cols
-		if rows > 1 || cols > 1 {
+		if self.Cols > 1 || self.Rows > 1 {
 			self.MeshType = SpriteMeshTypeGrid
 		} else {
 			self.MeshType = SpriteMeshTypeQuad
 		}
+		self.Vertices = nil
+		self.Indices = nil
+		self.baseVertices = nil
+
 		self.dirty = true
 	}
 	return self
@@ -95,15 +101,27 @@ func (self *SpriteComponent) GetSourceRect() image.Rectangle {
 	return image.Rect(0, 0, int(self.DstW), int(self.DstH))
 }
 
+func (self *SpriteComponent) SetVerticesAndIndices(vertices []ebiten.Vertex, indices []uint16) {
+	if len(vertices) == 0 || len(indices) == 0 {
+		return
+	}
+	self.Vertices = vertices
+	self.Indices = indices
+	self.baseVertices = make([]ebiten.Vertex, len(vertices))
+	copy(self.baseVertices, vertices)
+	self.dirty = false
+}
+
 // GenerateMesh creates the vertices and indices for the sprite's mesh.
 func (self *SpriteComponent) GenerateMesh() {
-	if !self.dirty {
+	if !self.dirty || self.MeshType == SpriteMeshTypeCustom {
 		return
 	}
 
 	srcRect := self.GetSourceRect()
 
 	numVertices := (self.Rows + 1) * (self.Cols + 1)
+	self.baseVertices = make([]ebiten.Vertex, numVertices)
 	self.Vertices = make([]ebiten.Vertex, numVertices)
 
 	for r := 0; r <= self.Rows; r++ {
@@ -145,6 +163,17 @@ func (self *SpriteComponent) GenerateMesh() {
 			i += 6
 		}
 	}
+
+	self.baseVertices = make([]ebiten.Vertex, len(self.Vertices))
+	copy(self.baseVertices, self.Vertices)
+
+	self.dirty = false
+}
+
+func (self *SpriteComponent) ResetMesh() {
+	self.Vertices = make([]ebiten.Vertex, len(self.baseVertices))
+	copy(self.Vertices, self.baseVertices)
+
 	self.dirty = false
 }
 

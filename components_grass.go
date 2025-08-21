@@ -177,13 +177,15 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 	for _, opt := range opts {
 		opt(self)
 	}
-	self.noiseImage = utils.GeneratePerlinNoiseImage(self.noiseMapSize, self.noiseMapSize, self.noiseFrequency)
-	self.initGrass(world)
+
 	bounds := ebimath.Rectangle{
 		Min: ebimath.Vector{X: 0, Y: 0},
 		Max: ebimath.Vector{X: float64(worldWidth), Y: float64(worldHeight)},
 	}
 	self.quadtree = NewQuadtree(world, bounds)
+	self.noiseImage = utils.GeneratePerlinNoiseImage(self.noiseMapSize, self.noiseMapSize, self.noiseFrequency)
+	self.initGrass(world)
+
 	return self
 }
 
@@ -218,8 +220,6 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					transform.SetPosition(ebimath.V(posX, posY))
 					transform.Z = self.Z
 
-					self.quadtree.Insert(entity)
-
 					textureID := self.TextureID
 					if len(area.TexturesIDs) > 0 {
 						textureID = area.TexturesIDs[rand.Intn(len(area.TexturesIDs))]
@@ -231,6 +231,8 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					world.AddComponent(entity, grassComp)
 					world.AddComponent(entity, transform)
 					world.AddComponent(entity, sprite)
+
+					self.quadtree.Insert(entity)
 				}
 			}
 		}
