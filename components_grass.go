@@ -5,7 +5,6 @@ import (
 	"math/rand"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
-	"github.com/edwinsyarief/katsu2d/quadtree"
 	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -135,7 +134,7 @@ type GrassControllerComponent struct {
 	worldHeight           int
 	tileSize              int
 	grassDensity          int
-	quadtree              *quadtree.Quadtree
+	quadtree              *QuadtreeECS
 	tm                    *TextureManager
 	externalForceSources  []ForceSource
 	strongWindGusts       []*StrongWindGust
@@ -184,7 +183,7 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 		Min: ebimath.Vector{X: 0, Y: 0},
 		Max: ebimath.Vector{X: float64(worldWidth), Y: float64(worldHeight)},
 	}
-	self.quadtree = quadtree.New(bounds)
+	self.quadtree = NewQuadtreeECS(world, bounds)
 	return self
 }
 
@@ -219,7 +218,7 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					transform.SetPosition(ebimath.V(posX, posY))
 					transform.Z = self.Z
 
-					self.quadtree.Insert(transform)
+					self.quadtree.Insert(entity)
 
 					textureID := self.TextureID
 					if len(area.TexturesIDs) > 0 {

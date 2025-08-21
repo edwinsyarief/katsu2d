@@ -77,7 +77,8 @@ func (self *GrassControllerSystem) Update(world *World, delta float64) {
 	for _, fs := range currentFrameForceSources {
 		affectedObjects := controller.quadtree.QueryCircle(fs.Position, fs.Radius)
 		for _, obj := range affectedObjects {
-			transform := obj.(*TransformComponent)
+			transformAny, _ := world.GetComponent(obj, CTTransform)
+			transform := transformAny.(*TransformComponent)
 			grassEntities := world.Query(CTGrass, CTTransform)
 			for _, entity := range grassEntities {
 				t, _ := world.GetComponent(entity, CTTransform)
@@ -123,7 +124,8 @@ func (self *GrassControllerSystem) Update(world *World, delta float64) {
 
 		affectedObjects := controller.quadtree.Query(gustRect)
 		for _, obj := range affectedObjects {
-			transform := obj.(*TransformComponent)
+			transformAny, _ := world.GetComponent(obj, CTTransform)
+			transform := transformAny.(*TransformComponent)
 			grassEntities := world.Query(CTGrass, CTTransform)
 			for _, entity := range grassEntities {
 				t, _ := world.GetComponent(entity, CTTransform)
