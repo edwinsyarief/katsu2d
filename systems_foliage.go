@@ -64,7 +64,7 @@ func (self *FoliageSystem) Update(world *World, delta float64) {
 			y += controller.noiseMapSize
 		}
 
-		windValue := controller.getWindForceAt(float64(x), float64(y)) / 65535.0
+		windValue := controller.getWindForceAt(float64(x), float64(y))
 
 		directionalSwayBias := controller.windDirection.X * controller.windForce * windValue
 		oscillationAmplitude := controller.windForce * windValue * 0.5
