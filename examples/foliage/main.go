@@ -41,8 +41,9 @@ func NewGame() *Game {
 	// --- Foliage Controller ---
 	foliageControllerEntity := world.CreateEntity()
 	foliageController := katsu2d.NewFoliageControllerComponent(
-		katsu2d.WithFoliageWindForce(0.3), // Radians
-		katsu2d.WithFoliageWindSpeed(2.5),
+		katsu2d.WithFoliageWindForce(70), // Radians
+		katsu2d.WithFoliageWindSpeed(1.5),
+		katsu2d.WithFoliageRippleStrength(80.0),
 	)
 	world.AddComponent(foliageControllerEntity, foliageController)
 
@@ -83,7 +84,7 @@ func createFoliage(world *katsu2d.World, tm *katsu2d.TextureManager, textureID i
 	sprite := katsu2d.NewSpriteComponent(textureID, img.Bounds())
 	sprite.DstW = 128
 	sprite.DstH = 128
-	sprite.SetGrid(5, 3) // 1 column, 10 rows
+	sprite.SetGrid(5, 5) // 1 column, 10 rows
 	world.AddComponent(entity, sprite)
 
 	// Foliage

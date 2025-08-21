@@ -2,100 +2,108 @@ package katsu2d
 
 import (
 	"math"
+
+	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// FoliageSystem is an update system that simulates foliage physics.
-// It assumes that there is only one FoliageControllerComponent in the world.
 type FoliageSystem struct{}
 
 func NewFoliageSystem() *FoliageSystem {
 	return &FoliageSystem{}
 }
 
-// Update simulates the foliage physics, applying wind effects to vertices.
 func (s *FoliageSystem) Update(world *World, delta float64) {
-	foliageControllerEntities := world.Query(CTFoliageController)
-	if len(foliageControllerEntities) == 0 {
+	// Get controller
+	controllers := world.Query(CTFoliageController)
+	if len(controllers) == 0 {
 		return
 	}
-	foliageControllerEntity := foliageControllerEntities[0]
-	foliageControllerComp, ok := world.GetComponent(foliageControllerEntity, CTFoliageController)
+
+	controllerComp, ok := world.GetComponent(controllers[0], CTFoliageController)
 	if !ok {
 		return
 	}
-	controller := foliageControllerComp.(*FoliageControllerComponent)
+	controller := controllerComp.(*FoliageControllerComponent)
 	controller.windTime += delta
 
-	foliageEntities := world.Query(CTFoliage, CTSprite, CTTransform)
-
-	for _, entity := range foliageEntities {
-		foliageComp, _ := world.GetComponent(entity, CTFoliage)
-		foliage := foliageComp.(*FoliageComponent)
-
-		spriteComp, _ := world.GetComponent(entity, CTSprite)
-		sprite := spriteComp.(*SpriteComponent)
+	// Process foliage entities
+	for _, entity := range world.Query(CTFoliage, CTSprite, CTTransform) {
+		foliageAny, _ := world.GetComponent(entity, CTFoliage)
+		spriteAny, _ := world.GetComponent(entity, CTSprite)
+		foliage := foliageAny.(*FoliageComponent)
+		sprite := spriteAny.(*SpriteComponent)
 
 		if len(sprite.baseVertices) == 0 {
 			continue
 		}
 
-		// Calculate height from base vertices for robustness
-		minY, maxY := float32(math.Inf(1)), float32(math.Inf(-1))
-		for _, v := range sprite.baseVertices {
-			if v.DstY < minY {
-				minY = v.DstY
-			}
-			if v.DstY > maxY {
-				maxY = v.DstY
-			}
-		}
+		// Calculate sprite dimensions
+		minY, maxY := getVertexBounds(sprite.baseVertices)
 		height := float64(maxY - minY)
 		if height == 0 {
 			continue
 		}
 
-		// Default pivot to bottom center if not set
-		pivot := foliage.Pivot
-		if pivot.X == 0 && pivot.Y == 0 {
-			pivot.X = 0.5
-			pivot.Y = 1.0
-		}
+		// Set default pivot if not specified
+		pivot := getDefaultPivot(foliage.Pivot)
 
-		// Calculate a directional sway factor (0 to 1) to simulate gusts
-		sway := 0.5 + 0.5*math.Sin(controller.windTime*controller.windSpeed+foliage.SwaySeed)
-		foliage.Angle = sway * controller.windForce
-
-		// Reset vertices to base state before applying new transformations
+		// Reset vertices to base state
 		copy(sprite.Vertices, sprite.baseVertices)
 
-		for i, baseVertex := range sprite.baseVertices {
-			normalizedY := (baseVertex.DstY - minY) / float32(height)
-
-			// The sway factor is based on the distance from the pivot.
-			// It is 0 at the pivot and 1 at the point furthest from the pivot.
-			dist := math.Abs(float64(normalizedY) - pivot.Y)
-			maxDist := math.Max(pivot.Y, 1.0-pivot.Y)
-			swayFactor := 0.0
-			if maxDist > 0 {
-				swayFactor = dist / maxDist
-			}
-
-			// Apply a power to make the bending more natural
-			swayFactor = math.Pow(swayFactor, 1.5)
-
-			angle := foliage.Angle * swayFactor
-
-			// The displacement is proportional to the distance from the pivot
-			displacementHeight := dist * height
-			displacement := math.Sin(angle) * displacementHeight
-
-			// Distribute the displacement along the wind direction vector
-			displacementX := displacement * controller.windDirection.X
-			displacementY := displacement * controller.windDirection.Y
-
-			// Add the displacement to the base position to move it in the wind's direction
-			sprite.Vertices[i].DstX = baseVertex.DstX + float32(displacementX)
-			sprite.Vertices[i].DstY = baseVertex.DstY + float32(displacementY)
-		}
+		// Apply wind effect to each vertex
+		applyWindEffect(sprite, controller, foliage, minY, height, pivot)
 	}
+}
+
+func getVertexBounds(vertices []ebiten.Vertex) (minY, maxY float32) {
+	minY = float32(math.Inf(1))
+	maxY = float32(math.Inf(-1))
+	for _, v := range vertices {
+		minY = min(minY, v.DstY)
+		maxY = max(maxY, v.DstY)
+	}
+	return
+}
+
+func getDefaultPivot(pivot ebimath.Vector) ebimath.Vector {
+	if pivot.X == 0 && pivot.Y == 0 {
+		return ebimath.V(0.5, 1.0) // Default pivot at the bottom center
+	}
+	return pivot
+}
+
+func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerComponent,
+	foliage *FoliageComponent, minY float32, height float64, pivot ebimath.Vector) {
+
+	for i, baseVertex := range sprite.baseVertices {
+		normalizedY := (baseVertex.DstY - minY) / float32(height)
+		swayFactor := math.Pow(math.Abs(float64(normalizedY)-pivot.Y), 1.5)
+
+		// Calculate wind displacement
+		swayNoise := controller.noise.Noise3D(controller.windTime*controller.windSpeed*0.1+foliage.SwaySeed, 0, 0)
+		rippleNoise := controller.noise.Noise3D(controller.windTime*controller.windSpeed+float64(baseVertex.DstX)*0.05, 0, 0)
+		swayValue := math.Sin(controller.windTime*controller.windSpeed*0.1 + swayNoise*10)
+
+		displacement := (swayValue * controller.windForce) + (rippleNoise * controller.rippleStrength)
+
+		// Calculate final displacement
+		dispX := calculateDisplacement(displacement, swayFactor, controller.windDirection.X)
+		dispY := calculateDisplacement(displacement, swayFactor, controller.windDirection.Y)
+
+		// Apply displacement
+		sprite.Vertices[i].DstX = baseVertex.DstX + float32(dispX)
+		sprite.Vertices[i].DstY = baseVertex.DstY + float32(dispY)
+	}
+}
+
+func calculateDisplacement(displacement, swayFactor, direction float64) float64 {
+	disp := displacement * swayFactor * direction
+	if direction > 0 {
+		return math.Abs(disp)
+	}
+	if direction < 0 && disp > 0 {
+		return -disp
+	}
+	return disp
 }
