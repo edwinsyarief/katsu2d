@@ -2,7 +2,7 @@ package katsu2d
 
 type BasicCameraSystem struct{}
 
-func (self *BasicCameraSystem) Update(world *World, deltaTime float64) {
+func (self *BasicCameraSystem) Update(world *World, dt float64) {
 	entities := world.Query(CTBasicCamera)
 	for _, entity := range entities {
 		comp, ok := world.GetComponent(entity, CTBasicCamera)
@@ -10,13 +10,13 @@ func (self *BasicCameraSystem) Update(world *World, deltaTime float64) {
 			continue
 		}
 		camera := comp.(*BasicCameraComponent)
-		camera.Update(deltaTime)
+		camera.Update(dt)
 	}
 }
 
 type CameraSystem struct{}
 
-func (self *CameraSystem) Update(world *World, deltaTime float64) {
+func (self *CameraSystem) Update(world *World, dt float64) {
 	entities := world.Query(CTCamera)
 	for _, entity := range entities {
 		comp, ok := world.GetComponent(entity, CTCamera)
@@ -24,6 +24,6 @@ func (self *CameraSystem) Update(world *World, deltaTime float64) {
 			continue
 		}
 		camera := comp.(*CameraComponent)
-		camera.Update(deltaTime)
+		camera.Update(dt)
 	}
 }

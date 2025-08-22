@@ -13,7 +13,7 @@ func NewFoliageSystem() *FoliageSystem {
 	return &FoliageSystem{}
 }
 
-func (s *FoliageSystem) Update(world *World, delta float64) {
+func (self *FoliageSystem) Update(world *World, dt float64) {
 	// Get controller
 	controllers := world.Query(CTFoliageController)
 	if len(controllers) == 0 {
@@ -25,7 +25,7 @@ func (s *FoliageSystem) Update(world *World, delta float64) {
 		return
 	}
 	controller := controllerComp.(*FoliageControllerComponent)
-	controller.windTime += delta
+	controller.windTime += dt
 
 	// Process foliage entities
 	for _, entity := range world.Query(CTFoliage, CTSprite, CTTransform) {

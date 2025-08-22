@@ -14,7 +14,7 @@ func NewGrassControllerSystem() *GrassControllerSystem {
 }
 
 // Update simulates the grass physics, applying forces and wind effects.
-func (self *GrassControllerSystem) Update(world *World, delta float64) {
+func (self *GrassControllerSystem) Update(world *World, dt float64) {
 	grassControllerEntities := world.Query(CTGrassController)
 	if len(grassControllerEntities) == 0 {
 		return
@@ -36,8 +36,8 @@ func (self *GrassControllerSystem) Update(world *World, delta float64) {
 		}
 	}
 
-	controller.windTime += delta
-	controller.windScroll = controller.windScroll.Add(ebimath.Vector{X: 0.6 * delta * 60, Y: 0.4 * delta * 60})
+	controller.windTime += dt
+	controller.windScroll = controller.windScroll.Add(ebimath.Vector{X: 0.6 * dt * 60, Y: 0.4 * dt * 60})
 
 	currentFrameForceSources := make([]ForceSource, len(controller.externalForceSources))
 	copy(currentFrameForceSources, controller.externalForceSources)
@@ -48,7 +48,7 @@ func (self *GrassControllerSystem) Update(world *World, delta float64) {
 		if !gust.Active {
 			continue
 		}
-		gust.ElapsedTime += delta
+		gust.ElapsedTime += dt
 		if gust.ElapsedTime >= gust.Duration {
 			gust.Active = false
 			continue
@@ -163,9 +163,9 @@ func (self *GrassControllerSystem) Update(world *World, delta float64) {
 		grass := grassComp.(*GrassComponent)
 		springForce := (0 - grass.InteractionSway) * controller.swaySpringStrength
 		totalForce := grass.AccumulatedForce + springForce
-		grass.SwayVelocity += totalForce * delta
+		grass.SwayVelocity += totalForce * dt
 		grass.SwayVelocity *= controller.swayDamping
-		grass.InteractionSway += grass.SwayVelocity * delta
+		grass.InteractionSway += grass.SwayVelocity * dt
 		transformComp, _ := world.GetComponent(entity, CTTransform)
 		transform := transformComp.(*TransformComponent)
 		pos := transform.Position()

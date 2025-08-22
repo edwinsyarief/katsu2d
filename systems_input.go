@@ -13,7 +13,7 @@ func NewInputSystem() *InputSystem {
 // Update implements the UpdateSystem interface. It polls the keyboard
 // and gamepad and updates the internal state of all actions. This should be run
 // once per game tick.
-func (self *InputSystem) Update(world *World, dt float64) {
+func (self *InputSystem) Update(world *World, _ float64) {
 	entities := world.Query(CTInput)
 	for _, e := range entities {
 		comp, _ := world.GetComponent(e, CTInput)
