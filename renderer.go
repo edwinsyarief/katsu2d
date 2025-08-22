@@ -2,6 +2,7 @@ package katsu2d
 
 import (
 	"image/color"
+	"maps"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/utils"
@@ -47,14 +48,142 @@ func (self *BatchRenderer) Begin(screen *ebiten.Image, shader *ebiten.Shader) {
 	self.currentImage = nil
 }
 
+type DrawOptions func(*ebiten.DrawTrianglesOptions)
+
+func WithRenderBlendMode(mode ebiten.Blend) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.Blend = mode
+	}
+}
+
+func WithRenderColorScaleMode(mode ebiten.ColorScaleMode) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.ColorScaleMode = mode
+	}
+}
+
+func WithRenderFilterMode(mode ebiten.Filter) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.Filter = mode
+	}
+}
+
+func WithRenderAddressMode(mode ebiten.Address) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.Address = mode
+	}
+}
+
+func WithRenderFillRule(rule ebiten.FillRule) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.FillRule = rule
+	}
+}
+
+func WithRenderAntiAlias(aa bool) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.AntiAlias = aa
+	}
+}
+
+func WithRenderDisableMipmaps(disable bool) DrawOptions {
+	return func(opt *ebiten.DrawTrianglesOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesOptions{}
+		}
+		opt.DisableMipmaps = disable
+	}
+}
+
 // SetDrawOptions sets the draw options for the batch renderer.
-func (self *BatchRenderer) SetDrawOptions(opt *ebiten.DrawTrianglesOptions) {
-	self.dOpt = opt
+func (self *BatchRenderer) SetDrawOptions(opts ...DrawOptions) {
+	for _, opt := range opts {
+		opt(self.dOpt)
+	}
+}
+
+type DrawShaderOptions func(*ebiten.DrawTrianglesShaderOptions)
+
+func WithShaderRenderBlendMode(mode ebiten.Blend) DrawShaderOptions {
+	return func(opt *ebiten.DrawTrianglesShaderOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesShaderOptions{}
+		}
+		opt.Blend = mode
+	}
+}
+
+func WithShaderRenderFillRule(rule ebiten.FillRule) DrawShaderOptions {
+	return func(opt *ebiten.DrawTrianglesShaderOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesShaderOptions{}
+		}
+		opt.FillRule = rule
+	}
+}
+
+func WithShaderRenderAntiAlias(aa bool) DrawShaderOptions {
+	return func(opt *ebiten.DrawTrianglesShaderOptions) {
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesShaderOptions{}
+		}
+		opt.AntiAlias = aa
+	}
+}
+
+func WithShaderRenderImages(images ...*ebiten.Image) DrawShaderOptions {
+	return func(opt *ebiten.DrawTrianglesShaderOptions) {
+		if len(images) == 0 {
+			return
+		}
+
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesShaderOptions{}
+		}
+		copy(opt.Images[:], images)
+	}
+}
+
+func WithShaderRenderUniforms(uniforms map[string]interface{}) DrawShaderOptions {
+	return func(opt *ebiten.DrawTrianglesShaderOptions) {
+		if uniforms == nil {
+			return
+		}
+
+		if opt == nil {
+			opt = &ebiten.DrawTrianglesShaderOptions{}
+		}
+		maps.Copy(opt.Uniforms, uniforms)
+	}
 }
 
 // SetDrawShaderOptions sets the shader options for the batch renderer.
-func (self *BatchRenderer) SetDrawShaderOptions(opt *ebiten.DrawTrianglesShaderOptions) {
-	self.dsOpt = opt
+func (self *BatchRenderer) SetDrawShaderOptions(opt ...DrawShaderOptions) {
+	if self.currentShader == nil {
+		panic("Set a shader using Begin before setting shader options")
+	}
+
+	for _, o := range opt {
+		o(self.dsOpt)
+	}
 }
 
 // Flush draws the current batch.
@@ -65,9 +194,9 @@ func (self *BatchRenderer) Flush() {
 
 	if self.currentShader != nil {
 		if self.dsOpt == nil {
-			self.dsOpt = &ebiten.DrawTrianglesShaderOptions{}
+			panic("SetDrawShaderOptions must be called before Flush when using a shader")
 		}
-		self.dsOpt.Images[0] = self.currentImage
+
 		self.screen.DrawTrianglesShader(self.vertices, self.indices, self.currentShader, self.dsOpt)
 		self.vertices = self.vertices[:0]
 		self.indices = self.indices[:0]
@@ -108,7 +237,12 @@ func (self *BatchRenderer) AddCustomMeshes(verts []ebiten.Vertex, inds []uint16,
 }
 
 // AddQuad draws a quad (sprite) with specified source rectangle and destination size.
-func (self *BatchRenderer) AddQuad(pos, scale ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA, srcMinX, srcMinY, srcMaxX, srcMaxY float32, destW, destH float64) {
+func (self *BatchRenderer) AddQuad(
+	pos, scale ebimath.Vector, rotation float64, // transform parameters
+	img *ebiten.Image, clr color.RGBA, // image & color parameters
+	srcMinX, srcMinY, srcMaxX, srcMaxY float32, // source rectangle
+	// destination size
+	destW, destH float64) {
 	totalEstimation := len(self.vertices) + 4
 	if totalEstimation >= maxVertices {
 		self.Flush()
