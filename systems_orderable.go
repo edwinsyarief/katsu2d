@@ -72,6 +72,6 @@ func (self *OrderableSystem) Draw(world *World, renderer *BatchRenderer) {
 			v.DstY = float32(vy)
 			worldVertices[i] = v
 		}
-		renderer.AddVertices(worldVertices, s.Indices, img)
+		renderer.AddCustomMeshes(worldVertices, s.Indices, img)
 	}
 }

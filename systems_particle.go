@@ -200,7 +200,7 @@ func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		if !t.Origin().IsZero() {
 			realPos = realPos.Sub(t.Origin())
 		}
-		renderer.DrawQuad(
+		renderer.AddQuad(
 			realPos,
 			t.Scale(),
 			t.Rotation(),

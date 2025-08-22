@@ -51,7 +51,7 @@ func (self *LayerRendererSytem) Draw(world *World, renderer *BatchRenderer) {
 	self.buffer.Fill(color.Transparent)
 
 	// Begin batch rendering to the buffer
-	self.batchRenderer.Begin(self.buffer)
+	self.batchRenderer.Begin(self.buffer, nil)
 
 	// Execute all registered drawing systems
 	for _, ds := range self.drawSystems {

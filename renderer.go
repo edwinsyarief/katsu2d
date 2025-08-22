@@ -14,10 +14,13 @@ const (
 
 // BatchRenderer batches draw calls for performance.
 type BatchRenderer struct {
-	screen       *ebiten.Image
-	vertices     []ebiten.Vertex
-	indices      []uint16
-	currentImage *ebiten.Image
+	screen        *ebiten.Image
+	vertices      []ebiten.Vertex
+	indices       []uint16
+	currentImage  *ebiten.Image
+	currentShader *ebiten.Shader
+	dOpt          *ebiten.DrawTrianglesOptions
+	dsOpt         *ebiten.DrawTrianglesShaderOptions
 }
 
 // NewBatchRenderer creates a new batch renderer.
@@ -34,11 +37,24 @@ func (self *BatchRenderer) GetScreen() *ebiten.Image {
 }
 
 // Begin prepares the renderer for a new frame.
-func (self *BatchRenderer) Begin(screen *ebiten.Image) {
+func (self *BatchRenderer) Begin(screen *ebiten.Image, shader *ebiten.Shader) {
 	self.screen = screen
+	self.currentShader = shader
+	self.dsOpt = nil
+	self.dOpt = nil
 	self.vertices = self.vertices[:0]
 	self.indices = self.indices[:0]
 	self.currentImage = nil
+}
+
+// SetDrawOptions sets the draw options for the batch renderer.
+func (self *BatchRenderer) SetDrawOptions(opt *ebiten.DrawTrianglesOptions) {
+	self.dOpt = opt
+}
+
+// SetDrawShaderOptions sets the shader options for the batch renderer.
+func (self *BatchRenderer) SetDrawShaderOptions(opt *ebiten.DrawTrianglesShaderOptions) {
+	self.dsOpt = opt
 }
 
 // Flush draws the current batch.
@@ -46,14 +62,28 @@ func (self *BatchRenderer) Flush() {
 	if len(self.vertices) == 0 {
 		return
 	}
-	self.screen.DrawTriangles(self.vertices, self.indices, self.currentImage, nil)
-	self.vertices = self.vertices[:0]
-	self.indices = self.indices[:0]
-	self.currentImage = nil
+
+	if self.currentShader != nil {
+		if self.dsOpt == nil {
+			self.dsOpt = &ebiten.DrawTrianglesShaderOptions{}
+		}
+		self.dsOpt.Images[0] = self.currentImage
+		self.screen.DrawTrianglesShader(self.vertices, self.indices, self.currentShader, self.dsOpt)
+		self.vertices = self.vertices[:0]
+		self.indices = self.indices[:0]
+		self.dsOpt = nil
+		self.currentImage = nil
+	} else {
+		self.screen.DrawTriangles(self.vertices, self.indices, self.currentImage, self.dOpt)
+		self.vertices = self.vertices[:0]
+		self.indices = self.indices[:0]
+		self.dOpt = nil
+		self.currentImage = nil
+	}
 }
 
-// AddVertices adds custom vertices and indices to the batch.
-func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img *ebiten.Image) {
+// AddCustomMeshes adds custom vertices and indices to the batch.
+func (self *BatchRenderer) AddCustomMeshes(verts []ebiten.Vertex, inds []uint16, img *ebiten.Image) {
 	if img != self.currentImage && self.currentImage != nil {
 		self.Flush()
 	}
@@ -77,8 +107,8 @@ func (self *BatchRenderer) AddVertices(verts []ebiten.Vertex, inds []uint16, img
 	}
 }
 
-// DrawQuad draws a quad (sprite) with specified source rectangle and destination size.
-func (self *BatchRenderer) DrawQuad(pos, scale ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA, srcMinX, srcMinY, srcMaxX, srcMaxY float32, destW, destH float64) {
+// AddQuad draws a quad (sprite) with specified source rectangle and destination size.
+func (self *BatchRenderer) AddQuad(pos, scale ebimath.Vector, rotation float64, img *ebiten.Image, clr color.RGBA, srcMinX, srcMinY, srcMaxX, srcMaxY float32, destW, destH float64) {
 	totalEstimation := len(self.vertices) + 4
 	if totalEstimation >= maxVertices {
 		self.Flush()
@@ -121,8 +151,8 @@ func (self *BatchRenderer) DrawQuad(pos, scale ebimath.Vector, rotation float64,
 	self.indices = append(self.indices, uint16(vertIndex), uint16(vertIndex+1), uint16(vertIndex+2), uint16(vertIndex), uint16(vertIndex+2), uint16(vertIndex+3))
 }
 
-// DrawTriangleStrip draws a triangle strip.
-func (self *BatchRenderer) DrawTriangleStrip(verts []ebiten.Vertex, img *ebiten.Image) {
+// AddTriangleStrip draws a triangle strip.
+func (self *BatchRenderer) AddTriangleStrip(verts []ebiten.Vertex, img *ebiten.Image) {
 	totalEstimation := len(self.vertices) + len(verts)
 	if totalEstimation >= maxVertices {
 		self.Flush()

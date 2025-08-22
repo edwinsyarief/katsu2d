@@ -250,7 +250,7 @@ func (self *Engine) Draw(screen *ebiten.Image) {
 		screen.Fill(fillColor)
 	}
 
-	self.renderer.Begin(screen)
+	self.renderer.Begin(screen, nil)
 
 	// Draw the engine's background systems (bottom-most layer).
 	for _, ds := range self.backgroundDrawSystems {
