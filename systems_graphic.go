@@ -129,6 +129,7 @@ type SpriteRenderSystem struct {
 	lastFrameEntities map[Entity]struct{}
 	includes          []ComponentID
 	excludes          []ComponentID
+	zSortNeeded       bool
 }
 
 // NewSpriteRenderSystem creates a new SpriteRenderSystem with the given texture manager.
@@ -148,6 +149,14 @@ func NewSpriteRenderSystem(world *World, tm *TextureManager, opts ...SpriteRende
 
 // Update checks if a re-sort is needed for the drawables list.
 func (self *SpriteRenderSystem) Update(world *World, dt float64) {
+	eb := world.GetEventBus()
+	if eb != nil {
+		eb.Subscribe(TransformZDirtyEvent{}, func(_ interface{}) {
+			// Mark entity for sorting
+			self.zSortNeeded = true
+		})
+	}
+
 	includeComponents := make([]ComponentID, 0, len(self.includes)+2)
 	includeComponents = append(includeComponents, CTSprite, CTTransform)
 	for _, comp := range self.includes {
@@ -163,7 +172,7 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 		currentEntities = world.QueryWithExclusion(includeComponents, self.excludes)
 	}
 
-	zSortNeeded := world.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
+	zSortNeeded := self.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
 	if !zSortNeeded && len(currentEntities) > 0 {
 		for _, entity := range currentEntities {
 			if _, ok := self.lastFrameEntities[entity]; !ok {
@@ -182,7 +191,7 @@ func (self *SpriteRenderSystem) Update(world *World, dt float64) {
 			t2 := t2Any.(*TransformComponent)
 			return t1.Z < t2.Z
 		})
-		world.zSortNeeded = false
+		self.zSortNeeded = false
 	}
 
 	self.lastFrameEntities = make(map[Entity]struct{}, len(currentEntities))

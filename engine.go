@@ -228,6 +228,9 @@ func (self *Engine) Update() error {
 		us.Update(self.world, dt)
 	}
 
+	// Process event bus
+	self.World().ProcessEventBus()
+
 	// Then, update the active scene's systems.
 	if self.sm.current != nil {
 		self.sm.current.Update(self.sm.current.World, dt)

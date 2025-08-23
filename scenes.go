@@ -48,6 +48,8 @@ func (self *Scene) Update(world *World, dt float64) {
 	for _, us := range self.UpdateSystems {
 		us.Update(world, dt)
 	}
+	// Process event bus
+	self.World.ProcessEventBus()
 }
 
 // Draw runs all the scene's draw systems using the engine's shared renderer.

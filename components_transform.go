@@ -21,14 +21,3 @@ func NewTransformComponent() *TransformComponent {
 		Transform: ebimath.T(),
 	}
 }
-
-// SetZ updates the Z-coordinate of the transform and marks the world's Z-ordering as dirty
-// This ensures proper depth sorting will occur on the next update
-// world: The game world context
-// z: The new Z-coordinate value
-func (self *TransformComponent) SetZ(world *World, z float64) {
-	if self.Z != z {
-		self.Z = z
-		world.MarkZDirty() // Notify world that Z-ordering needs to be recalculated
-	}
-}

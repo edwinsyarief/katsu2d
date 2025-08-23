@@ -5,6 +5,12 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+
+	"github.com/edwinsyarief/katsu2d/event"
+)
+
+const (
+	event_bus = "EventBus"
 )
 
 // Entity is a unique identifier for an entity, including a version for safety.
@@ -30,9 +36,10 @@ type World struct {
 	archetypes map[uint64]*Archetype
 	// A map to store component pools for each component type to reduce GC.
 	componentPools sync.Map
-	toRemove       []Entity
-	zSortNeeded    bool
-	ySortNeeded    bool
+	// An array to store entities that need to be removed
+	toRemove []Entity
+	// Resources storage
+	Resources sync.Map
 }
 
 // Archetype is a contiguous block of memory for a specific set of components.
@@ -55,6 +62,7 @@ func NewWorld() *World {
 		entities:     make(map[uint32]entityMeta), // Initialized as a map
 		archetypes:   make(map[uint64]*Archetype),
 		toRemove:     make([]Entity, 0),
+		//Resources:    sync.Map{},
 	}
 	// Create the initial empty archetype.
 	w.archetypes[0] = &Archetype{
@@ -65,6 +73,30 @@ func NewWorld() *World {
 		componentIDs:  make([]ComponentID, 0),
 	}
 	return w
+}
+
+func (self *World) NewEventBus() *event.EventBus {
+	if eb, ok := self.Resources.Load(event_bus); ok {
+		return eb.(*event.EventBus)
+	}
+
+	eb := event.NewEventBus()
+	self.Resources.Store(event_bus, eb)
+	return eb
+}
+
+func (self *World) GetEventBus() *event.EventBus {
+	if eb, ok := self.Resources.Load(event_bus); ok {
+		return eb.(*event.EventBus)
+	}
+
+	return nil
+}
+
+func (self *World) ProcessEventBus() {
+	if eb, ok := self.Resources.Load(event_bus); ok {
+		eb.(*event.EventBus).Process()
+	}
 }
 
 // getOrCreateArchetype finds an existing archetype for the given mask, or creates a new one.
@@ -401,26 +433,4 @@ func (self *World) QueryWithExclusion(includes []ComponentID, excludes []Compone
 	}
 
 	return res
-}
-
-// MarkZDirty sets the flag that signals the SpriteRenderSystem
-// that a Z-sort is required.
-func (self *World) MarkZDirty() {
-	self.zSortNeeded = true
-}
-
-// ResetZDirty is called by the SpriteRenderSystem after sorting.
-func (self *World) ResetZDirty() {
-	self.zSortNeeded = false
-}
-
-// MarkYSortedDirty sets the flag that signals the YSortedRendererSystem
-// that a Y-sort is required.
-func (self *World) MarkYSortedDirty() {
-	self.ySortNeeded = true
-}
-
-// ResetYSortedDirty is called by the YSortedRendererSystem after sorting.
-func (self *World) ResetYSortedDirty() {
-	self.ySortNeeded = false
 }
