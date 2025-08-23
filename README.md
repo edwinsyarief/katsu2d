@@ -12,6 +12,11 @@ This project is currently under active development. While core functionalities a
 
 - **Fast & Unique ECS Architecture:** A robust Entity Component System that promotes modularity, reusability, and high performance by separating data (components) from logic (systems).
 - **Optimized Batching Renderer:** Efficiently draws multiple sprites in a single draw call, significantly reducing overhead. Supports advanced transformations like rotation and scaling for batched entities.
+- **Powerful Audio Manager:** Feature-rich audio system supporting music and sound effects with:
+  - Fade in/out transitions for smooth audio blending
+  - Stereo panning for positional audio
+  - Sound stacking for multiple concurrent instances
+  - Independent volume control for each audio source
 - **Smooth Slow Motion Control:** Implement dynamic time scaling with smooth interpolation (lerping) between normal and slow-motion speeds, allowing for compelling gameplay effects.
 - **Flexible Cooldown System:** Easily manage ability cooldowns or timed events with a dedicated component and system.
 - **Simplified API with Functional Options:** A fluent, chainable API for engine configuration and entity creation, inspired by the "Functional Options" pattern, making setup and game logic development more intuitive.
