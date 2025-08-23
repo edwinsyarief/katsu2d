@@ -237,6 +237,9 @@ func (self *Engine) Update() error {
 		}
 	}
 
+	// Finally, update the audio manager.
+	self.am.Update(dt)
+
 	return nil
 }
 
