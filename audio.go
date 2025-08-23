@@ -97,31 +97,13 @@ func NewStereoPanStream(src io.ReadSeeker) *StereoPanStream {
 	}
 }
 
-// InfiniteLoop wraps an io.ReadSeeker to loop indefinitely.
-/* type InfiniteLoop struct {
-	track io.ReadSeeker
-}
-
-func (self *InfiniteLoop) Read(p []byte) (int, error) {
-	n, err := self.track.Read(p)
-	if err == io.EOF {
-		if _, err := self.track.Seek(0, io.SeekStart); err != nil {
-			return n, err
-		}
-		n, err = self.track.Read(p)
-	}
-	return n, err
-}
-
-func (self *InfiniteLoop) Seek(offset int64, whence int) (int64, error) {
-	return self.track.Seek(offset, whence)
-} */
-
+// StackingConfig defines how multiple instances of the same sound are handled.
 type StackingConfig struct {
 	Enabled  bool
 	MaxStack int
 }
 
+// StackingArray keeps track of active playback IDs for a specific track.
 type StackingArray struct {
 	playbackIDs []PlaybackID
 }
