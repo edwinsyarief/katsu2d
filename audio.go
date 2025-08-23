@@ -24,9 +24,9 @@ type AudioFadeType int
 
 const (
 	// FadeIn indicates the volume will increase.
-	FadeIn AudioFadeType = iota
+	AudioFadeIn AudioFadeType = iota
 	// FadeOut indicates the volume will decrease.
-	FadeOut
+	AudioFadeOut
 )
 
 // StereoPanStream is an audio buffer that changes the stereo channel's signal
@@ -98,7 +98,7 @@ func NewStereoPanStream(src io.ReadSeeker) *StereoPanStream {
 }
 
 // InfiniteLoop wraps an io.ReadSeeker to loop indefinitely.
-type InfiniteLoop struct {
+/* type InfiniteLoop struct {
 	track io.ReadSeeker
 }
 
@@ -115,7 +115,7 @@ func (self *InfiniteLoop) Read(p []byte) (int, error) {
 
 func (self *InfiniteLoop) Seek(offset int64, whence int) (int64, error) {
 	return self.track.Seek(offset, whence)
-}
+} */
 
 type StackingConfig struct {
 	Enabled  bool
@@ -135,11 +135,10 @@ type AudioSource struct {
 	currentVolume float64
 	targetVolume  float64
 	fadeType      AudioFadeType
-	trackID       TrackID // New field to store the original track ID
+	trackID       TrackID
 }
 
 type TrackData struct {
-	trackID TrackID
 	content []byte
 	ext     string
 }
@@ -147,41 +146,38 @@ type TrackData struct {
 // AudioManager manages all game audio, including music and sound effects.
 type AudioManager struct {
 	audioContext   *audio.Context
-	audioBytes     map[TrackID]TrackData // Refactored to store raw audio bytes
+	trackList      map[TrackID]TrackData
 	players        map[PlaybackID]*AudioSource
 	nextPlaybackID PlaybackID
-	stackingTracks map[TrackID]*StackingArray // New field
+	stackingTracks map[TrackID]*StackingArray
 }
 
 // NewAudioManager initializes and returns a new AudioManager.
 func NewAudioManager(sampleRate int) *AudioManager {
 	return &AudioManager{
 		audioContext:   audio.NewContext(sampleRate),
-		audioBytes:     make(map[TrackID]TrackData),
+		trackList:      make(map[TrackID]TrackData),
 		players:        make(map[PlaybackID]*AudioSource),
 		nextPlaybackID: 0,
 		stackingTracks: make(map[TrackID]*StackingArray),
 	}
 }
 
-// Internal helper function to decode audio from bytes
+// fromBytes decodes audio from bytes.
 func (self *AudioManager) fromBytes(content []byte, ext string) (io.ReadSeeker, error) {
 	switch ext {
 	case "ogg":
-		return vorbis.DecodeWithoutResampling(bytes.NewReader(content))
+		return vorbis.DecodeF32(bytes.NewReader(content))
 	case "wav":
-		return wav.DecodeWithoutResampling(bytes.NewReader(content))
+		return wav.DecodeF32(bytes.NewReader(content))
 	case "mp3":
-		return mp3.DecodeWithoutResampling(bytes.NewReader(content))
+		return mp3.DecodeF32(bytes.NewReader(content))
 	default:
 		return nil, fmt.Errorf("unsupported audio format: %s", ext)
 	}
 }
 
 // Load loads an audio file from disk and stores its bytes.
-//
-// NOTE: These functions assume that the `readFile`, `openEmbeddedFile`, and
-// `openBundledFile` functions exist and correctly return a byte slice of the audio data.
 func (self *AudioManager) Load(path string) (TrackID, error) {
 	if path == "" {
 		return -1, fmt.Errorf("audio file path cannot be empty")
@@ -192,8 +188,8 @@ func (self *AudioManager) Load(path string) (TrackID, error) {
 		return -1, fmt.Errorf("failed to read audio file: %s", path)
 	}
 
-	id := TrackID(len(self.audioBytes))
-	self.audioBytes[id] = TrackData{trackID: id, content: b, ext: utils.GetFileExtension(path)}
+	id := TrackID(len(self.trackList))
+	self.trackList[id] = TrackData{content: b, ext: utils.GetFileExtension(path)}
 	return id, nil
 }
 
@@ -204,8 +200,8 @@ func (self *AudioManager) LoadEmbedded(path string) (TrackID, error) {
 		return -1, fmt.Errorf("failed to read embedded audio file: %s", path)
 	}
 
-	id := TrackID(len(self.audioBytes))
-	self.audioBytes[id] = TrackData{trackID: id, content: b, ext: utils.GetFileExtension(path)}
+	id := TrackID(len(self.trackList))
+	self.trackList[id] = TrackData{content: b, ext: utils.GetFileExtension(path)}
 	return id, nil
 }
 
@@ -216,34 +212,57 @@ func (self *AudioManager) LoadFromAssetPacker(path string) (TrackID, error) {
 		return -1, fmt.Errorf("failed to read bundled audio file: %s", path)
 	}
 
-	id := TrackID(len(self.audioBytes))
-	self.audioBytes[id] = TrackData{trackID: id, content: b, ext: utils.GetFileExtension(path)}
+	id := TrackID(len(self.trackList))
+	self.trackList[id] = TrackData{content: b, ext: utils.GetFileExtension(path)}
 	return id, nil
 }
 
-// Helper method to prepare a new audio source from stored bytes
+// prepareAudioSource prepares a new audio source from stored bytes.
 func (self *AudioManager) prepareAudioSource(trackID TrackID, pan float64, loop bool) (*AudioSource, error) {
-	if int(trackID) < 0 || int(trackID) >= len(self.audioBytes) {
+	if int(trackID) < 0 || int(trackID) >= len(self.trackList) {
 		return nil, fmt.Errorf("invalid track ID: %d", trackID)
 	}
 
-	audioBytes := self.audioBytes[trackID]
-	reader, err := self.fromBytes(audioBytes.content, audioBytes.ext)
+	trackData := self.trackList[trackID]
+	reader, err := self.fromBytes(trackData.content, trackData.ext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode audio from bytes: %w", err)
 	}
 
 	var stream io.ReadSeeker = reader
+	var panStream *StereoPanStream
 	if loop {
-		stream = &InfiniteLoop{track: reader}
+		switch trackData.ext {
+		case "ogg":
+			vorbisStream, ok := reader.(*vorbis.Stream)
+			if !ok {
+				return nil, fmt.Errorf("failed to assert vorbis stream type")
+			}
+			panStream = NewStereoPanStream(audio.NewInfiniteLoop(vorbisStream, vorbisStream.Length()))
+		case "wav":
+			wavStream, ok := reader.(*wav.Stream)
+			if !ok {
+				return nil, fmt.Errorf("failed to assert wav stream type")
+			}
+			panStream = NewStereoPanStream(audio.NewInfiniteLoop(wavStream, wavStream.Length()))
+		case "mp3":
+			mp3Stream, ok := reader.(*mp3.Stream)
+			if !ok {
+				return nil, fmt.Errorf("failed to assert mp3 stream type")
+			}
+			panStream = NewStereoPanStream(audio.NewInfiniteLoop(mp3Stream, mp3Stream.Length()))
+		default:
+			return nil, fmt.Errorf("unsupported audio format for looping: %s", trackData.ext)
+		}
+	} else {
+		panStream = NewStereoPanStream(stream)
 	}
 
-	panStream := NewStereoPanStream(stream)
 	if pan != 0 {
 		panStream.SetPan(pan)
 	}
 
-	player, err := self.audioContext.NewPlayer(panStream)
+	player, err := self.audioContext.NewPlayerF32(panStream)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audio player: %w", err)
 	}
@@ -251,105 +270,27 @@ func (self *AudioManager) prepareAudioSource(trackID TrackID, pan float64, loop 
 	return &AudioSource{
 		player:    player,
 		panStream: panStream,
-		trackID:   trackID, // Set the trackID here
+		trackID:   trackID,
 	}, nil
 }
 
-// PlaySound plays a one-shot sound effect.
-func (self *AudioManager) PlaySound(trackID TrackID, pan float64, stackConfig *StackingConfig) (PlaybackID, error) {
-	if stackConfig != nil && stackConfig.Enabled {
-		return self.playStackedSound(trackID, pan, *stackConfig)
-	}
-
-	// Stop existing instances if not stacking
-	self.StopByTrackID(trackID)
-
-	source, err := self.prepareAudioSource(trackID, pan, false)
-	if err != nil {
-		return -1, err
-	}
-
-	source.currentVolume = 1.0
-	source.player.Play()
-
-	playbackID := self.nextPlaybackID
-	self.players[playbackID] = source
-	self.nextPlaybackID++
-
-	return playbackID, nil
-}
-
-func (self *AudioManager) playStackedSound(trackID TrackID, pan float64, stackConfig StackingConfig) (PlaybackID, error) {
-	stackArray, exists := self.stackingTracks[trackID]
-	if !exists {
-		stackArray = &StackingArray{
-			playbackIDs: make([]PlaybackID, 0),
-		}
-		self.stackingTracks[trackID] = stackArray
-	}
-
-	// Handle stack limit
-	if len(stackArray.playbackIDs) >= stackConfig.MaxStack {
-		oldestID := stackArray.playbackIDs[0]
-		_ = self.Stop(oldestID)
-		stackArray.playbackIDs = stackArray.playbackIDs[1:]
-	}
-
-	source, err := self.prepareAudioSource(trackID, pan, false)
-	if err != nil {
-		return -1, err
-	}
-
-	source.currentVolume = 1.0
-	source.player.Play()
-
-	playbackID := self.nextPlaybackID
-	self.players[playbackID] = source
-	self.nextPlaybackID++
-
-	stackArray.playbackIDs = append(stackArray.playbackIDs, playbackID)
-
-	return playbackID, nil
-}
-
-// PlayMusic plays a music track.
-func (self *AudioManager) PlayMusic(trackID TrackID, loop bool) (PlaybackID, error) {
-	// Stop any existing instances of this specific music track
-	self.StopByTrackID(trackID)
-
-	source, err := self.prepareAudioSource(trackID, 0, loop)
-	if err != nil {
-		return -1, err
-	}
-
-	const defaultMusicVolume = 0.5
-	source.currentVolume = defaultMusicVolume
-	source.player.SetVolume(defaultMusicVolume)
-	source.player.Play()
-
-	playbackID := self.nextPlaybackID
-	self.players[playbackID] = source
-	self.nextPlaybackID++
-
-	return playbackID, nil
-}
-
-// Helper method for fade initialization
-func (self *AudioManager) initFade(trackID TrackID, pan float64, loop bool, fadeDuration float64,
-	fadeType AudioFadeType, defaultVolume float64) (PlaybackID, error) {
-
+// createAudioSource creates and initializes an audio source, starting playback.
+func (self *AudioManager) createAudioSource(trackID TrackID, pan float64, loop bool, defaultVolume float64, fadeDuration float64, fadeType AudioFadeType) (*AudioSource, error) {
 	source, err := self.prepareAudioSource(trackID, pan, loop)
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
 
 	if fadeDuration <= 0 {
-		return -1, fmt.Errorf("fade duration must be greater than 0")
+		source.currentVolume = defaultVolume
+		source.player.SetVolume(defaultVolume)
+		source.player.Play()
+		return source, nil
 	}
 
 	startVolume := defaultVolume
 	targetVolume := defaultVolume
-	if fadeType == FadeIn {
+	if fadeType == AudioFadeIn {
 		startVolume = 0
 		source.player.SetVolume(0)
 	} else {
@@ -363,55 +304,68 @@ func (self *AudioManager) initFade(trackID TrackID, pan float64, loop bool, fade
 	source.targetVolume = targetVolume
 	source.fadeType = fadeType
 
-	playbackID := self.nextPlaybackID
-	self.players[playbackID] = source
-	self.nextPlaybackID++
-
-	return playbackID, nil
+	return source, nil
 }
 
-// FadeSound plays a sound effect with a fade effect.
-// The allowStacking parameter controls if multiple instances of the same sound can play.
-func (self *AudioManager) FadeSound(trackID TrackID, pan, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
-	if stackConfig != nil && stackConfig.Enabled {
-		return self.fadeStackedSound(trackID, pan, fadeDuration, fadeType, *stackConfig)
-	}
-
-	self.StopByTrackID(trackID)
-	return self.initFade(trackID, pan, false, fadeDuration, fadeType, 1.0)
-}
-
-func (self *AudioManager) fadeStackedSound(trackID TrackID, pan, fadeDuration float64, fadeType AudioFadeType, stackConfig StackingConfig) (PlaybackID, error) {
-	stackArray, exists := self.stackingTracks[trackID]
-	if !exists {
-		stackArray = &StackingArray{
-			playbackIDs: make([]PlaybackID, 0),
+// internalPlay handles playback logic, including stacking and fading.
+func (self *AudioManager) internalPlay(trackID TrackID, pan float64, loop bool, defaultVolume float64, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
+	stacking := stackConfig != nil && stackConfig.Enabled && stackConfig.MaxStack > 1
+	if !stacking {
+		self.StopByTrackID(trackID)
+	} else {
+		stackArray, ok := self.stackingTracks[trackID]
+		if !ok {
+			stackArray = &StackingArray{}
+			self.stackingTracks[trackID] = stackArray
 		}
-		self.stackingTracks[trackID] = stackArray
+		active := []PlaybackID{}
+		for _, id := range stackArray.playbackIDs {
+			if s, ok := self.players[id]; ok && s.player.IsPlaying() {
+				active = append(active, id)
+			}
+		}
+		stackArray.playbackIDs = active
+		if len(active) >= stackConfig.MaxStack {
+			oldest := active[0]
+			if err := self.Stop(oldest); err != nil {
+				panic(fmt.Errorf("error stopping playback ID %d: %v\n", oldest, err))
+			}
+			stackArray.playbackIDs = active[1:]
+		}
 	}
 
-	if len(stackArray.playbackIDs) >= stackConfig.MaxStack {
-		oldestID := stackArray.playbackIDs[0]
-		self.Stop(oldestID)
-		stackArray.playbackIDs = stackArray.playbackIDs[1:]
-	}
-
-	playbackID, err := self.initFade(trackID, pan, false, fadeDuration, fadeType, 1.0)
+	source, err := self.createAudioSource(trackID, pan, loop, defaultVolume, fadeDuration, fadeType)
 	if err != nil {
 		return -1, err
 	}
 
-	stackArray.playbackIDs = append(stackArray.playbackIDs, playbackID)
-
+	playbackID := self.nextPlaybackID
+	self.players[playbackID] = source
+	self.nextPlaybackID++
+	if stacking {
+		self.stackingTracks[trackID].playbackIDs = append(self.stackingTracks[trackID].playbackIDs, playbackID)
+	}
 	return playbackID, nil
 }
 
+// PlaySound plays a one-shot sound effect.
+func (self *AudioManager) PlaySound(trackID TrackID, pan float64, stackConfig *StackingConfig) (PlaybackID, error) {
+	return self.internalPlay(trackID, pan, false, 1.0, 0, AudioFadeIn, stackConfig)
+}
+
+// PlayMusic plays a music track.
+func (self *AudioManager) PlayMusic(trackID TrackID, loop bool) (PlaybackID, error) {
+	return self.internalPlay(trackID, 0, loop, 0.5, 0, AudioFadeIn, nil)
+}
+
+// FadeSound plays a sound effect with a fade effect.
+func (self *AudioManager) FadeSound(trackID TrackID, pan, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
+	return self.internalPlay(trackID, pan, false, 1.0, fadeDuration, fadeType, stackConfig)
+}
+
 // FadeMusic plays a music track with a fade effect.
-// Music is typically not stacked, so this will still stop any existing instances.
 func (self *AudioManager) FadeMusic(trackID TrackID, loop bool, fadeDuration float64, fadeType AudioFadeType) (PlaybackID, error) {
-	// Stop any existing instances of this specific music track
-	self.StopByTrackID(trackID)
-	return self.initFade(trackID, 0, loop, fadeDuration, fadeType, 1.0)
+	return self.internalPlay(trackID, 0, loop, 1.0, fadeDuration, fadeType, nil)
 }
 
 // Stop stops and removes a single playing audio source.
@@ -421,15 +375,14 @@ func (self *AudioManager) Stop(id PlaybackID) error {
 		return fmt.Errorf("invalid playback ID: %d", id)
 	}
 
-	// Remove from stacking array if present
 	if stackArray, exists := self.stackingTracks[source.trackID]; exists {
-		for i, stackedID := range stackArray.playbackIDs {
-			if stackedID == id {
-				stackArray.playbackIDs = append(stackArray.playbackIDs[:i], stackArray.playbackIDs[i+1:]...)
-				break
+		newPlaybackIDs := []PlaybackID{}
+		for _, stackedID := range stackArray.playbackIDs {
+			if stackedID != id {
+				newPlaybackIDs = append(newPlaybackIDs, stackedID)
 			}
 		}
-		// Clean up empty stacking arrays
+		stackArray.playbackIDs = newPlaybackIDs
 		if len(stackArray.playbackIDs) == 0 {
 			delete(self.stackingTracks, source.trackID)
 		}
@@ -443,14 +396,12 @@ func (self *AudioManager) Stop(id PlaybackID) error {
 
 // StopByTrackID stops all playing instances of a specific track.
 func (self *AudioManager) StopByTrackID(trackID TrackID) {
-	// Create a slice to hold the playback IDs to stop
 	var idsToStop []PlaybackID
 	for id, source := range self.players {
 		if source.trackID == trackID {
 			idsToStop = append(idsToStop, id)
 		}
 	}
-	// Stop each player found
 	for _, id := range idsToStop {
 		_ = self.Stop(id)
 	}
@@ -527,15 +478,14 @@ func (self *AudioManager) SetPan(id PlaybackID, pan float64) error {
 func (self *AudioManager) Update(dt float64) {
 	for id, source := range self.players {
 		if source.isFading {
-			// Calculate volume change per frame
 			volumeChange := (1.0 / source.fadeDuration) * dt
-			if source.fadeType == FadeOut {
+			if source.fadeType == AudioFadeOut {
 				volumeChange = -volumeChange
 			}
 
 			source.currentVolume += volumeChange
-			fadeComplete := (source.fadeType == FadeIn && source.currentVolume >= source.targetVolume) ||
-				(source.fadeType == FadeOut && source.currentVolume <= source.targetVolume)
+			fadeComplete := (source.fadeType == AudioFadeIn && source.currentVolume >= source.targetVolume) ||
+				(source.fadeType == AudioFadeOut && source.currentVolume <= source.targetVolume)
 
 			if fadeComplete {
 				source.currentVolume = source.targetVolume
@@ -545,9 +495,10 @@ func (self *AudioManager) Update(dt float64) {
 			source.player.SetVolume(source.currentVolume)
 		}
 
-		// Clean up finished players
 		if !source.player.IsPlaying() && !source.isFading {
-			self.Stop(id)
+			if err := self.Stop(id); err != nil {
+				panic(fmt.Errorf("error stopping playback ID %d: %v\n", id, err))
+			}
 		}
 	}
 }

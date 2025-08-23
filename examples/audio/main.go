@@ -8,19 +8,23 @@ import (
 )
 
 const (
-	ActionPlaySound katsu2d.Action = "play_sound"
+	ActionPlayMusic katsu2d.Action = "play_music"
+	ActionPlaySfx   katsu2d.Action = "play_sfx"
 )
 
 var keybindings = map[katsu2d.Action][]katsu2d.KeyConfig{
-	ActionPlaySound: {{Key: ebiten.KeySpace}},
+	ActionPlayMusic: {{Key: ebiten.KeySpace}},
+	ActionPlaySfx:   {{Key: ebiten.KeyS}},
 }
 
 // AudioSystem is a simple system to play a sound when the spacebar is pressed.
 type AudioSystem struct {
-	audioManager *katsu2d.AudioManager
-	trackID      katsu2d.TrackID
-	playbackID   katsu2d.PlaybackID
-	stackConfig  *katsu2d.StackingConfig
+	audioManager  *katsu2d.AudioManager
+	trackID       katsu2d.TrackID
+	playbackID    katsu2d.PlaybackID
+	stackConfig   *katsu2d.StackingConfig
+	sfxID         katsu2d.TrackID
+	sfxPlaybackID katsu2d.PlaybackID
 }
 
 func (s *AudioSystem) Update(world *katsu2d.World, dt float64) {
@@ -28,8 +32,11 @@ func (s *AudioSystem) Update(world *katsu2d.World, dt float64) {
 		i, _ := world.GetComponent(e, katsu2d.CTInput)
 		input := i.(*katsu2d.InputComponent)
 
-		if input.IsJustPressed(ActionPlaySound) {
-			s.playbackID, _ = s.audioManager.FadeMusic(s.trackID, true, 3.75, katsu2d.FadeIn)
+		if input.IsJustPressed(ActionPlayMusic) {
+			s.playbackID, _ = s.audioManager.FadeSound(s.trackID, 0, 3.75, katsu2d.AudioFadeIn, s.stackConfig)
+		}
+		if input.IsJustPressed(ActionPlaySfx) {
+			s.sfxPlaybackID, _ = s.audioManager.PlaySound(s.sfxID, 0, s.stackConfig)
 		}
 	}
 }
@@ -55,9 +62,13 @@ func NewGame() *Game {
 
 	// --- Audio Setup ---
 	g.audioManager = g.engine.AudioManager()
-	trackID, err := g.audioManager.Load("./examples/audio/piano.mp3")
+	trackID, err := g.audioManager.Load("./examples/audio/piano.ogg")
 	if err != nil {
 		log.Fatalf("failed to load audio file: %v", err)
+	}
+	sfxID, err := g.audioManager.Load("./examples/audio/wood-step.mp3")
+	if err != nil {
+		log.Fatalf("failed to load sfx file: %v", err)
 	}
 
 	// --- Entity Setup ---
@@ -69,9 +80,10 @@ func NewGame() *Game {
 	g.engine.AddUpdateSystem(&AudioSystem{
 		audioManager: g.audioManager,
 		trackID:      trackID,
+		sfxID:        sfxID,
 		stackConfig: &katsu2d.StackingConfig{
 			Enabled:  true,
-			MaxStack: 3, // Allow up to 3 instances of the same sound
+			MaxStack: 1, // Allow up to 3 instances of the same sound
 		},
 	})
 
