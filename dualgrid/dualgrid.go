@@ -58,14 +58,14 @@ func NewDualGrid(width, height, tileSize int, defaultMaterial TileType) DualGrid
 	}
 }
 
-func (g *DualGrid) AddMaterial(material, mask *ebiten.Image) {
-	if mask == nil && (material.Bounds().Dx() != 4*g.TileSize || material.Bounds().Dy() != 4*g.TileSize) {
-		log.Fatal(fmt.Errorf("Material without mask must have the correct size: %dx%d", 4*g.TileSize, 4*g.TileSize))
+func (self *DualGrid) AddMaterial(material, mask *ebiten.Image) {
+	if mask == nil && (material.Bounds().Dx() != 4*self.TileSize || material.Bounds().Dy() != 4*self.TileSize) {
+		log.Fatal(fmt.Errorf("Material without mask must have the correct size: %dx%d", 4*self.TileSize, 4*self.TileSize))
 	}
-	if material.Bounds().Dx() != g.TileSize || material.Bounds().Dy() != g.TileSize {
+	if material.Bounds().Dx() != self.TileSize || material.Bounds().Dy() != self.TileSize {
 		log.Fatal(errors.New("Material isnt the right dimension"))
 	}
-	if mask.Bounds().Dx() != 4*g.TileSize || mask.Bounds().Dy() != 4*g.TileSize {
+	if mask.Bounds().Dx() != 4*self.TileSize || mask.Bounds().Dy() != 4*self.TileSize {
 		log.Fatal(errors.New("Mask isnt the right dimension"))
 	}
 
@@ -84,87 +84,87 @@ func (g *DualGrid) AddMaterial(material, mask *ebiten.Image) {
 	order := []int{2, 5, 11, 3, 9, 7, 15, 14, 4, 12, 13, 10, 0, 1, 6, 8}
 
 	newMaterial := Material{}
-	tempImage := ebiten.NewImage(g.TileSize, g.TileSize)
+	tempImage := ebiten.NewImage(self.TileSize, self.TileSize)
 	for i := range 16 {
-		x := (i % 4) * g.TileSize
-		y := (i / 4) * g.TileSize
+		x := (i % 4) * self.TileSize
+		y := (i / 4) * self.TileSize
 
-		finalImage := ebiten.NewImage(g.TileSize, g.TileSize)
+		finalImage := ebiten.NewImage(self.TileSize, self.TileSize)
 
 		if mask != nil {
 			tempImage.DrawImage(material, opts)
-			tempImage.DrawImage(mask.SubImage(image.Rect(x, y, x+g.TileSize, y+g.TileSize)).(*ebiten.Image), multiplyOpts)
+			tempImage.DrawImage(mask.SubImage(image.Rect(x, y, x+self.TileSize, y+self.TileSize)).(*ebiten.Image), multiplyOpts)
 		} else {
-			tempImage.DrawImage(material.SubImage(image.Rect(x, y, x+g.TileSize, y+g.TileSize)).(*ebiten.Image), opts)
+			tempImage.DrawImage(material.SubImage(image.Rect(x, y, x+self.TileSize, y+self.TileSize)).(*ebiten.Image), opts)
 		}
 
 		finalImage.DrawImage(tempImage, opts)
 
 		newMaterial[order[i]] = finalImage
 	}
-	g.Materials = append(g.Materials, newMaterial)
-	g.atlas = nil
+	self.Materials = append(self.Materials, newMaterial)
+	self.atlas = nil
 }
 
-func (g *DualGrid) buildAtlas() {
-	numMats := len(g.Materials)
+func (self *DualGrid) buildAtlas() {
+	numMats := len(self.Materials)
 	if numMats == 0 {
 		return
 	}
-	atlasW := 16 * g.TileSize
-	atlasH := numMats * g.TileSize
-	g.atlas = ebiten.NewImage(atlasW, atlasH)
+	atlasW := 16 * self.TileSize
+	atlasH := numMats * self.TileSize
+	self.atlas = ebiten.NewImage(atlasW, atlasH)
 	opts := &ebiten.DrawImageOptions{}
-	for m, mat := range g.Materials {
+	for m, mat := range self.Materials {
 		for b := 0; b < 16; b++ {
 			opts.GeoM.Reset()
-			opts.GeoM.Translate(float64(b*g.TileSize), float64(m*g.TileSize))
-			g.atlas.DrawImage(mat[b], opts)
+			opts.GeoM.Translate(float64(b*self.TileSize), float64(m*self.TileSize))
+			self.atlas.DrawImage(mat[b], opts)
 		}
 	}
 }
 
-func (g DualGrid) DrawTo(img *ebiten.Image) {
-	if g.atlas == nil {
-		g.buildAtlas()
+func (self DualGrid) DrawTo(img *ebiten.Image) {
+	if self.atlas == nil {
+		self.buildAtlas()
 	}
-	if g.atlas == nil {
+	if self.atlas == nil {
 		return
 	}
 
 	img.Fill(color.Transparent)
 
-	verts := make([]ebiten.Vertex, 0, (g.GridWidth+1)*(g.GridHeight+1)*16)
-	indices := make([]uint16, 0, (g.GridWidth+1)*(g.GridHeight+1)*24)
+	verts := make([]ebiten.Vertex, 0, (self.GridWidth+1)*(self.GridHeight+1)*16)
+	indices := make([]uint16, 0, (self.GridWidth+1)*(self.GridHeight+1)*24)
 	var idx uint16
 
 	var xPos, yPos float64
 	var tl, tr, bl, br TileType
 
-	matTypeMask := make([]bool, len(g.Materials))
-	ts := float32(g.TileSize)
+	matTypeMask := make([]bool, len(self.Materials))
+	ts := float32(self.TileSize)
 
-	for x := 0; x < g.GridWidth+1; x++ {
-		xPos = float64(x * g.TileSize)
-		for y := 0; y < g.GridHeight+1; y++ {
-			yPos = float64(y * g.TileSize)
+	for x := 0; x < self.GridWidth+1; x++ {
+		xPos = float64(x * self.TileSize)
+		for y := 0; y < self.GridHeight+1; y++ {
+			yPos = float64(y * self.TileSize)
 
-			tl = g.DefaultMaterial
-			tr = g.DefaultMaterial
-			bl = g.DefaultMaterial
-			br = g.DefaultMaterial
+			tl = self.DefaultMaterial
+			tr = self.DefaultMaterial
+			bl = self.DefaultMaterial
+			br = self.DefaultMaterial
 
 			if x >= 1 && y >= 1 {
-				tl = g.WorldGrid[x-1][y-1]
+				tl = self.WorldGrid[x-1][y-1]
 			}
-			if x < g.GridWidth && y >= 1 {
-				tr = g.WorldGrid[x][y-1]
+			if x < self.GridWidth && y >= 1 {
+				tr = self.WorldGrid[x][y-1]
 			}
-			if x >= 1 && y < g.GridHeight {
-				bl = g.WorldGrid[x-1][y]
+			if x >= 1 && y < self.GridHeight {
+				bl = self.WorldGrid[x-1][y]
 			}
-			if x < g.GridWidth && y < g.GridHeight {
-				br = g.WorldGrid[x][y]
+			if x < self.GridWidth && y < self.GridHeight {
+				br = self.WorldGrid[x][y]
 			}
 
 			for i := range matTypeMask {
@@ -176,7 +176,7 @@ func (g DualGrid) DrawTo(img *ebiten.Image) {
 			matTypeMask[bl] = true
 			matTypeMask[br] = true
 
-			for i := range len(g.Materials) {
+			for i := range len(self.Materials) {
 				if !matTypeMask[i] {
 					continue
 				}
@@ -195,8 +195,8 @@ func (g DualGrid) DrawTo(img *ebiten.Image) {
 					bitmask |= 1 << 0
 				}
 
-				srcX := float32(bitmask * g.TileSize)
-				srcY := float32(int(matType) * g.TileSize)
+				srcX := float32(bitmask * self.TileSize)
+				srcY := float32(int(matType) * self.TileSize)
 				maxSrcX := srcX + ts
 				maxSrcY := srcY + ts
 
@@ -217,5 +217,5 @@ func (g DualGrid) DrawTo(img *ebiten.Image) {
 		}
 	}
 
-	img.DrawTriangles(verts, indices, g.atlas, nil)
+	img.DrawTriangles(verts, indices, self.atlas, nil)
 }
