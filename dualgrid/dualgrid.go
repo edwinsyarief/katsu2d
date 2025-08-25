@@ -4,6 +4,7 @@ package dualgrid
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"log"
@@ -58,6 +59,9 @@ func NewDualGrid(width, height, tileSize int, defaultMaterial TileType) DualGrid
 }
 
 func (g *DualGrid) AddMaterial(material, mask *ebiten.Image) {
+	if mask == nil && (material.Bounds().Dx() != 4*g.TileSize || material.Bounds().Dy() != 4*g.TileSize) {
+		log.Fatal(fmt.Errorf("Material without mask must have the correct size: %dx%d", 4*g.TileSize, 4*g.TileSize))
+	}
 	if material.Bounds().Dx() != g.TileSize || material.Bounds().Dy() != g.TileSize {
 		log.Fatal(errors.New("Material isnt the right dimension"))
 	}
