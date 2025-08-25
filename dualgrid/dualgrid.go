@@ -87,8 +87,12 @@ func (g *DualGrid) AddMaterial(material, mask *ebiten.Image) {
 
 		finalImage := ebiten.NewImage(g.TileSize, g.TileSize)
 
-		tempImage.DrawImage(material, opts)
-		tempImage.DrawImage(mask.SubImage(image.Rect(x, y, x+g.TileSize, y+g.TileSize)).(*ebiten.Image), multiplyOpts)
+		if mask != nil {
+			tempImage.DrawImage(material, opts)
+			tempImage.DrawImage(mask.SubImage(image.Rect(x, y, x+g.TileSize, y+g.TileSize)).(*ebiten.Image), multiplyOpts)
+		} else {
+			tempImage.DrawImage(material.SubImage(image.Rect(x, y, x+g.TileSize, y+g.TileSize)).(*ebiten.Image), opts)
+		}
 
 		finalImage.DrawImage(tempImage, opts)
 
