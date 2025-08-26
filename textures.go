@@ -70,6 +70,14 @@ func (self *TextureManager) Get(id int) *ebiten.Image {
 	return self.textures[id]
 }
 
+// Override will override the image with specified ID with the new image
+func (self *TextureManager) Override(id int, img *ebiten.Image) {
+	if id < 0 || id >= len(self.textures) {
+		return
+	}
+	self.textures[id] = img
+}
+
 // Add adds a pre-existing *ebiten.Image to the manager and returns its new ID.
 func (self *TextureManager) Add(img *ebiten.Image) int {
 	id := len(self.textures)
