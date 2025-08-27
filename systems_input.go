@@ -31,14 +31,18 @@ func (s *InputSystem) Update(world *World, delta float64) {
 					}
 				}
 
+				if !modsDown {
+					continue
+				}
+
 				if isJustPressed(binding.Primary) {
-					comp.justPressed[action] = modsDown
+					comp.justPressed[action] = true
 				}
 				if isPressed(binding.Primary) {
-					comp.pressed[action] = modsDown
+					comp.pressed[action] = true
 				}
 				if isJustReleased(binding.Primary) {
-					comp.JustReleased[action] = modsDown
+					comp.JustReleased[action] = true
 				}
 			}
 		}
