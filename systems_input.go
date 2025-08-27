@@ -18,7 +18,7 @@ func (s *InputSystem) Update(world *World, delta float64) {
 		for action := range comp.bindings {
 			comp.justPressed[action] = false
 			comp.pressed[action] = false
-			comp.JustReleased[action] = false
+			comp.justReleased[action] = false
 		}
 		// Now, check for the current state for all bindings.
 		for action := range comp.bindings {
@@ -42,7 +42,7 @@ func (s *InputSystem) Update(world *World, delta float64) {
 					comp.pressed[action] = true
 				}
 				if isJustReleased(binding.Primary) {
-					comp.JustReleased[action] = true
+					comp.justReleased[action] = true
 				}
 			}
 		}

@@ -39,7 +39,7 @@ type InputComponent struct {
 	bindings     map[Action][]Binding
 	justPressed  map[Action]bool
 	pressed      map[Action]bool
-	JustReleased map[Action]bool
+	justReleased map[Action]bool
 }
 
 // NewInputComponent creates and initializes a new InputComponent.
@@ -48,7 +48,7 @@ func NewInputComponent(bindinds map[Action][]KeyConfig) *InputComponent {
 		bindings:     make(map[Action][]Binding),
 		justPressed:  make(map[Action]bool),
 		pressed:      make(map[Action]bool),
-		JustReleased: make(map[Action]bool),
+		justReleased: make(map[Action]bool),
 	}
 
 	if len(bindinds) > 0 {
@@ -108,7 +108,7 @@ func (self *InputComponent) IsJustPressed(action Action) bool {
 }
 
 func (self *InputComponent) IsJustReleased(action Action) bool {
-	return self.JustReleased[action]
+	return self.justReleased[action]
 }
 
 // isPressed checks if the given InputCode is currently pressed.
