@@ -1,179 +1,62 @@
 package katsu2d
 
-import (
-	"math"
+import "github.com/hajimehoshi/ebiten/v2"
 
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
-)
+type InputSystem struct{}
 
-const (
-	InvalidKey            = ebiten.Key(-1)
-	InvalidMouse          = ebiten.MouseButton(-1)
-	InvalidGamepad        = ebiten.GamepadButton(-1)
-	InvalidStdButton      = ebiten.StandardGamepadButton(-1)
-	InvalidStdAxis        = ebiten.StandardGamepadAxis(-1)
-	GamepadUpdateInterval = 60 // Update gamepad IDs every 60 frames
-)
-
-// InputSystem is an UpdateSystem that handles all game input.
-type InputSystem struct {
-	gamepadIDs []ebiten.GamepadID
-}
-
-// NewInputSystem creates a new input system
 func NewInputSystem() *InputSystem {
-	return &InputSystem{
-		gamepadIDs: ebiten.AppendGamepadIDs(nil),
-	}
+	return &InputSystem{}
 }
 
-// Update implements the UpdateSystem interface
 func (self *InputSystem) Update(world *World, _ float64) {
-	// Update gamepad IDs periodically
-	if uint(ebiten.ActualTPS())%GamepadUpdateInterval == 0 {
-		self.gamepadIDs = ebiten.AppendGamepadIDs(nil)
-	}
-
 	entities := world.Query(CTInput)
 	for _, e := range entities {
 		comp, _ := world.GetComponent(e, CTInput)
 		inputComp := comp.(*InputComponent)
-		self.updateInputComponent(inputComp)
+
+		self.updateInputStates(inputComp)
+		self.processBindings(inputComp)
+		self.updateActionStates(inputComp)
 	}
 }
 
-func (self *InputSystem) updateInputComponent(inputComp *InputComponent) {
-	// Copy current state to previous state
-	for action, isPressed := range inputComp.actionState {
-		inputComp.previousState[action] = isPressed
+func (self *InputSystem) updateInputStates(input *InputComponent) {
+	// Copy current to previous state
+	for action, isPressed := range input.actionState {
+		input.previousState[action] = isPressed
+		// Clear current states
+		input.actionState[action] = false
+		input.wheelState[action] = false
 	}
-
-	// Reset states
-	self.resetStates(inputComp)
-
-	// Get wheel delta
-	inputComp.wheelDeltaX, inputComp.wheelDeltaY = ebiten.Wheel()
-
-	// Evaluate actions
-	for action, configs := range inputComp.bindings {
-		self.evaluateAction(action, configs, inputComp)
-	}
+	input.wheelDeltaX, input.wheelDeltaY = ebiten.Wheel()
 }
 
-func (self *InputSystem) resetStates(inputComp *InputComponent) {
-	for action := range inputComp.bindings {
-		inputComp.actionState[action] = false
-		inputComp.wheelState[action] = false
-		inputComp.pressDuration[action] = 0
-	}
-}
-
-func (self *InputSystem) evaluateAction(action Action, configs []KeyConfig, inputComp *InputComponent) {
-	actionIsPressed := false
-	maxDuration := 0
-
-	for _, config := range configs {
-		pressed, duration := self.evaluateInputConfig(config, inputComp)
-		if pressed {
-			actionIsPressed = true
-			if duration > maxDuration {
-				maxDuration = duration
+func (self *InputSystem) processBindings(input *InputComponent) {
+	for action, configs := range input.bindings {
+		for _, config := range configs {
+			if self.isBindingActive(config, input) {
+				input.actionState[action] = true
+				if config.Wheel != WheelNone {
+					input.wheelState[action] = true
+				}
+				break // Stop checking other configs for this action
 			}
 		}
 	}
-
-	inputComp.actionState[action] = actionIsPressed
-	if actionIsPressed {
-		inputComp.pressDuration[action] = maxDuration
-	}
-
-	inputComp.justPressed[action] = actionIsPressed && !inputComp.previousState[action]
-	inputComp.justReleased[action] = !actionIsPressed && inputComp.previousState[action]
 }
 
-func (self *InputSystem) evaluateInputConfig(config KeyConfig, inputComp *InputComponent) (bool, int) {
-	switch {
-	case config.Key != InvalidKey:
-		return self.checkKeyboard(config)
-	case config.MouseButton != InvalidMouse:
-		return self.checkMouseButton(config)
-	case config.Wheel != WheelNone:
-		return self.checkWheel(config, inputComp)
-	case config.GamepadButton != InvalidGamepad:
-		return self.checkGamepadButton(config)
-	case config.StandardGamepadButton != InvalidStdButton:
-		return self.checkStandardGamepadButton(config)
-	case config.StandardGamepadAxis != InvalidStdAxis:
-		return self.checkStandardGamepadAxis(config)
-	}
-	return false, 0
+func (self *InputSystem) isBindingActive(config KeyConfig, input *InputComponent) bool {
+	return self.isKeyboardBindingActive(config) ||
+		self.isGamepadBindingActive(config) ||
+		self.isMouseBindingActive(config) ||
+		self.isWheelBindingActive(config, input)
 }
 
-func (self *InputSystem) checkKeyboard(config KeyConfig) (bool, int) {
-	if ebiten.IsKeyPressed(config.Key) {
-		if checkKeyboardModifiers(config) && checkMouseButtonModifiers(config) {
-			return true, inpututil.KeyPressDuration(config.Key)
-		}
+func (self *InputSystem) checkModifiers(modifiers []ebiten.Key) bool {
+	if len(modifiers) == 0 {
+		return true
 	}
-	return false, 0
-}
-
-func (self *InputSystem) checkMouseButton(config KeyConfig) (bool, int) {
-	if ebiten.IsMouseButtonPressed(config.MouseButton) {
-		if checkKeyboardModifiers(config) && checkMouseButtonModifiers(config) {
-			return true, inpututil.MouseButtonPressDuration(config.MouseButton)
-		}
-	}
-	return false, 0
-}
-
-func (self *InputSystem) checkWheel(config KeyConfig, inputComp *InputComponent) (bool, int) {
-	if isWheelActive(config, inputComp) {
-		if checkKeyboardModifiers(config) && checkMouseButtonModifiers(config) {
-			return true, 0
-		}
-	}
-	return false, 0
-}
-
-func (self *InputSystem) checkGamepadButton(config KeyConfig) (bool, int) {
-	for _, gID := range self.gamepadIDs {
-		if ebiten.IsGamepadButtonPressed(gID, config.GamepadButton) {
-			if checkGamepadModifiers(gID, config) {
-				return true, inpututil.GamepadButtonPressDuration(gID, config.GamepadButton)
-			}
-		}
-	}
-	return false, 0
-}
-
-func (self *InputSystem) checkStandardGamepadButton(config KeyConfig) (bool, int) {
-	for _, gID := range self.gamepadIDs {
-		if ebiten.IsStandardGamepadButtonPressed(gID, config.StandardGamepadButton) {
-			if checkStandardGamepadModifiers(gID, config) {
-				return true, inpututil.StandardGamepadButtonPressDuration(gID, config.StandardGamepadButton)
-			}
-		}
-	}
-	return false, 0
-}
-
-func (self *InputSystem) checkStandardGamepadAxis(config KeyConfig) (bool, int) {
-	for _, gID := range self.gamepadIDs {
-		axisValue := ebiten.StandardGamepadAxisValue(gID, config.StandardGamepadAxis)
-		if math.Abs(axisValue) > config.AxisThreshold && (axisValue*float64(config.AxisDirection) > 0) {
-			if checkStandardGamepadModifiers(gID, config) {
-				return true, 0
-			}
-		}
-	}
-	return false, 0
-}
-
-// Helper functions (unchanged from original)
-func checkKeyboardModifiers(config KeyConfig) bool {
-	for _, mod := range config.Modifiers {
+	for _, mod := range modifiers {
 		if !ebiten.IsKeyPressed(mod) {
 			return false
 		}
@@ -181,8 +64,11 @@ func checkKeyboardModifiers(config KeyConfig) bool {
 	return true
 }
 
-func checkMouseButtonModifiers(config KeyConfig) bool {
-	for _, mod := range config.MouseButtonModifiers {
+func (self *InputSystem) checkMouseModifiers(modifiers []ebiten.MouseButton) bool {
+	if len(modifiers) == 0 {
+		return true
+	}
+	for _, mod := range modifiers {
 		if !ebiten.IsMouseButtonPressed(mod) {
 			return false
 		}
@@ -190,27 +76,67 @@ func checkMouseButtonModifiers(config KeyConfig) bool {
 	return true
 }
 
-func checkGamepadModifiers(gamepadID ebiten.GamepadID, config KeyConfig) bool {
-	for _, mod := range config.GamepadModifiers {
-		if !ebiten.IsGamepadButtonPressed(gamepadID, mod) {
-			return false
-		}
-	}
-	return true
+func (self *InputSystem) isKeyboardBindingActive(config KeyConfig) bool {
+	return config.Key != ebiten.Key(-1) &&
+		ebiten.IsKeyPressed(config.Key) &&
+		self.checkModifiers(config.Modifiers)
 }
 
-func checkStandardGamepadModifiers(gamepadID ebiten.GamepadID, config KeyConfig) bool {
-	for _, mod := range config.StandardGamepadModifiers {
-		if !ebiten.IsStandardGamepadButtonPressed(gamepadID, mod) {
-			return false
+func (self *InputSystem) isGamepadBindingActive(config KeyConfig) bool {
+	if config.GamepadButton == ebiten.GamepadButton(-1) {
+		return false
+	}
+
+	for _, gID := range ebiten.AppendGamepadIDs(nil) {
+		if ebiten.IsGamepadButtonPressed(gID, config.GamepadButton) {
+			hasAllModifiers := true
+			for _, mod := range config.GamepadModifiers {
+				if !ebiten.IsGamepadButtonPressed(gID, mod) {
+					hasAllModifiers = false
+					break
+				}
+			}
+			if hasAllModifiers {
+				return true
+			}
 		}
 	}
-	return true
+	return false
 }
 
-func isWheelActive(config KeyConfig, inputComp *InputComponent) bool {
-	return (config.Wheel == WheelUp && inputComp.wheelDeltaY > 0) ||
-		(config.Wheel == WheelDown && inputComp.wheelDeltaY < 0) ||
-		(config.Wheel == WheelLeft && inputComp.wheelDeltaX < 0) ||
-		(config.Wheel == WheelRight && inputComp.wheelDeltaX > 0)
+func (self *InputSystem) isMouseBindingActive(config KeyConfig) bool {
+	return config.MouseButton != ebiten.MouseButton(-1) &&
+		ebiten.IsMouseButtonPressed(config.MouseButton) &&
+		self.checkMouseModifiers(config.MouseButtonModifiers)
+}
+
+func (self *InputSystem) isWheelBindingActive(config KeyConfig, input *InputComponent) bool {
+	if config.Wheel == WheelNone {
+		return false
+	}
+
+	wheelActive := false
+	switch config.Wheel {
+	case WheelUp:
+		wheelActive = input.wheelDeltaY > 0
+	case WheelDown:
+		wheelActive = input.wheelDeltaY < 0
+	case WheelLeft:
+		wheelActive = input.wheelDeltaX < 0
+	case WheelRight:
+		wheelActive = input.wheelDeltaX > 0
+	}
+
+	return wheelActive &&
+		self.checkModifiers(config.Modifiers) &&
+		self.checkMouseModifiers(config.MouseButtonModifiers)
+}
+
+func (self *InputSystem) updateActionStates(input *InputComponent) {
+	for action := range input.bindings {
+		current := input.actionState[action]
+		previous := input.previousState[action]
+		input.justPressed[action] = current && !previous
+		input.justReleased[action] = !current && previous
+	}
 }
