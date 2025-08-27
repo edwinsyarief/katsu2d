@@ -2,141 +2,107 @@ package katsu2d
 
 import "github.com/hajimehoshi/ebiten/v2"
 
+// InputSystem is an UpdateSystem that handles all game input.
 type InputSystem struct{}
 
+// NewInputSystem creates a new input system
 func NewInputSystem() *InputSystem {
 	return &InputSystem{}
 }
 
+// Update implements the UpdateSystem interface. It polls the keyboard
+// and gamepad and updates the internal state of all actions. This should be run
+// once per game tick.
 func (self *InputSystem) Update(world *World, _ float64) {
 	entities := world.Query(CTInput)
 	for _, e := range entities {
 		comp, _ := world.GetComponent(e, CTInput)
 		inputComp := comp.(*InputComponent)
 
-		self.updateInputStates(inputComp)
-		self.processBindings(inputComp)
-		self.updateActionStates(inputComp)
-	}
-}
+		// First, copy the current state to the previous state.
+		for action, isPressed := range inputComp.actionState {
+			inputComp.previousState[action] = isPressed
+		}
 
-func (self *InputSystem) updateInputStates(input *InputComponent) {
-	// Copy current to previous state
-	for action, isPressed := range input.actionState {
-		input.previousState[action] = isPressed
-		// Clear current states
-		input.actionState[action] = false
-		input.wheelState[action] = false
-	}
-	input.wheelDeltaX, input.wheelDeltaY = ebiten.Wheel()
-}
+		// Then, clear the current state to be re-evaluated.
+		for action := range inputComp.actionState {
+			inputComp.actionState[action] = false
+		}
 
-func (self *InputSystem) processBindings(input *InputComponent) {
-	for action, configs := range input.bindings {
-		for _, config := range configs {
-			if self.isBindingActive(config, input) {
-				input.actionState[action] = true
-				if config.Wheel != WheelNone {
-					input.wheelState[action] = true
+		// Iterate through all defined actions and their bindings to check for key presses.
+		for action, configs := range inputComp.bindings {
+			for _, config := range configs {
+				isPressed := false
+
+				// Check for keyboard input if a key is defined.
+				if config.Key != ebiten.Key(-1) {
+					isPressed = ebiten.IsKeyPressed(config.Key)
+					// If the main key is pressed, check for modifiers.
+					if isPressed && len(config.Modifiers) > 0 {
+						for _, mod := range config.Modifiers {
+							if !ebiten.IsKeyPressed(mod) {
+								isPressed = false
+								break
+							}
+						}
+					}
 				}
-				break // Stop checking other configs for this action
-			}
-		}
-	}
-}
 
-func (self *InputSystem) isBindingActive(config KeyConfig, input *InputComponent) bool {
-	return self.isKeyboardBindingActive(config) ||
-		self.isGamepadBindingActive(config) ||
-		self.isMouseBindingActive(config) ||
-		self.isWheelBindingActive(config, input)
-}
+				// Check for gamepad input if a button is defined.
+				if config.GamepadButton != ebiten.GamepadButton(-1) {
+					// We assume the first detected gamepad is the one being used.
+					// A more advanced system could handle multiple gamepads.
+					for _, gID := range ebiten.AppendGamepadIDs(nil) {
+						isGamepadButtonDown := ebiten.IsGamepadButtonPressed(gID, config.GamepadButton)
+						// If the main button is pressed, check for modifiers.
+						if isGamepadButtonDown {
+							hasAllModifiers := true
+							for _, mod := range config.GamepadModifiers {
+								if !ebiten.IsGamepadButtonPressed(gID, mod) {
+									hasAllModifiers = false
+									break
+								}
+							}
+							if hasAllModifiers {
+								isPressed = true
+								break // Found a valid gamepad binding, exit this inner loop
+							}
+						}
+					}
+				}
 
-func (self *InputSystem) checkModifiers(modifiers []ebiten.Key) bool {
-	if len(modifiers) == 0 {
-		return true
-	}
-	for _, mod := range modifiers {
-		if !ebiten.IsKeyPressed(mod) {
-			return false
-		}
-	}
-	return true
-}
+				// Check for mouse input if a button is defined.
+				if config.MouseButton != ebiten.MouseButton(-1) {
+					isMouseButtonDown := ebiten.IsMouseButtonPressed(config.MouseButton)
+					// If the main mouse button is pressed, check for modifiers.
+					if isMouseButtonDown {
+						hasAllModifiers := true
+						for _, mod := range config.MouseButtonModifiers {
+							if !ebiten.IsMouseButtonPressed(mod) {
+								hasAllModifiers = false
+								break
+							}
+						}
+						if hasAllModifiers {
+							isPressed = true
+							break // Found a valid mouse binding, exit this inner loop
+						}
+					}
+				}
 
-func (self *InputSystem) checkMouseModifiers(modifiers []ebiten.MouseButton) bool {
-	if len(modifiers) == 0 {
-		return true
-	}
-	for _, mod := range modifiers {
-		if !ebiten.IsMouseButtonPressed(mod) {
-			return false
-		}
-	}
-	return true
-}
-
-func (self *InputSystem) isKeyboardBindingActive(config KeyConfig) bool {
-	return config.Key != ebiten.Key(-1) &&
-		ebiten.IsKeyPressed(config.Key) &&
-		self.checkModifiers(config.Modifiers)
-}
-
-func (self *InputSystem) isGamepadBindingActive(config KeyConfig) bool {
-	if config.GamepadButton == ebiten.GamepadButton(-1) {
-		return false
-	}
-
-	for _, gID := range ebiten.AppendGamepadIDs(nil) {
-		if ebiten.IsGamepadButtonPressed(gID, config.GamepadButton) {
-			hasAllModifiers := true
-			for _, mod := range config.GamepadModifiers {
-				if !ebiten.IsGamepadButtonPressed(gID, mod) {
-					hasAllModifiers = false
-					break
+				// If any binding for this action is pressed, mark the action as active.
+				if isPressed {
+					inputComp.actionState[action] = true
+					break // Stop checking other key configs for this action.
 				}
 			}
-			if hasAllModifiers {
-				return true
-			}
+
+			// Update the "just pressed" and "just released" states.
+			// An action is "just pressed" if it's currently pressed but was not pressed last frame.
+			// An action is "just released" if it's currently not pressed but was pressed last frame.
+			inputComp.justPressed[action] = inputComp.actionState[action] && !inputComp.previousState[action]
+			inputComp.justReleased[action] = !inputComp.actionState[action] && inputComp.previousState[action]
 		}
 	}
-	return false
-}
 
-func (self *InputSystem) isMouseBindingActive(config KeyConfig) bool {
-	return config.MouseButton != ebiten.MouseButton(-1) &&
-		ebiten.IsMouseButtonPressed(config.MouseButton) &&
-		self.checkMouseModifiers(config.MouseButtonModifiers)
-}
-
-func (self *InputSystem) isWheelBindingActive(config KeyConfig, input *InputComponent) bool {
-	if config.Wheel == WheelNone {
-		return false
-	}
-
-	wheelActive := false
-	switch config.Wheel {
-	case WheelUp:
-		wheelActive = input.wheelDeltaY > 0
-	case WheelDown:
-		wheelActive = input.wheelDeltaY < 0
-	case WheelLeft:
-		wheelActive = input.wheelDeltaX < 0
-	case WheelRight:
-		wheelActive = input.wheelDeltaX > 0
-	}
-
-	return wheelActive &&
-		self.checkModifiers(config.Modifiers) &&
-		self.checkMouseModifiers(config.MouseButtonModifiers)
-}
-
-func (self *InputSystem) updateActionStates(input *InputComponent) {
-	for action := range input.bindings {
-		current := input.actionState[action]
-		previous := input.previousState[action]
-		input.justPressed[action] = current && !previous
-		input.justReleased[action] = !current && previous
-	}
 }
