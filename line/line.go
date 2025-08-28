@@ -10,6 +10,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// LineTextureMode defines how a texture is applied to the line.
 type LineTextureMode int
 
 const (
@@ -18,6 +19,7 @@ const (
 	LineTextureTile
 )
 
+// LineTextureDirection defines the direction of the texture on the line.
 type LineTextureDirection int
 
 const (
@@ -25,6 +27,8 @@ const (
 	LineTextureVertical
 )
 
+// LinePoint represents a single point on the line with position, color, and width.
+// top and bottom are used for building the mesh geometry.
 type LinePoint struct {
 	position ebimath.Vector
 	color    color.RGBA
@@ -33,6 +37,7 @@ type LinePoint struct {
 	top, bottom ebimath.Vector
 }
 
+// createLinePoint is a helper to create a new LinePoint.
 func createLinePoint(position ebimath.Vector, col color.RGBA, width float64) *LinePoint {
 	return &LinePoint{
 		position: position,
@@ -41,13 +46,16 @@ func createLinePoint(position ebimath.Vector, col color.RGBA, width float64) *Li
 	}
 }
 
+// LinePoints is a slice of LinePoint pointers.
 type LinePoints []*LinePoint
 
+// Line holds all the data required to render a line as a series of connected quads.
 type Line struct {
 	vertices []ebiten.Vertex
 	indices  []uint16
 
 	color                color.RGBA
+	opacity              float64
 	points               LinePoints
 	width                float64
 	textureMode          LineTextureMode
@@ -60,21 +68,25 @@ type Line struct {
 	tileScale            float64
 	pointLimit           int
 	texture              *ebiten.Image
+	textureScale         float64
 	whiteDot             *ebiten.Image
 
 	// isDirty is a flag used for caching. The mesh is only rebuilt when this is true.
 	isDirty bool
 }
 
-func NewLineBuilder(col color.RGBA, width float64) *Line {
+// NewLine creates and initializes a new Line object.
+func NewLine(col color.RGBA, width float64) *Line {
 	res := &Line{
-		color:       col,
-		width:       width,
-		points:      LinePoints{},
-		tileScale:   1.0,
-		textureMode: LineTextureNone,
-		vertices:    make([]ebiten.Vertex, 0),
-		indices:     make([]uint16, 0),
+		color:        col,
+		opacity:      1.0,
+		width:        width,
+		points:       LinePoints{},
+		tileScale:    1.0,
+		textureMode:  LineTextureNone,
+		textureScale: 1.0,
+		vertices:     make([]ebiten.Vertex, 0),
+		indices:      make([]uint16, 0),
 		// The mesh is initially dirty and needs to be built on the first draw.
 		isDirty: true,
 	}
@@ -84,6 +96,7 @@ func NewLineBuilder(col color.RGBA, width float64) *Line {
 	return res
 }
 
+// SetTexture sets the texture image for the line.
 func (self *Line) SetTexture(img *ebiten.Image) {
 	if img == nil {
 		return
@@ -93,32 +106,35 @@ func (self *Line) SetTexture(img *ebiten.Image) {
 	self.textureSize = ebimath.V(float64(img.Bounds().Dx()), float64(img.Bounds().Dy()))
 }
 
+// SetTextureSize sets the texture size.
 func (self *Line) SetTextureSize(size ebimath.Vector) {
 	self.isDirty = true
 	self.textureSize = size
 }
 
+// SetTextureDirection sets the texture direction.
 func (self *Line) SetTextureDirection(direction LineTextureDirection) {
 	self.isDirty = true
 	self.textureDirection = direction
 }
 
+// SetTextureMode sets the texture mode.
 func (self *Line) SetTextureMode(mode LineTextureMode) {
 	self.isDirty = true
 	self.textureMode = mode
 }
 
+// SetTileScale sets the tile scale for texture tiling.
 func (self *Line) SetTileScale(scale float64) {
 	self.isDirty = true
 	self.tileScale = scale
 }
 
+// SetPointCountLimit sets the maximum number of points the line can hold.
 func (self *Line) SetPointCountLimit(limit int) {
 	if limit <= 0 {
 		return
 	}
-	// No need to set dirty if the point limit is the same or the number of points doesn't change.
-	// But to be safe and simple, we set it anyway as this changes a property.
 	self.isDirty = true
 	self.pointLimit = limit
 	if len(self.points) > self.pointLimit {
@@ -126,6 +142,7 @@ func (self *Line) SetPointCountLimit(limit int) {
 	}
 }
 
+// AddPoint adds a new point to the end of the line.
 func (self *Line) AddPoint(pos ebimath.Vector) {
 	if len(self.points) > 0 {
 		lastPoint := self.points[len(self.points)-1].position
@@ -141,6 +158,7 @@ func (self *Line) AddPoint(pos ebimath.Vector) {
 	}
 }
 
+// SetPosition sets the position of a point at a given index.
 func (self *Line) SetPosition(index int, position ebimath.Vector) {
 	if index < 0 || index >= len(self.points) {
 		return
@@ -149,6 +167,7 @@ func (self *Line) SetPosition(index int, position ebimath.Vector) {
 	self.points[index].position = position
 }
 
+// SetWidth sets the width of a point at a given index.
 func (self *Line) SetWidth(index int, width float64) {
 	if index < 0 || index >= len(self.points) {
 		return
@@ -157,6 +176,7 @@ func (self *Line) SetWidth(index int, width float64) {
 	self.points[index].width = width
 }
 
+// ApplyAllWidth sets the width for all points and disables interpolation.
 func (self *Line) ApplyAllWidth(width float64) {
 	self.isDirty = true
 	self.interpolateWidth = false
@@ -166,6 +186,7 @@ func (self *Line) ApplyAllWidth(width float64) {
 	}
 }
 
+// InterpolateWidth enables width interpolation and sets the start and end widths.
 func (self *Line) InterpolateWidth(start, end float64) {
 	self.isDirty = true
 	self.interpolateWidth = true
@@ -174,6 +195,7 @@ func (self *Line) InterpolateWidth(start, end float64) {
 	self.endWidth = end
 }
 
+// SetColor sets the color of a point at a given index.
 func (self *Line) SetColor(index int, color color.RGBA) {
 	if index < 0 || index >= len(self.points) {
 		return
@@ -182,6 +204,7 @@ func (self *Line) SetColor(index int, color color.RGBA) {
 	self.points[index].color = color
 }
 
+// ApplyAllColor sets the color for all points and disables interpolation.
 func (self *Line) ApplyAllColor(color color.RGBA) {
 	self.isDirty = true
 	self.interpolateColor = false
@@ -190,6 +213,7 @@ func (self *Line) ApplyAllColor(color color.RGBA) {
 	}
 }
 
+// InterpolateColors enables color interpolation and sets the colors to use.
 func (self *Line) InterpolateColors(colors ...color.RGBA) {
 	self.isDirty = true
 	self.interpolateColor = true
@@ -198,11 +222,9 @@ func (self *Line) InterpolateColors(colors ...color.RGBA) {
 
 // BuildMesh rebuilds the line mesh only if a change has occurred.
 func (self *Line) BuildMesh() {
-	// If the line is not dirty, there is no need to rebuild the mesh.
 	if !self.isDirty {
 		return
 	}
-
 	self.ResetMesh()
 
 	if len(self.points) < 2 {
@@ -210,109 +232,93 @@ func (self *Line) BuildMesh() {
 		return
 	}
 
-	currPoint := self.points[len(self.points)-1]
-	prevPoint := self.points[len(self.points)-2]
+	// Step 1: Calculate the top and bottom vectors for each point
+	for i := 0; i < len(self.points); i++ {
+		p := self.points[i]
 
-	currHw := currPoint.width / 2
-	prevHw := prevPoint.width / 2
+		if i == 0 {
+			// First point: use the angle to the next point
+			nextP := self.points[i+1]
+			angle := p.position.AngleToPoint(nextP.position)
+			perp := ebimath.V(math.Cos(angle+math.Pi/2), math.Sin(angle+math.Pi/2)).Normalized().ScaleF(p.width / 2)
+			p.top = p.position.Add(perp)
+			p.bottom = p.position.Sub(perp)
+		} else if i == len(self.points)-1 {
+			// Last point: use the angle from the previous point
+			prevP := self.points[i-1]
+			angle := prevP.position.AngleToPoint(p.position)
+			perp := ebimath.V(math.Cos(angle+math.Pi/2), math.Sin(angle+math.Pi/2)).Normalized().ScaleF(p.width / 2)
+			p.top = p.position.Add(perp)
+			p.bottom = p.position.Sub(perp)
+		} else {
+			// Intermediate points: calculate a proper miter joint
+			prevP := self.points[i-1]
+			nextP := self.points[i+1]
 
-	angle := currPoint.position.AngleToPoint(prevPoint.position)
-	currPoint.top = currPoint.position.MoveInDirection(currHw, angle+utils.ToRadians(90))
-	currPoint.bottom = currPoint.position.MoveInDirection(currHw, angle-utils.ToRadians(90))
+			// Get direction vectors for the two segments
+			dir1 := p.position.Sub(prevP.position).Normalized()
+			dir2 := nextP.position.Sub(p.position).Normalized()
 
-	v0 := utils.CreateVertice(ebimath.V2(0), currPoint.top, currPoint.color)
-	v1 := utils.CreateVertice(ebimath.V2(0), currPoint.bottom, currPoint.color)
+			// Get the perpendicular vectors
+			perp1 := ebimath.V(-dir1.Y, dir1.X).Normalized()
+			perp2 := ebimath.V(-dir2.Y, dir2.X).Normalized()
 
-	self.vertices = append(self.vertices, v0, v1)
+			// Calculate the miter vector. The miter is the sum of the two perpendicular vectors.
+			miter := perp1.Add(perp2)
+			miterLength := miter.Length()
 
-	angle = prevPoint.position.AngleToPoint(currPoint.position)
-	prevPoint.top = prevPoint.position.MoveInDirection(prevHw, angle+utils.ToRadians(90))
-	prevPoint.bottom = prevPoint.position.MoveInDirection(prevHw, angle-utils.ToRadians(90))
+			// If the miter vector is zero, the lines are parallel. We just use the first perpendicular vector.
+			if miterLength == 0 {
+				p.top = p.position.Add(perp1.ScaleF(p.width / 2))
+				p.bottom = p.position.Sub(perp1.ScaleF(p.width / 2))
+			} else {
+				// Normalize the miter vector and scale it by the correct length.
+				// The scaling factor is 1 / sin(angle / 2) which is the miter limit.
+				// Since dot product of two normalized vectors is cos(angle), we can get the angle from that.
+				cosHalfAngle := math.Sqrt((dir1.Dot(dir2) + 1.0) / 2.0)
+				miterScale := p.width / (2.0 * cosHalfAngle)
 
-	v2 := utils.CreateVertice(ebimath.V2(0), prevPoint.top, prevPoint.color)
-	v3 := utils.CreateVertice(ebimath.V2(0), prevPoint.bottom, prevPoint.color)
+				miter = miter.Normalized().ScaleF(miterScale)
 
-	self.vertices = append(self.vertices, v2, v3)
-
-	for i := len(self.points) - 3; i >= 0; i-- {
-		currPoint := self.points[i]
-		nextPoint := self.points[i+1]
-		furtherPoint := self.points[i+2]
-
-		currHw := currPoint.width / 2
-		nextHw := nextPoint.width / 2
-
-		angle := currPoint.position.AngleToPoint(nextPoint.position)
-		currPoint.top = currPoint.position.MoveInDirection(currHw, angle+utils.ToRadians(90))
-		currPoint.bottom = currPoint.position.MoveInDirection(currHw, angle-utils.ToRadians(90))
-
-		currAngleEnd := nextPoint.position.AngleToPoint(currPoint.position)
-		currTopLineStart := currPoint.top
-		currBottomLineStart := currPoint.bottom
-		currTopLineEnd := nextPoint.position.MoveInDirection(nextHw, currAngleEnd-utils.ToRadians(90))
-		currBottomLineEnd := nextPoint.position.MoveInDirection(nextHw, currAngleEnd+utils.ToRadians(90))
-
-		nextTopLineStart := nextPoint.top
-		nextBottomLineStart := nextPoint.bottom
-		nextTopLineEnd := furtherPoint.top
-		nextBottomLineEnd := furtherPoint.bottom
-
-		crossIntersectTop, _ := self.lineIntersects(currTopLineStart, currTopLineEnd, nextBottomLineStart, nextBottomLineEnd)
-		crossIntersectBottom, _ := self.lineIntersects(currBottomLineStart, currBottomLineEnd, nextBottomLineStart, nextBottomLineEnd)
-
-		if !crossIntersectTop && !crossIntersectBottom {
-			intersectTop, topPos := self.lineIntersects(currTopLineStart, currTopLineEnd, nextTopLineStart, nextTopLineEnd)
-			intersectBottom, bottomPos := self.lineIntersects(currBottomLineStart, currBottomLineEnd, nextBottomLineStart, nextBottomLineEnd)
-			if intersectTop {
-				nextPoint.top = topPos
-				dist := topPos.DistanceTo(nextPoint.position)
-				if dist > nextPoint.width {
-					self.vertices = append(self.vertices, utils.CreateVertice(ebimath.V2(0), topPos, currPoint.color))
-					self.vertices = append(self.vertices, utils.CreateVertice(ebimath.V2(0), currBottomLineEnd, currPoint.color))
-				} else {
-					angle := topPos.AngleToPoint(nextPoint.position)
-					nextPoint.bottom = nextPoint.position.MoveInDirection(dist, angle)
-					self.vertices[len(self.vertices)-1].DstX = float32(nextPoint.bottom.X)
-					self.vertices[len(self.vertices)-1].DstY = float32(nextPoint.bottom.Y)
-					self.vertices[len(self.vertices)-2].DstX = float32(nextPoint.top.X)
-					self.vertices[len(self.vertices)-2].DstY = float32(nextPoint.top.Y)
-				}
-			} else if intersectBottom {
-				nextPoint.bottom = bottomPos
-				dist := bottomPos.DistanceTo(nextPoint.position)
-				if dist > nextPoint.width {
-					self.vertices = append(self.vertices, utils.CreateVertice(ebimath.V2(0), currTopLineEnd, currPoint.color))
-					self.vertices = append(self.vertices, utils.CreateVertice(ebimath.V2(0), bottomPos, currPoint.color))
-				} else {
-					angle := bottomPos.AngleToPoint(nextPoint.position)
-					nextPoint.top = nextPoint.position.MoveInDirection(dist, angle)
-					self.vertices[len(self.vertices)-1].DstX = float32(nextPoint.bottom.X)
-					self.vertices[len(self.vertices)-1].DstY = float32(nextPoint.bottom.Y)
-					self.vertices[len(self.vertices)-2].DstX = float32(nextPoint.top.X)
-					self.vertices[len(self.vertices)-2].DstY = float32(nextPoint.top.Y)
-				}
+				p.top = p.position.Add(miter)
+				p.bottom = p.position.Sub(miter)
 			}
 		}
-
-		self.vertices = append(self.vertices, utils.CreateVertice(ebimath.V2(0), currPoint.top, currPoint.color))
-		self.vertices = append(self.vertices, utils.CreateVertice(ebimath.V2(0), currPoint.bottom, currPoint.color))
 	}
 
-	self.indices = utils.GenerateIndices(len(self.vertices))
+	// Step 2: Build the mesh from the calculated points
+	for i := 0; i < len(self.points)-1; i++ {
+		p1 := self.points[i]
+		p2 := self.points[i+1]
+
+		// Append vertices for the current segment
+		v1 := utils.CreateVertexDefaultSrc(p1.top, p1.color)
+		v2 := utils.CreateVertexDefaultSrc(p1.bottom, p1.color)
+		v3 := utils.CreateVertexDefaultSrc(p2.top, p2.color)
+		v4 := utils.CreateVertexDefaultSrc(p2.bottom, p2.color)
+
+		self.vertices = append(self.vertices, v1, v2, v3, v4)
+
+		// Append indices for the quad (2 triangles)
+		vertexIndex := uint16(i * 4) // Each segment adds 4 vertices
+		self.indices = append(self.indices,
+			vertexIndex+0, vertexIndex+1, vertexIndex+2,
+			vertexIndex+2, vertexIndex+1, vertexIndex+3,
+		)
+	}
 
 	self.calculateUvs()
-
-	// Reset the dirty flag after successfully building the mesh.
 	self.isDirty = false
 }
 
+// Draw renders the line on the screen.
 func (self *Line) Draw(screen *ebiten.Image) {
-	if len(self.vertices) == 0 {
-		self.BuildMesh()
-	}
+	self.BuildMesh()
+
 	if len(self.vertices) == 0 {
 		return
 	}
+
 	img := self.whiteDot
 	if self.textureMode != LineTextureNone && self.texture != nil {
 		img = self.texture
@@ -321,6 +327,7 @@ func (self *Line) Draw(screen *ebiten.Image) {
 	screen.DrawTriangles(self.vertices, self.indices, img, op)
 }
 
+// GetBounds returns the bounding box of the line.
 func (self *Line) GetBounds() image.Rectangle {
 	if len(self.points) == 0 {
 		return image.Rectangle{}
@@ -347,113 +354,83 @@ func (self *Line) GetBounds() image.Rectangle {
 	return image.Rect(minX, minY, maxX, maxY)
 }
 
+// ResetMesh clears the vertex and index slices.
 func (self *Line) ResetMesh() {
 	self.vertices = make([]ebiten.Vertex, 0)
 	self.indices = make([]uint16, 0)
 }
 
+// calculateUvs sets the texture coordinates and interpolates color/width if enabled.
+// This function no longer changes DstX/DstY.
 func (self *Line) calculateUvs() {
-	if self.textureMode == LineTextureNone {
+	// The vertices are already correctly positioned by BuildMesh. This function should only handle UVs and colors.
+	totalSegments := len(self.points) - 1 // Use points slice for correct interpolation range
+	if totalSegments == 0 {
 		return
 	}
 
-	segmentCounter := 0
-	totalSegments := len(self.colors) - 1
-	var segmentSize float64
-	if totalSegments > 0 {
-		segmentSize = float64(len(self.vertices)/2) / float64(totalSegments)
-	}
+	for i := 0; i < len(self.vertices); i += 4 {
+		p1_index := i / 4
 
-	for i := 0; i < len(self.vertices); i += 2 {
-		if self.interpolateWidth {
-			v1 := ebimath.V(float64(self.vertices[i].DstX), float64(self.vertices[i].DstY))
-			v2 := ebimath.V(float64(self.vertices[i+1].DstX), float64(self.vertices[i+1].DstY))
-			t := float64(segmentCounter) / float64((len(self.vertices)/2)-1)
-			width := ebimath.Lerp(self.startWidth, self.endWidth, t) / 2
-			center := v1.Add(v2).DivF(2)
-			dir := v2.Sub(v1).Normalized()
-			dst := center.Sub(dir.MulF(width))
-			self.vertices[i].DstX = float32(dst.X)
-			self.vertices[i].DstY = float32(dst.Y)
-			self.vertices[i+1].DstX = float32(dst.X)
-			self.vertices[i+1].DstY = float32(dst.Y)
-		}
+		// Handle color interpolation
+		if self.interpolateColor {
+			t := float64(p1_index) / float64(totalSegments)
 
-		if self.interpolateColor && len(self.colors) > 1 {
-			segment := int(float64(i) / segmentSize)
-			t := (float64(i) / segmentSize) - float64(segment)
-			if segment >= totalSegments {
-				segment = totalSegments - 1
-				t = 1.0
+			// Interpolate color for the first point of the segment
+			segment := int(t * float64(len(self.colors)-1))
+			tInSegment := (t * float64(len(self.colors)-1)) - float64(segment)
+			if segment >= len(self.colors)-1 {
+				segment = len(self.colors) - 2
+				tInSegment = 1.0
 			}
-			col := utils.LerpPremultipliedRGBA(self.colors[segment], self.colors[segment+1], t)
-			r, g, b, a := col.RGBA()
-			self.vertices[i].ColorR = float32(r) / 255
-			self.vertices[i].ColorG = float32(g) / 255
-			self.vertices[i].ColorB = float32(b) / 255
-			self.vertices[i].ColorA = float32(a) / 255
-			self.vertices[i+1].ColorR = float32(r) / 255
-			self.vertices[i+1].ColorG = float32(g) / 255
-			self.vertices[i+1].ColorB = float32(b) / 255
-			self.vertices[i+1].ColorA = float32(a) / 255
+			col1 := utils.LerpPremultipliedRGBA(self.colors[segment], self.colors[segment+1], tInSegment)
+
+			// Interpolate color for the second point of the segment
+			t2 := float64(p1_index+1) / float64(totalSegments)
+			segment2 := int(t2 * float64(len(self.colors)-1))
+			tInSegment2 := (t2 * float64(len(self.colors)-1)) - float64(segment2)
+			if segment2 >= len(self.colors)-1 {
+				segment2 = len(self.colors) - 2
+				tInSegment2 = 1.0
+			}
+			col2 := utils.LerpPremultipliedRGBA(self.colors[segment2], self.colors[segment2+1], tInSegment2)
+
+			// Apply interpolated colors to the four vertices of the quad
+			self.vertices[i].ColorR, self.vertices[i].ColorG, self.vertices[i].ColorB, self.vertices[i].ColorA = float32(col1.R)/255.0, float32(col1.G)/255.0, float32(col1.B)/255.0, float32(col1.A)/255.0
+			self.vertices[i+1].ColorR, self.vertices[i+1].ColorG, self.vertices[i+1].ColorB, self.vertices[i+1].ColorA = float32(col1.R)/255.0, float32(col1.G)/255.0, float32(col1.B)/255.0, float32(col1.A)/255.0
+			self.vertices[i+2].ColorR, self.vertices[i+2].ColorG, self.vertices[i+2].ColorB, self.vertices[i+2].ColorA = float32(col2.R)/255.0, float32(col2.G)/255.0, float32(col2.B)/255.0, float32(col2.A)/255.0
+			self.vertices[i+3].ColorR, self.vertices[i+3].ColorG, self.vertices[i+3].ColorB, self.vertices[i+3].ColorA = float32(col2.R)/255.0, float32(col2.G)/255.0, float32(col2.B)/255.0, float32(col2.A)/255.0
 		}
 
-		switch self.textureMode {
-		case LineTextureStretch:
-			step := float64(segmentCounter) / float64((len(self.vertices)/2)-1)
-			if self.textureDirection == LineTextureHorizontal {
-				src1 := ebimath.V(step*self.textureSize.X, 0)
-				src2 := ebimath.V(step*self.textureSize.X, self.textureSize.Y)
-				self.vertices[i].SrcX = float32(src1.X)
-				self.vertices[i].SrcY = float32(src1.Y)
-				self.vertices[i+1].SrcX = float32(src2.X)
-				self.vertices[i+1].SrcY = float32(src2.Y)
+		// Handle texture coordinates (UVs)
+		if self.textureMode != LineTextureNone {
+			step := float64(p1_index) / float64(totalSegments)
+
+			// Use a temporary texture size based on mode
+			tempTextureSize := ebimath.Vector{}
+			if self.textureMode == LineTextureTile {
+				tempTextureSize = self.textureSize.ScaleF(self.tileScale)
 			} else {
-				src1 := ebimath.V(0, step*self.textureSize.Y)
-				src2 := ebimath.V(self.textureSize.X, step*self.textureSize.Y)
-				self.vertices[i].SrcX = float32(src1.X)
-				self.vertices[i].SrcY = float32(src1.Y)
-				self.vertices[i+1].SrcX = float32(src2.X)
-				self.vertices[i+1].SrcY = float32(src2.Y)
+				tempTextureSize = self.textureSize.ScaleF(self.textureScale)
 			}
-		case LineTextureTile:
+
+			// Apply UVs based on texture direction
 			if self.textureDirection == LineTextureHorizontal {
-				segmentSize := self.textureSize.X / self.tileScale
-				step := float64(segmentCounter%2) * segmentSize
-				src1 := ebimath.V(step, 0)
-				src2 := ebimath.V(step, self.textureSize.Y)
-				self.vertices[i].SrcX = float32(src1.X)
-				self.vertices[i].SrcY = float32(src1.Y)
-				self.vertices[i+1].SrcX = float32(src2.X)
-				self.vertices[i+1].SrcY = float32(src2.Y)
-			} else {
-				segmentSize := self.textureSize.Y / self.tileScale
-				step := float64(segmentCounter%2) * segmentSize
-				src1 := ebimath.V(0, step)
-				src2 := ebimath.V(self.textureSize.X, step)
-				self.vertices[i].SrcX = float32(src1.X)
-				self.vertices[i].SrcY = float32(src1.Y)
-				self.vertices[i+1].SrcX = float32(src2.X)
-				self.vertices[i+1].SrcY = float32(src2.Y)
+				self.vertices[i].SrcX, self.vertices[i].SrcY = float32(step*tempTextureSize.X), 0
+				self.vertices[i+1].SrcX, self.vertices[i+1].SrcY = float32(step*tempTextureSize.X), float32(tempTextureSize.Y)
+				self.vertices[i+2].SrcX, self.vertices[i+2].SrcY = float32((step+1.0/float64(totalSegments))*tempTextureSize.X), 0
+				self.vertices[i+3].SrcX, self.vertices[i+3].SrcY = float32((step+1.0/float64(totalSegments))*tempTextureSize.X), float32(tempTextureSize.Y)
+			} else { // LineTextureVertical
+				self.vertices[i].SrcX, self.vertices[i].SrcY = 0, float32(step*tempTextureSize.Y)
+				self.vertices[i+1].SrcX, self.vertices[i+1].SrcY = float32(tempTextureSize.X), float32(step*tempTextureSize.Y)
+				self.vertices[i+2].SrcX, self.vertices[i+2].SrcY = 0, float32((step+1.0/float64(totalSegments))*tempTextureSize.Y)
+				self.vertices[i+3].SrcX, self.vertices[i+3].SrcY = float32(tempTextureSize.X), float32((step+1.0/float64(totalSegments))*tempTextureSize.Y)
 			}
 		}
 
-		segmentCounter++
+		// Apply opacity to all vertices
+		for j := 0; j < 4; j++ {
+			self.vertices[i+j].ColorA *= float32(self.opacity)
+		}
 	}
-}
-
-func (self *Line) lineIntersects(fromA, toA, fromB, toB ebimath.Vector) (bool, ebimath.Vector) {
-	A1 := toA.Y - fromA.Y
-	B1 := fromA.X - toA.X
-	C1 := A1*fromA.X + B1*fromA.Y
-
-	A2 := toB.Y - fromB.Y
-	B2 := fromB.X - toB.X
-	C2 := A2*fromB.X + B2*fromB.Y
-
-	det := A1*B2 - A2*B1
-	if det != 0 {
-		return true, ebimath.V((B2*C1-B1*C2)/det, (A1*C2-A2*C1)/det)
-	}
-	return false, ebimath.V2(0)
 }

@@ -384,7 +384,7 @@ func GetFileExtension(path string) string {
 	return ""
 }
 
-func CreateVertice(src, dst ebimath.Vector, col color.RGBA) ebiten.Vertex {
+func CreateVertex(dst, src ebimath.Vector, col color.RGBA) ebiten.Vertex {
 	r := float32(col.R) / 255.0
 	g := float32(col.G) / 255.0
 	b := float32(col.B) / 255.0
@@ -406,29 +406,47 @@ func CreateVertice(src, dst ebimath.Vector, col color.RGBA) ebiten.Vertex {
 	}
 }
 
-func GenerateIndices(verticesLength int) []uint16 {
-	if verticesLength < 4 || verticesLength%2 != 0 {
-		return nil
+func CreateVertexDefaultSrc(dst ebimath.Vector, col color.RGBA) ebiten.Vertex {
+	return CreateVertex(dst, ebimath.V2(0), col)
+}
+
+func UpdateVertexColor(vert ebiten.Vertex, col color.RGBA) ebiten.Vertex {
+	r := float32(col.R) / 255.0
+	g := float32(col.G) / 255.0
+	b := float32(col.B) / 255.0
+	a := float32(col.A) / 255.0
+	vert.ColorR = r
+	vert.ColorG = g
+	vert.ColorB = b
+	vert.ColorA = a
+
+	return vert
+}
+
+func UpdateVertexDst(vert ebiten.Vertex, dst ebimath.Vector) ebiten.Vertex {
+	vert.DstX = float32(dst.X)
+	vert.DstY = float32(dst.Y)
+
+	return vert
+}
+
+func UpdateVertexSrc(vert ebiten.Vertex, src ebimath.Vector) ebiten.Vertex {
+	vert.SrcX = float32(src.X)
+	vert.SrcY = float32(src.Y)
+
+	return vert
+}
+
+func GenerateIndices(numVerts int) []uint16 {
+	indices := []uint16{}
+	numQuads := (numVerts / 2) - 1
+	for i := 0; i < numQuads; i++ {
+		start := (i + 1) * 2
+		end := i * 2
+		indices = append(indices, uint16(start), uint16(end), uint16(end+1))
+		indices = append(indices, uint16(start), uint16(end+1), uint16(start+1))
 	}
-
-	result := []uint16{}
-
-	loop := (verticesLength / 2) - 1
-
-	for i := range loop {
-		maxIndices := 3 + (i * 2)
-		minIndex := maxIndices - 3
-
-		if i == 0 {
-			result = append(result, uint16(minIndex), uint16(minIndex+1), uint16(minIndex+2))
-			result = append(result, uint16(minIndex), uint16(maxIndices-1), uint16(maxIndices))
-		} else {
-			result = append(result, uint16(minIndex+1), uint16(minIndex), uint16(minIndex+2))
-			result = append(result, uint16(minIndex+1), uint16(maxIndices-1), uint16(maxIndices))
-		}
-	}
-
-	return result
+	return indices
 }
 
 func ToRadians(degrees float64) float64 {
