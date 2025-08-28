@@ -406,6 +406,19 @@ func CreateVertex(dst, src ebimath.Vector, col color.RGBA) ebiten.Vertex {
 	}
 }
 
+func CreateVertexWithOpacity(pos, uv ebimath.Vector, col color.RGBA, opacity float64) ebiten.Vertex {
+	return ebiten.Vertex{
+		DstX:   float32(pos.X),
+		DstY:   float32(pos.Y),
+		SrcX:   float32(uv.X),
+		SrcY:   float32(uv.Y),
+		ColorR: float32(col.R) / 255,
+		ColorG: float32(col.G) / 255,
+		ColorB: float32(col.B) / 255,
+		ColorA: float32(col.A) / 255 * float32(opacity),
+	}
+}
+
 func CreateVertexDefaultSrc(dst ebimath.Vector, col color.RGBA) ebiten.Vertex {
 	return CreateVertex(dst, ebimath.V2(0), col)
 }
