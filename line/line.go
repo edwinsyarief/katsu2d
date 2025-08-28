@@ -232,6 +232,17 @@ func (self *Line) BuildMesh() {
 		return
 	}
 
+	// NEW: Check if width interpolation is enabled and apply it to each point.
+	if self.interpolateWidth {
+		for i, p := range self.points {
+			// Calculate the interpolation factor (t)
+			t := float64(i) / float64(len(self.points)-1)
+
+			// Interpolate the width and update the point's width value
+			p.width = self.startWidth + t*(self.endWidth-self.startWidth)
+		}
+	}
+
 	// Step 1: Calculate the top and bottom vectors for each point
 	for i := 0; i < len(self.points); i++ {
 		p := self.points[i]
