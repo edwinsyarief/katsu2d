@@ -383,3 +383,54 @@ func GetFileExtension(path string) string {
 	}
 	return ""
 }
+
+func CreateVertice(src, dst ebimath.Vector, col color.RGBA) ebiten.Vertex {
+	r := float32(col.R) / 255.0
+	g := float32(col.G) / 255.0
+	b := float32(col.B) / 255.0
+	a := float32(col.A) / 255.0
+	if a > 0.0 {
+		r /= a
+		g /= a
+		b /= a
+	}
+	return ebiten.Vertex{
+		DstX:   AdjustDestinationPixel(float32(dst.X)),
+		DstY:   AdjustDestinationPixel(float32(dst.Y)),
+		SrcX:   float32(src.X),
+		SrcY:   float32(src.Y),
+		ColorR: r,
+		ColorG: g,
+		ColorB: b,
+		ColorA: a,
+	}
+}
+
+func GenerateIndices(verticesLength int) []uint16 {
+	if verticesLength < 4 || verticesLength%2 != 0 {
+		return nil
+	}
+
+	result := []uint16{}
+
+	loop := (verticesLength / 2) - 1
+
+	for i := range loop {
+		maxIndices := 3 + (i * 2)
+		minIndex := maxIndices - 3
+
+		if i == 0 {
+			result = append(result, uint16(minIndex), uint16(minIndex+1), uint16(minIndex+2))
+			result = append(result, uint16(minIndex), uint16(maxIndices-1), uint16(maxIndices))
+		} else {
+			result = append(result, uint16(minIndex+1), uint16(minIndex), uint16(minIndex+2))
+			result = append(result, uint16(minIndex+1), uint16(maxIndices-1), uint16(maxIndices))
+		}
+	}
+
+	return result
+}
+
+func ToRadians(degrees float64) float64 {
+	return math.Pi * degrees / 180
+}
