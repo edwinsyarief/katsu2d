@@ -30,7 +30,7 @@ func (self *BevelJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 
 		// Calculate segment direction and perpendicular
 		dir := p2.position.Sub(p1.position).Normalized()
-		perp := ebimath.V(-dir.Y, dir.X).Normalized()
+		perp := ebimath.V(-dir.Y, dir.X).Normalized().ScaleF(p1.width / 2)
 
 		// Calculate texture coordinates
 		tempTextureSize := l.calculateTextureSize()
@@ -38,10 +38,10 @@ func (self *BevelJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 
 		// Create segment vertices
 		verts := []ebiten.Vertex{
-			utils.CreateVertexWithOpacity(p1.position.Add(perp.ScaleF(p1.width/2)), uv1, col1, l.opacity),
-			utils.CreateVertexWithOpacity(p1.position.Sub(perp.ScaleF(p1.width/2)), uv2, col1, l.opacity),
-			utils.CreateVertexWithOpacity(p2.position.Add(perp.ScaleF(p2.width/2)), uv3, col2, l.opacity),
-			utils.CreateVertexWithOpacity(p2.position.Sub(perp.ScaleF(p2.width/2)), uv4, col2, l.opacity),
+			utils.CreateVertexWithOpacity(p1.position.Add(perp), uv1, col1, l.opacity),
+			utils.CreateVertexWithOpacity(p1.position.Sub(perp), uv2, col1, l.opacity),
+			utils.CreateVertexWithOpacity(p2.position.Add(perp.ScaleF(p2.width/p1.width)), uv3, col2, l.opacity),
+			utils.CreateVertexWithOpacity(p2.position.Sub(perp.ScaleF(p2.width/p1.width)), uv4, col2, l.opacity),
 		}
 
 		// Add vertices and indices for segment
@@ -58,25 +58,23 @@ func (self *BevelJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			dir1 := p1.position.Sub(p0.position).Normalized()
 			dir2 := p2.position.Sub(p1.position).Normalized()
 
-			perp1 := ebimath.V(-dir1.Y, dir1.X).Normalized()
-			perp2 := ebimath.V(-dir2.Y, dir2.X).Normalized()
+			perp1 := ebimath.V(-dir1.Y, dir1.X).Normalized().ScaleF(p1.width / 2)
+			perp2 := ebimath.V(-dir2.Y, dir2.X).Normalized().ScaleF(p1.width / 2)
 
-			isConvex := dir1.X*dir2.Y-dir1.Y*dir2.X < 0
+			cross := dir1.X*dir2.Y - dir1.Y*dir2.X
+			if cross > 0 {
+				perp1 = perp1.Invert()
+				perp2 = perp2.Invert()
+			}
 
-			// Create join vertices
-			joinVertex := utils.CreateVertexDefaultSrc(p1.position, col1)
+			// Create join vertices with proper bevel connection
+			joinVertex := utils.CreateVertexWithOpacity(p1.position, ebimath.V(0, 0), col1, l.opacity)
 			joinVertexIndex := uint16(len(vertices))
 			vertices = append(vertices, joinVertex)
 
-			if isConvex {
-				v1 := utils.CreateVertexDefaultSrc(p1.position.Add(perp1.ScaleF(p1.width/2)), col1)
-				v2 := utils.CreateVertexDefaultSrc(p1.position.Add(perp2.ScaleF(p1.width/2)), col1)
-				vertices = append(vertices, v1, v2)
-			} else {
-				v1 := utils.CreateVertexDefaultSrc(p1.position.Sub(perp1.ScaleF(p1.width/2)), col1)
-				v2 := utils.CreateVertexDefaultSrc(p1.position.Sub(perp2.ScaleF(p1.width/2)), col1)
-				vertices = append(vertices, v1, v2)
-			}
+			v1 := utils.CreateVertexWithOpacity(p1.position.Add(perp1), ebimath.V(0, 0), col1, l.opacity)
+			v2 := utils.CreateVertexWithOpacity(p1.position.Add(perp2), ebimath.V(0, 0), col1, l.opacity)
+			vertices = append(vertices, v1, v2)
 			indices = append(indices, joinVertexIndex, joinVertexIndex+1, joinVertexIndex+2)
 		}
 	}
