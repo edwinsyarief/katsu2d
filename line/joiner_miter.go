@@ -66,12 +66,22 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 	vertices := make([]ebiten.Vertex, 0)
 	indices := make([]uint16, 0)
 	totalSegments := len(l.points) - 1
+	if l.IsClosed {
+		totalSegments = len(l.points)
+	}
 
 	// Create PolySegments
 	segments := make([]PolySegment, 0)
 	for i := 0; i < len(l.points)-1; i++ {
 		p1 := l.points[i]
 		p2 := l.points[i+1]
+		if !p1.position.Equals(p2.position) {
+			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2))
+		}
+	}
+	if l.IsClosed && len(l.points) > 1 {
+		p1 := l.points[len(l.points)-1]
+		p2 := l.points[0]
 		if !p1.position.Equals(p2.position) {
 			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2))
 		}
@@ -83,30 +93,49 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 
 	var start1, start2, end1, end2, nextStart1, nextStart2 ebimath.Vector
 
-	// End caps
-	start1 = segments[0].Edge1.A
-	start2 = segments[0].Edge2.A
-	end1 = segments[len(segments)-1].Edge1.B
-	end2 = segments[len(segments)-1].Edge2.B
-
 	// Loop through each segment to build the mesh
 	for i := 0; i < len(segments); i++ {
 		segment := segments[i]
+		isFirstSegment := i == 0
+		isLastSegment := i == len(segments)-1
 
-		col_start := l.points[i].color
+		var p1_idx, p2_idx int
+		p1_idx = i
+		if i == len(l.points)-1 {
+			p2_idx = 0
+		} else {
+			p2_idx = i + 1
+		}
+
+		col_start := l.points[p1_idx].color
 		if l.interpolateColor {
 			col_start = l.lerpColor(float64(i) / float64(totalSegments))
 		}
-		col_end := l.points[i+1].color
+		col_end := l.points[p2_idx].color
 		if l.interpolateColor {
 			col_end = l.lerpColor(float64(i+1) / float64(totalSegments))
 		}
 
-		if i < len(segments)-1 {
-			self.createJoint(segment, segments[i+1], &end1, &end2, &nextStart1, &nextStart2)
+		if isFirstSegment {
+			start1 = segment.Edge1.A
+			start2 = segment.Edge2.A
 		} else {
-			end1 = segments[i].Edge1.B
-			end2 = segments[i].Edge2.B
+			start1 = nextStart1
+			start2 = nextStart2
+		}
+
+		if l.IsClosed || !isLastSegment {
+			nextSegmentIndex := (i + 1) % len(segments)
+			self.createJoint(segment, segments[nextSegmentIndex], &end1, &end2, &nextStart1, &nextStart2)
+		} else {
+			end1 = segment.Edge1.B
+			end2 = segment.Edge2.B
+		}
+
+		if l.IsClosed && isFirstSegment {
+			var dummyEnd1, dummyEnd2 ebimath.Vector
+			prevSegmentIndex := len(segments) - 1
+			self.createJoint(segments[prevSegmentIndex], segment, &dummyEnd1, &dummyEnd2, &start1, &start2)
 		}
 
 		// Create the quad for the line segment
@@ -121,9 +150,6 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 
 		indices = append(indices, v_start1_idx, v_start2_idx, v_end1_idx)
 		indices = append(indices, v_end1_idx, v_start2_idx, v_end2_idx)
-
-		start1 = nextStart1
-		start2 = nextStart2
 	}
 	return vertices, indices
 }

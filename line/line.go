@@ -62,6 +62,7 @@ type Line struct {
 	color      color.RGBA
 	opacity    float64
 	lineJoin   LineJoinType
+	IsClosed   bool
 
 	// Width interpolation
 	interpolateWidth     bool
@@ -95,6 +96,7 @@ func NewLine(col color.RGBA, width float64) *Line {
 		indices:      make([]uint16, 0),
 		lineJoin:     LineJoinMiter,
 		isDirty:      true,
+		IsClosed:     false,
 	}
 	line.whiteDot = ebiten.NewImage(1, 1)
 	line.whiteDot.Fill(color.White)
@@ -134,6 +136,11 @@ func (l *Line) SetPosition(index int, position ebimath.Vector) {
 func (l *Line) SetLineJoin(join LineJoinType) {
 	l.isDirty = true
 	l.lineJoin = join
+}
+
+func (l *Line) SetIsClosed(isClosed bool) {
+	l.isDirty = true
+	l.IsClosed = isClosed
 }
 
 func (l *Line) SetTexture(img *ebiten.Image) {
