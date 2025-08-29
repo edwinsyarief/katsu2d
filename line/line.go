@@ -44,8 +44,6 @@ type LinePoint struct {
 	position ebimath.Vector
 	color    color.RGBA
 	width    float64
-	top      ebimath.Vector // Pre-calculated vertex for mesh
-	bottom   ebimath.Vector // Pre-calculated vertex for mesh
 }
 
 type LinePoints []*LinePoint
@@ -276,29 +274,4 @@ func (l *Line) GetBounds() image.Rectangle {
 func (l *Line) ResetMesh() {
 	l.vertices = l.vertices[:0]
 	l.indices = l.indices[:0]
-}
-
-func (l *Line) calculateTextureSize() ebimath.Vector {
-	if l.textureMode == LineTextureTile {
-		return l.textureSize.ScaleF(l.tileScale)
-	}
-	return l.textureSize.ScaleF(l.textureScale)
-}
-
-func (l *Line) calculateTextureCoords(i, totalSegments int, textureSize ebimath.Vector) (uv1, uv2, uv3, uv4 ebimath.Vector) {
-	step1 := float64(i) / float64(totalSegments)
-	step2 := float64(i+1) / float64(totalSegments)
-
-	if l.textureDirection == LineTextureHorizontal {
-		uv1 = ebimath.V(step1*textureSize.X, 0)
-		uv2 = ebimath.V(step1*textureSize.X, textureSize.Y)
-		uv3 = ebimath.V(step2*textureSize.X, 0)
-		uv4 = ebimath.V(step2*textureSize.X, textureSize.Y)
-	} else {
-		uv1 = ebimath.V(0, step1*textureSize.Y)
-		uv2 = ebimath.V(textureSize.X, step1*textureSize.Y)
-		uv3 = ebimath.V(0, step2*textureSize.Y)
-		uv4 = ebimath.V(textureSize.X, step2*textureSize.Y)
-	}
-	return
 }

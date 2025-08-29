@@ -69,7 +69,8 @@ func NewPolySegment(p1, p2 ebimath.Vector, thickness float64) PolySegment {
 	}
 }
 
-func createTriangleFan(vertices *[]ebiten.Vertex, indices *[]uint16, connectTo, origin, start, end ebimath.Vector, clockwise bool, numSegments int, col color.RGBA, opacity float64) {
+// createTriangleFan now accepts a starting and ending radius for width interpolation
+func createTriangleFan(vertices *[]ebiten.Vertex, indices *[]uint16, connectTo, origin, start, end ebimath.Vector, startRadius, endRadius float64, clockwise bool, numSegments int, col color.RGBA, opacity float64) {
 	point1 := start.Sub(origin)
 	point2 := end.Sub(origin)
 
@@ -89,27 +90,31 @@ func createTriangleFan(vertices *[]ebiten.Vertex, indices *[]uint16, connectTo, 
 	jointAngle := angle2 - angle1
 	triAngle := jointAngle / float64(numSegments)
 
-	startPoint := start
-
 	connectToIdx := uint16(len(*vertices))
 	*vertices = append(*vertices, utils.CreateVertexWithOpacity(connectTo, ebimath.Vector{}, col, opacity))
 
-	startPointIdx := uint16(len(*vertices))
-	*vertices = append(*vertices, utils.CreateVertexWithOpacity(startPoint, ebimath.Vector{}, col, opacity))
+	currentPoint := start
 
 	for i := 0; i < numSegments; i++ {
-		angle := angle1 + float64(i+1)*triAngle
-		endPoint := origin.Add(ebimath.V(math.Cos(angle), math.Sin(angle)).ScaleF(point1.Length()))
+		// Calculate the interpolated radius for the current segment
+		t := float64(i) / float64(numSegments)
+		currentRadius := startRadius + (endRadius-startRadius)*t
+
+		nextAngle := angle1 + float64(i+1)*triAngle
+		nextPoint := origin.Add(ebimath.V(math.Cos(nextAngle), math.Sin(nextAngle)).ScaleF(currentRadius))
 
 		if i+1 == numSegments {
-			endPoint = end
+			nextPoint = end
 		}
 
-		endPointIdx := uint16(len(*vertices))
-		*vertices = append(*vertices, utils.CreateVertexWithOpacity(endPoint, ebimath.Vector{}, col, opacity))
+		currentPointIdx := uint16(len(*vertices))
+		*vertices = append(*vertices, utils.CreateVertexWithOpacity(currentPoint, ebimath.Vector{}, col, opacity))
 
-		*indices = append(*indices, startPointIdx, endPointIdx, connectToIdx)
+		nextPointIdx := uint16(len(*vertices))
+		*vertices = append(*vertices, utils.CreateVertexWithOpacity(nextPoint, ebimath.Vector{}, col, opacity))
 
-		startPointIdx = endPointIdx
+		*indices = append(*indices, connectToIdx, currentPointIdx, nextPointIdx)
+
+		currentPoint = nextPoint
 	}
 }

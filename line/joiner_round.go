@@ -12,7 +12,7 @@ import (
 type RoundJoiner struct{}
 
 func (self *RoundJoiner) createJoint(vertices *[]ebiten.Vertex, indices *[]uint16,
-	segment1, segment2 PolySegment, col color.RGBA, opacity float64,
+	segment1, segment2 PolySegment, width1, width2 float64, col color.RGBA, opacity float64,
 	end1, end2, nextStart1, nextStart2 *ebimath.Vector) {
 
 	dir1 := segment1.Center.Direction(true)
@@ -50,8 +50,12 @@ func (self *RoundJoiner) createJoint(vertices *[]ebiten.Vertex, indices *[]uint1
 		*nextStart2 = outer2.A
 	}
 
+	// Correctly pass the start and end radii to the triangle fan creation
+	startRadius := width1
+	endRadius := width2
+
 	// Create a fan of triangles for the round join
-	createTriangleFan(vertices, indices, innerSec, segment1.Center.B, outer1.B, outer2.A, clockwise, roundJoinSegments, col, opacity)
+	createTriangleFan(vertices, indices, innerSec, segment1.Center.B, outer1.B, outer2.A, startRadius, endRadius, clockwise, roundJoinSegments, col, opacity)
 }
 
 // BuildMesh generates vertices and indices for a round-joined line
@@ -96,18 +100,21 @@ func (self *RoundJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			col_start = l.lerpColor(float64(i) / float64(totalSegments))
 		}
 
+		width_start := l.points[i].width
+		width_end := l.points[i+1].width
+
 		if i < len(segments)-1 {
 			col_join := l.points[i+1].color
 			if l.interpolateColor {
 				col_join = l.lerpColor(float64(i+1) / float64(totalSegments))
 			}
-			self.createJoint(&vertices, &indices, segment, segments[i+1], col_join, l.opacity, &end1, &end2, &nextStart1, &nextStart2)
+			self.createJoint(&vertices, &indices, segment, segments[i+1], width_start/2, width_end/2, col_join, l.opacity, &end1, &end2, &nextStart1, &nextStart2)
 		} else {
 			end1 = pathEnd1
 			end2 = pathEnd2
 		}
 
-		col_end := col_start
+		var col_end color.RGBA
 		if i < len(segments)-1 {
 			col_end = l.points[i+1].color
 			if l.interpolateColor {
@@ -120,6 +127,7 @@ func (self *RoundJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			}
 		}
 
+		// Create the quad for the line segment, now using the correct start and end points
 		v_start1_idx := uint16(len(vertices))
 		vertices = append(vertices, utils.CreateVertexWithOpacity(start1, ebimath.Vector{}, col_start, l.opacity))
 		v_start2_idx := uint16(len(vertices))
