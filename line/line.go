@@ -232,13 +232,32 @@ func (l *Line) updateInterpolatedWidths() {
 }
 
 func (l *Line) lerpColor(t float64) color.RGBA {
-	segment := int(t * float64(len(l.colors)-1))
-	tInSegment := (t * float64(len(l.colors)-1)) - float64(segment)
-	if segment >= len(l.colors)-1 {
-		segment = len(l.colors) - 2
+	if !l.interpolateColor || len(l.colors) == 0 {
+		return l.color
+	}
+	if len(l.colors) == 1 {
+		return l.colors[0]
+	}
+
+	colors := l.colors
+	if l.IsClosed {
+		colors = append(colors, l.colors[0])
+	}
+
+	pos := t * float64(len(colors)-1)
+	segment := int(pos)
+	tInSegment := pos - float64(segment)
+
+	if segment >= len(colors)-1 {
+		segment = len(colors) - 2
 		tInSegment = 1.0
 	}
-	return utils.LerpPremultipliedRGBA(l.colors[segment], l.colors[segment+1], tInSegment)
+	if segment < 0 {
+		segment = 0
+		tInSegment = 0.0
+	}
+
+	return utils.LerpPremultipliedRGBA(colors[segment], colors[segment+1], tInSegment)
 }
 
 // Drawing methods
