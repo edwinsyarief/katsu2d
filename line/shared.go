@@ -35,14 +35,14 @@ func (ls *LineSegment) Intersection(other LineSegment, infiniteLines bool) (ebim
 
 	r_cross_s := r.X*s.Y - r.Y*s.X
 	if math.Abs(r_cross_s) < 0.0001 {
-		return ebimath.Vector{}, false
+		return ebimath.ZeroVector, false
 	}
 
 	t := (originDist.X*s.Y - originDist.Y*s.X) / r_cross_s
 	u := (originDist.X*r.Y - originDist.Y*r.X) / r_cross_s
 
 	if !infiniteLines && (t < 0 || t > 1 || u < 0 || u > 1) {
-		return ebimath.Vector{}, false
+		return ebimath.ZeroVector, false
 	}
 
 	return ls.A.Add(r.ScaleF(t)), true
