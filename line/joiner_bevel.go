@@ -1,3 +1,4 @@
+// joiner_bevel.go
 package line
 
 import (
@@ -75,20 +76,20 @@ func (self *BevelJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 		totalSegments = len(l.points)
 	}
 
-	// Create PolySegments
+	// Create PolySegments with per-end thickness
 	segments := make([]PolySegment, 0)
 	for i := 0; i < len(l.points)-1; i++ {
 		p1 := l.points[i]
 		p2 := l.points[i+1]
 		if !p1.position.Equals(p2.position) {
-			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2))
+			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2, p2.width/2))
 		}
 	}
 	if l.IsClosed && len(l.points) > 1 {
 		p1 := l.points[len(l.points)-1]
 		p2 := l.points[0]
 		if !p1.position.Equals(p2.position) {
-			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2))
+			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2, p2.width/2))
 		}
 	}
 

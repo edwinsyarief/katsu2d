@@ -1,3 +1,4 @@
+// line.go
 package line
 
 import (
@@ -225,8 +226,12 @@ func (l *Line) updateInterpolatedWidths() {
 	if !l.interpolateWidth {
 		return
 	}
+	n := len(l.points)
+	if n < 2 {
+		return
+	}
 	for i, p := range l.points {
-		t := float64(i) / float64(len(l.points)-1)
+		t := float64(i) / float64(n-1)
 		p.width = l.startWidth + t*(l.endWidth-l.startWidth)
 	}
 }

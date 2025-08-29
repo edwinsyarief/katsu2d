@@ -1,3 +1,4 @@
+// shared.go
 package line
 
 import (
@@ -55,12 +56,16 @@ type PolySegment struct {
 	Edge2  LineSegment
 }
 
-func NewPolySegment(p1, p2 ebimath.Vector, thickness float64) PolySegment {
+// Updated: supports different start and end thickness
+func NewPolySegment(p1, p2 ebimath.Vector, startThickness, endThickness float64) PolySegment {
 	center := LineSegment{A: p1, B: p2}
-	normal := center.Normal().ScaleF(thickness)
+	normal := center.Normal().Normalized()
 
-	edge1 := LineSegment{A: p1.Add(normal), B: p2.Add(normal)}
-	edge2 := LineSegment{A: p1.Sub(normal), B: p2.Sub(normal)}
+	startOffset := normal.ScaleF(startThickness)
+	endOffset := normal.ScaleF(endThickness)
+
+	edge1 := LineSegment{A: p1.Add(startOffset), B: p2.Add(endOffset)}
+	edge2 := LineSegment{A: p1.Sub(startOffset), B: p2.Sub(endOffset)}
 
 	return PolySegment{
 		Center: center,
@@ -96,7 +101,7 @@ func createTriangleFan(vertices *[]ebiten.Vertex, indices *[]uint16, connectTo, 
 	currentPoint := start
 
 	for i := 0; i < numSegments; i++ {
-		// Calculate the interpolated radius for the current segment
+		// Interpolate radius between start and end if they differ slightly
 		t := float64(i) / float64(numSegments)
 		currentRadius := startRadius + (endRadius-startRadius)*t
 
