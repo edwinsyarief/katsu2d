@@ -1,6 +1,8 @@
 package line
 
 import (
+	"image/color"
+
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -9,74 +11,117 @@ import (
 // BevelJoiner implements bevel line joins
 type BevelJoiner struct{}
 
-// buildBevelMesh generates vertices and indices for a bevel-joined line
+func (self *BevelJoiner) createJoint(vertices *[]ebiten.Vertex, indices *[]uint16,
+	segment1, segment2 PolySegment, col color.RGBA, opacity float64,
+	end1, end2, nextStart1, nextStart2 *ebimath.Vector) {
+
+	dir1 := segment1.Center.Direction(true)
+	dir2 := segment2.Center.Direction(true)
+
+	clockwise := (dir1.X*dir2.Y - dir1.Y*dir2.X) < 0
+
+	var inner1, inner2, outer1, outer2 *LineSegment
+	if clockwise {
+		outer1 = &segment1.Edge1
+		outer2 = &segment2.Edge1
+		inner1 = &segment1.Edge2
+		inner2 = &segment2.Edge2
+	} else {
+		outer1 = &segment1.Edge2
+		outer2 = &segment2.Edge2
+		inner1 = &segment1.Edge1
+		inner2 = &segment2.Edge1
+	}
+
+	innerSec, ok := inner1.Intersection(*inner2, true)
+	if !ok {
+		innerSec = inner1.B
+	}
+
+	if clockwise {
+		*end1 = outer1.B
+		*end2 = innerSec
+		*nextStart1 = outer2.A
+		*nextStart2 = innerSec
+	} else {
+		*end1 = innerSec
+		*end2 = outer1.B
+		*nextStart1 = innerSec
+		*nextStart2 = outer2.A
+	}
+
+	// Add bevel triangle
+	idx := uint16(len(*vertices))
+	*vertices = append(*vertices,
+		utils.CreateVertexWithOpacity(outer1.B, ebimath.Vector{}, col, opacity),
+		utils.CreateVertexWithOpacity(outer2.A, ebimath.Vector{}, col, opacity),
+		utils.CreateVertexWithOpacity(innerSec, ebimath.Vector{}, col, opacity),
+	)
+	*indices = append(*indices, idx, idx+1, idx+2)
+}
+
+// BuildMesh generates vertices and indices for a bevel-joined line
 func (self *BevelJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
+	if len(l.points) < 2 {
+		return nil, nil
+	}
+
 	vertices := make([]ebiten.Vertex, 0)
 	indices := make([]uint16, 0)
 	totalSegments := len(l.points) - 1
 
-	for i := 0; i < totalSegments; i++ {
+	// Create PolySegments
+	segments := make([]PolySegment, 0)
+	for i := 0; i < len(l.points)-1; i++ {
 		p1 := l.points[i]
 		p2 := l.points[i+1]
+		if !p1.position.Equals(p2.position) {
+			segments = append(segments, NewPolySegment(p1.position, p2.position, p1.width/2))
+		}
+	}
 
-		// Handle color interpolation
-		col1, col2 := p1.color, p2.color
+	if len(segments) == 0 {
+		return nil, nil
+	}
+
+	var start1, start2, end1, end2, nextStart1, nextStart2 ebimath.Vector
+
+	pathStart1 := segments[0].Edge1.A
+	pathStart2 := segments[0].Edge2.A
+	pathEnd1 := segments[len(segments)-1].Edge1.B
+	pathEnd2 := segments[len(segments)-1].Edge2.B
+
+	start1 = pathStart1
+	start2 = pathStart2
+
+	for i := 0; i < len(segments); i++ {
+		segment := segments[i]
+		col := l.points[i].color
 		if l.interpolateColor {
-			t1 := float64(i) / float64(totalSegments)
-			t2 := float64(i+1) / float64(totalSegments)
-			col1 = l.lerpColor(t1)
-			col2 = l.lerpColor(t2)
+			col = l.lerpColor(float64(i) / float64(totalSegments))
 		}
 
-		// Calculate segment direction and perpendicular
-		dir := p2.position.Sub(p1.position).Normalized()
-		perp := ebimath.V(-dir.Y, dir.X).Normalized().ScaleF(p1.width / 2)
-
-		// Calculate texture coordinates
-		tempTextureSize := l.calculateTextureSize()
-		uv1, uv2, uv3, uv4 := l.calculateTextureCoords(i, totalSegments, tempTextureSize)
-
-		// Create segment vertices
-		verts := []ebiten.Vertex{
-			utils.CreateVertexWithOpacity(p1.position.Add(perp), uv1, col1, l.opacity),
-			utils.CreateVertexWithOpacity(p1.position.Sub(perp), uv2, col1, l.opacity),
-			utils.CreateVertexWithOpacity(p2.position.Add(perp.ScaleF(p2.width/p1.width)), uv3, col2, l.opacity),
-			utils.CreateVertexWithOpacity(p2.position.Sub(perp.ScaleF(p2.width/p1.width)), uv4, col2, l.opacity),
+		if i < len(segments)-1 {
+			self.createJoint(&vertices, &indices, segment, segments[i+1], col, l.opacity, &end1, &end2, &nextStart1, &nextStart2)
+		} else {
+			end1 = pathEnd1
+			end2 = pathEnd2
 		}
 
-		// Add vertices and indices for segment
-		vertexIndex := uint16(len(vertices))
-		vertices = append(vertices, verts...)
-		indices = append(indices,
-			vertexIndex+0, vertexIndex+1, vertexIndex+2,
-			vertexIndex+2, vertexIndex+1, vertexIndex+3,
-		)
+		v_start1_idx := uint16(len(vertices))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(start1, ebimath.Vector{}, col, l.opacity))
+		v_start2_idx := uint16(len(vertices))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(start2, ebimath.Vector{}, col, l.opacity))
+		v_end1_idx := uint16(len(vertices))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(end1, ebimath.Vector{}, col, l.opacity))
+		v_end2_idx := uint16(len(vertices))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(end2, ebimath.Vector{}, col, l.opacity))
 
-		// Add bevel join for intermediate points
-		if i > 0 {
-			p0 := l.points[i-1]
-			dir1 := p1.position.Sub(p0.position).Normalized()
-			dir2 := p2.position.Sub(p1.position).Normalized()
+		indices = append(indices, v_start1_idx, v_start2_idx, v_end1_idx)
+		indices = append(indices, v_end1_idx, v_start2_idx, v_end2_idx)
 
-			perp1 := ebimath.V(-dir1.Y, dir1.X).Normalized().ScaleF(p1.width / 2)
-			perp2 := ebimath.V(-dir2.Y, dir2.X).Normalized().ScaleF(p1.width / 2)
-
-			cross := dir1.X*dir2.Y - dir1.Y*dir2.X
-			if cross > 0 {
-				perp1 = perp1.Invert()
-				perp2 = perp2.Invert()
-			}
-
-			// Create join vertices with proper bevel connection
-			joinVertex := utils.CreateVertexWithOpacity(p1.position, ebimath.V(0, 0), col1, l.opacity)
-			joinVertexIndex := uint16(len(vertices))
-			vertices = append(vertices, joinVertex)
-
-			v1 := utils.CreateVertexWithOpacity(p1.position.Add(perp1), ebimath.V(0, 0), col1, l.opacity)
-			v2 := utils.CreateVertexWithOpacity(p1.position.Add(perp2), ebimath.V(0, 0), col1, l.opacity)
-			vertices = append(vertices, v1, v2)
-			indices = append(indices, joinVertexIndex, joinVertexIndex+1, joinVertexIndex+2)
-		}
+		start1 = nextStart1
+		start2 = nextStart2
 	}
 
 	return vertices, indices
