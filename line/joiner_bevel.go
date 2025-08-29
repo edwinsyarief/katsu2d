@@ -96,26 +96,44 @@ func (self *BevelJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 
 	for i := 0; i < len(segments); i++ {
 		segment := segments[i]
-		col := l.points[i].color
+
+		col_start := l.points[i].color
 		if l.interpolateColor {
-			col = l.lerpColor(float64(i) / float64(totalSegments))
+			col_start = l.lerpColor(float64(i) / float64(totalSegments))
 		}
 
 		if i < len(segments)-1 {
-			self.createJoint(&vertices, &indices, segment, segments[i+1], col, l.opacity, &end1, &end2, &nextStart1, &nextStart2)
+			col_join := l.points[i+1].color
+			if l.interpolateColor {
+				col_join = l.lerpColor(float64(i+1) / float64(totalSegments))
+			}
+			self.createJoint(&vertices, &indices, segment, segments[i+1], col_join, l.opacity, &end1, &end2, &nextStart1, &nextStart2)
 		} else {
 			end1 = pathEnd1
 			end2 = pathEnd2
 		}
 
+		var col_end color.RGBA
+		if i < len(segments)-1 {
+			col_end = l.points[i+1].color
+			if l.interpolateColor {
+				col_end = l.lerpColor(float64(i+1) / float64(totalSegments))
+			}
+		} else {
+			col_end = l.points[len(l.points)-1].color
+			if l.interpolateColor {
+				col_end = l.lerpColor(1.0)
+			}
+		}
+
 		v_start1_idx := uint16(len(vertices))
-		vertices = append(vertices, utils.CreateVertexWithOpacity(start1, ebimath.Vector{}, col, l.opacity))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(start1, ebimath.Vector{}, col_start, l.opacity))
 		v_start2_idx := uint16(len(vertices))
-		vertices = append(vertices, utils.CreateVertexWithOpacity(start2, ebimath.Vector{}, col, l.opacity))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(start2, ebimath.Vector{}, col_start, l.opacity))
 		v_end1_idx := uint16(len(vertices))
-		vertices = append(vertices, utils.CreateVertexWithOpacity(end1, ebimath.Vector{}, col, l.opacity))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(end1, ebimath.Vector{}, col_end, l.opacity))
 		v_end2_idx := uint16(len(vertices))
-		vertices = append(vertices, utils.CreateVertexWithOpacity(end2, ebimath.Vector{}, col, l.opacity))
+		vertices = append(vertices, utils.CreateVertexWithOpacity(end2, ebimath.Vector{}, col_end, l.opacity))
 
 		indices = append(indices, v_start1_idx, v_start2_idx, v_end1_idx)
 		indices = append(indices, v_end1_idx, v_start2_idx, v_end2_idx)
