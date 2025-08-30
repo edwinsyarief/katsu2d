@@ -1,4 +1,3 @@
-// joiner_miter.go
 package line
 
 import (
@@ -7,81 +6,64 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// MiterJoiner implements miter line joins
 type MiterJoiner struct{}
 
-// createJoint computes the end/start edges at the corner between segment1 -> segment2.
-// It computes the outer and inner intersections. If the outer miter exceeds the miter limit,
-// it gracefully falls back to a bevel-like corner to avoid spikes.
+// createJoint computes miter join points per side using bisector math.
+// Each side is handled independently, so one can bevel while the other miters.
 func (self *MiterJoiner) createJoint(
 	segment1, segment2 PolySegment,
 	end1, end2, nextStart1, nextStart2 *ebimath.Vector,
 ) {
-	dir1 := segment1.Center.Direction(true)
-	dir2 := segment2.Center.Direction(true)
-	clockwise := (dir1.X*dir2.Y - dir1.Y*dir2.X) < 0
+	// Directions of incoming and outgoing segments
+	d1 := segment1.Center.Direction(true).Normalized()
+	d2 := segment2.Center.Direction(true).Normalized()
 
-	var inner1, inner2, outer1, outer2 *LineSegment
-	if clockwise {
-		outer1 = &segment1.Edge1
-		outer2 = &segment2.Edge1
-		inner1 = &segment1.Edge2
-		inner2 = &segment2.Edge2
-	} else {
-		outer1 = &segment1.Edge2
-		outer2 = &segment2.Edge2
-		inner1 = &segment1.Edge1
-		inner2 = &segment2.Edge1
-	}
-
-	// Intersections on inner and outer sides
-	innerSec, okInner := inner1.Intersection(*inner2, false)
-	if !okInner {
-		innerSec = inner1.B
-	}
-	outerSec, okOuter := outer1.Intersection(*outer2, true)
-	if !okOuter {
-		outerSec = outer1.B
-	}
-
-	// Miter limit check based on the radius at the joint (end of segment1)
-	radiusAtJoint := segment1.Edge1.B.Sub(segment1.Center.B).Length()
-	maxMiter := radiusAtJoint * defaultMiterLimit
-	outDist := outerSec.Sub(segment1.Center.B).Length()
-
-	useBevelFallback := !okOuter || outDist > maxMiter
-
-	if useBevelFallback {
-		// Bevel-like fallback (same layout as BevelJoiner)
-		if clockwise {
-			*end1 = outer1.B
-			*end2 = innerSec
-			*nextStart1 = outer2.A
-			*nextStart2 = innerSec
-		} else {
-			*end1 = innerSec
-			*end2 = outer1.B
-			*nextStart1 = innerSec
-			*nextStart2 = outer2.A
-		}
+	// Bisector direction (normalized)
+	bisector := d1.Add(d2).Normalized()
+	if bisector.Length() == 0 {
+		// 180° turn — just bevel both sides
+		*end1 = segment1.Edge1.B
+		*end2 = segment1.Edge2.B
+		*nextStart1 = segment2.Edge1.A
+		*nextStart2 = segment2.Edge2.A
 		return
 	}
 
-	// True miter: use the outer intersection for the outer edge, inner intersection for the inner edge
-	if clockwise {
-		*end1 = outerSec
-		*end2 = innerSec
-		*nextStart1 = outerSec
-		*nextStart2 = innerSec
+	// Perpendiculars for each segment (left/right offsets)
+	perp1 := ebimath.V(-d1.Y, d1.X)
+	perp2 := ebimath.V(-d2.Y, d2.X)
+
+	// --- Side 1 (Edge1 continuity) ---
+	hw1 := segment1.Edge1.B.Sub(segment1.Center.B).Length()
+	miterDir1 := perp1.Add(perp2).Normalized()
+	scale1 := hw1 / miterDir1.Dot(perp1) // miter length factor
+	miterPoint1 := segment1.Center.B.Add(miterDir1.ScaleF(scale1))
+
+	if miterPoint1.Sub(segment1.Center.B).Length() > hw1*defaultMiterLimit {
+		// Bevel fallback
+		*end1 = segment1.Edge1.B
+		*nextStart1 = segment2.Edge1.A
 	} else {
-		*end1 = innerSec
-		*end2 = outerSec
-		*nextStart1 = innerSec
-		*nextStart2 = outerSec
+		*end1 = miterPoint1
+		*nextStart1 = miterPoint1
+	}
+
+	// --- Side 2 (Edge2 continuity) ---
+	hw2 := segment1.Edge2.B.Sub(segment1.Center.B).Length()
+	miterDir2 := perp1.ScaleF(-1).Add(perp2.ScaleF(-1)).Normalized()
+	scale2 := hw2 / miterDir2.Dot(perp1.ScaleF(-1))
+	miterPoint2 := segment1.Center.B.Add(miterDir2.ScaleF(scale2))
+
+	if miterPoint2.Sub(segment1.Center.B).Length() > hw2*defaultMiterLimit {
+		// Bevel fallback
+		*end2 = segment1.Edge2.B
+		*nextStart2 = segment2.Edge2.A
+	} else {
+		*end2 = miterPoint2
+		*nextStart2 = miterPoint2
 	}
 }
 
-// BuildMesh generates vertices and indices for a miter-joined line
 func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 	if len(l.points) < 2 {
 		return nil, nil
@@ -117,13 +99,11 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 
 	var start1, start2, end1, end2, nextStart1, nextStart2 ebimath.Vector
 
-	// Loop through each segment to build the mesh
 	for i := 0; i < len(segments); i++ {
 		segment := segments[i]
 		isFirstSegment := i == 0
 		isLastSegment := i == len(segments)-1
 
-		// Map segment index to point indices (assumes non-degenerate point ordering)
 		var p1_idx, p2_idx int
 		p1_idx = i
 		if i == len(l.points)-1 {
@@ -132,7 +112,6 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			p2_idx = i + 1
 		}
 
-		// Colors (with optional interpolation)
 		col_start := l.points[p1_idx].color
 		if l.interpolateColor {
 			col_start = l.lerpColor(float64(i) / float64(totalSegments))
@@ -142,7 +121,6 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			col_end = l.lerpColor(float64(i+1) / float64(totalSegments))
 		}
 
-		// Determine start edge of this segment
 		if isFirstSegment {
 			start1 = segment.Edge1.A
 			start2 = segment.Edge2.A
@@ -151,7 +129,6 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			start2 = nextStart2
 		}
 
-		// Determine end edge via joint with next segment (or the raw end if last and open)
 		if l.IsClosed || !isLastSegment {
 			nextSegmentIndex := (i + 1) % len(segments)
 			self.createJoint(segment, segments[nextSegmentIndex], &end1, &end2, &nextStart1, &nextStart2)
@@ -160,14 +137,12 @@ func (self *MiterJoiner) BuildMesh(l *Line) ([]ebiten.Vertex, []uint16) {
 			end2 = segment.Edge2.B
 		}
 
-		// If closed, fix the very first start edge by "joining" previous to current without adding geometry
 		if l.IsClosed && isFirstSegment {
 			var dummyEnd1, dummyEnd2 ebimath.Vector
 			prevSegmentIndex := len(segments) - 1
 			self.createJoint(segments[prevSegmentIndex], segment, &dummyEnd1, &dummyEnd2, &start1, &start2)
 		}
 
-		// Create the quad for the line segment
 		v_start1_idx := uint16(len(vertices))
 		vertices = append(vertices, utils.CreateVertexWithOpacity(start1, ebimath.Vector{}, col_start, l.opacity))
 		v_start2_idx := uint16(len(vertices))
