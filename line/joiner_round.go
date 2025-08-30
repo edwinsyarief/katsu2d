@@ -42,7 +42,7 @@ func (self *RoundJoiner) createJoint(
 	}
 
 	// Intersection on inner side (apex for our fan).
-	innerSec, ok := inner1.Intersection(*inner2, true)
+	innerSec, ok := inner1.Intersection(*inner2, false)
 	if !ok {
 		// Fallback: pick a stable point near the joint to avoid huge skinny triangles.
 		innerSec = inner1.B

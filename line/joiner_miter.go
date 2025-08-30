@@ -35,7 +35,7 @@ func (self *MiterJoiner) createJoint(
 	}
 
 	// Intersections on inner and outer sides
-	innerSec, okInner := inner1.Intersection(*inner2, true)
+	innerSec, okInner := inner1.Intersection(*inner2, false)
 	if !okInner {
 		innerSec = inner1.B
 	}

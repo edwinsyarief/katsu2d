@@ -5,7 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"math/rand/v2"
+
 	"reflect"
 	"time"
 
@@ -13,6 +13,8 @@ import (
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+var rand *ebimath.Rand = ebimath.Random()
 
 func ResizeSlices[T any](slice []T, newLen int) []T {
 	if newLen > cap(slice) {
@@ -351,17 +353,17 @@ func AdjustDestinationPixel(x float32) float32 {
 
 // GetInterpolatedColor returns a color between min and max
 func GetInterpolatedColor(min, max color.RGBA) color.RGBA {
-	r := uint8(float64(min.R) + rand.Float64()*float64(max.R-min.R))
-	g := uint8(float64(min.G) + rand.Float64()*float64(max.G-min.G))
-	b := uint8(float64(min.B) + rand.Float64()*float64(max.B-min.B))
-	a := uint8(float64(min.A) + rand.Float64()*float64(max.A-min.A))
+	r := uint8(float64(min.R) + rand.FloatRange(float64(min.R), float64(max.R)))
+	g := uint8(float64(min.G) + rand.FloatRange(float64(min.G), float64(max.G)))
+	b := uint8(float64(min.B) + rand.FloatRange(float64(min.B), float64(max.B)))
+	a := uint8(float64(min.A) + rand.FloatRange(float64(min.A), float64(max.A)))
 	return color.RGBA{R: r, G: g, B: b, A: a}
 }
 
 // generatePerlinNoiseImage generates a Perlin noise image for wind simulation.
 func GeneratePerlinNoiseImage(width, height int, frequency float64) *ebiten.Image {
 	img := ebiten.NewImage(width, height)
-	p := perlin.NewPerlin(2, 2, 3, rand.Int64())
+	p := perlin.NewPerlin(2, 2, 3, rand.PositiveInt64())
 	pixels := make([]byte, width*height*4)
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
@@ -448,18 +450,6 @@ func UpdateVertexSrc(vert ebiten.Vertex, src ebimath.Vector) ebiten.Vertex {
 	vert.SrcY = float32(src.Y)
 
 	return vert
-}
-
-func GenerateIndices(numVerts int) []uint16 {
-	indices := []uint16{}
-	numQuads := (numVerts / 2) - 1
-	for i := 0; i < numQuads; i++ {
-		start := (i + 1) * 2
-		end := i * 2
-		indices = append(indices, uint16(start), uint16(end), uint16(end+1))
-		indices = append(indices, uint16(start), uint16(end+1), uint16(start+1))
-	}
-	return indices
 }
 
 func ToRadians(degrees float64) float64 {

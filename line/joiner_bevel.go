@@ -34,7 +34,7 @@ func (self *BevelJoiner) createJoint(vertices *[]ebiten.Vertex, indices *[]uint1
 		inner2 = &segment2.Edge1
 	}
 
-	innerSec, ok := inner1.Intersection(*inner2, true)
+	innerSec, ok := inner1.Intersection(*inner2, false)
 	if !ok {
 		innerSec = inner1.B
 	}

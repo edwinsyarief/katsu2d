@@ -14,7 +14,6 @@ import (
 // Constants and types
 const (
 	defaultMiterLimit = 10.0
-	roundJoinSegments = 10
 )
 
 type (
