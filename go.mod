@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/aquilax/go-perlin v1.1.0
 	github.com/edwinsyarief/assetpacker v1.0.0
-	github.com/edwinsyarief/ebi-math v1.2.0
+	github.com/edwinsyarief/ebi-math v1.2.1
 	github.com/hajimehoshi/ebiten/v2 v2.8.8
 	golang.org/x/text v0.28.0
 )
