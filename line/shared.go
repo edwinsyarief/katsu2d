@@ -23,7 +23,7 @@ func (ls *LineSegment) Normal() ebimath.Vector {
 func (ls *LineSegment) Direction(normalized bool) ebimath.Vector {
 	vec := ls.B.Sub(ls.A)
 	if normalized {
-		return vec.Normalized()
+		return vec.Normalize()
 	}
 	return vec
 }
@@ -59,7 +59,7 @@ type PolySegment struct {
 // Updated: supports different start and end thickness
 func NewPolySegment(p1, p2 ebimath.Vector, startThickness, endThickness float64) PolySegment {
 	center := LineSegment{A: p1, B: p2}
-	normal := center.Normal().Normalized()
+	normal := center.Normal().Normalize()
 
 	startOffset := normal.ScaleF(startThickness)
 	endOffset := normal.ScaleF(endThickness)

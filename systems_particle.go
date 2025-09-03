@@ -136,8 +136,8 @@ func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
 		sprite, _ := world.GetComponent(entity, CTSprite)
 		s := sprite.(*SpriteComponent)
 
-		p.Velocity = p.Velocity.Add(p.Gravity.MulF(dt))
-		t.SetPosition(t.Position().Add(p.Velocity.MulF(dt)))
+		p.Velocity = p.Velocity.Add(p.Gravity.ScaleF(dt))
+		t.SetPosition(t.Position().Add(p.Velocity.ScaleF(dt)))
 		p.Lifetime -= dt
 
 		tp := 1.0 - (p.Lifetime / p.TotalLifetime)

@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/aquilax/go-perlin v1.1.0
 	github.com/edwinsyarief/assetpacker v1.0.0
-	github.com/edwinsyarief/ebi-math v1.1.1
+	github.com/edwinsyarief/ebi-math v1.2.0
 	github.com/hajimehoshi/ebiten/v2 v2.8.8
 	golang.org/x/text v0.28.0
 )
@@ -20,7 +20,6 @@ require (
 	github.com/jezek/xgb v1.1.1 // indirect
 	github.com/jfreymuth/oggvorbis v1.0.5 // indirect
 	github.com/jfreymuth/vorbis v1.0.2 // indirect
-	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
 	golang.org/x/image v0.30.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect

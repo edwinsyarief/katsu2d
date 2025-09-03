@@ -110,7 +110,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		currentGustPos := gustData.pos
 		currentStrengthMultiplier := gustData.strengthMultiplier
 
-		perp := ebimath.Vector{X: -gust.Direction.Y, Y: gust.Direction.X}.Normalized()
+		perp := ebimath.Vector{X: -gust.Direction.Y, Y: gust.Direction.X}.Normalize()
 		halfLength := gust.Length / 2.0
 		halfWidth := gust.Width / 2.0
 		corner1 := currentGustPos.Add(gust.Direction.ScaleF(halfLength)).Add(perp.ScaleF(halfWidth))

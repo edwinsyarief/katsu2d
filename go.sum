@@ -10,8 +10,8 @@ github.com/ebitengine/purego v0.8.4 h1:CF7LEKg5FFOsASUj0+QwaXf8Ht6TlFxg09+S9wz0o
 github.com/ebitengine/purego v0.8.4/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/edwinsyarief/assetpacker v1.0.0 h1:V4z0MZRfDQGRafo4jvXyGsYKfUw61B7bRCYQoIRlcV8=
 github.com/edwinsyarief/assetpacker v1.0.0/go.mod h1:Cv5V5pP0S33109CQJkip4fHCVDJVi44o4kVsHEGzeEw=
-github.com/edwinsyarief/ebi-math v1.1.1 h1:wj4t7rhq+SoNgD4Kzr422CqSsZWpY9YyBCaRGRkZ9wo=
-github.com/edwinsyarief/ebi-math v1.1.1/go.mod h1:paIJ2BnRy0HRH2DOTQM/3iy0lQceveoi9pxrLseU22I=
+github.com/edwinsyarief/ebi-math v1.2.0 h1:BlnCkGQdktYCyhZmtzUNbGzyJnCbDgY4T92yy/W1ISo=
+github.com/edwinsyarief/ebi-math v1.2.0/go.mod h1:lbp0G39FFDw6Ip24UtFpykJtRnUFuyC3HelaoYZkuOU=
 github.com/go-text/typesetting v0.3.0 h1:OWCgYpp8njoxSRpwrdd1bQOxdjOXDj9Rqart9ML4iF4=
 github.com/go-text/typesetting v0.3.0/go.mod h1:qjZLkhRgOEYMhU9eHBr3AR4sfnGJvOXNLt8yRAySFuY=
 github.com/go-text/typesetting-utils v0.0.0-20241103174707-87a29e9e6066 h1:qCuYC+94v2xrb1PoS4NIDe7DGYtLnU2wWiQe9a1B1c0=
@@ -31,8 +31,6 @@ github.com/jfreymuth/vorbis v1.0.2 h1:m1xH6+ZI4thH927pgKD8JOH4eaGRm18rEE9/0WKjvN
 github.com/jfreymuth/vorbis v1.0.2/go.mod h1:DoftRo4AznKnShRl1GxiTFCseHr4zR9BN3TWXyuzrqQ=
 github.com/pierrec/lz4/v4 v4.1.21 h1:yOVMLb6qSIDP67pl/5F7RepeKYu/VmTyEXvuMI5d9mQ=
 github.com/pierrec/lz4/v4 v4.1.21/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
-golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b h1:DXr+pvt3nC887026GRP39Ej11UATqWDmWuS99x26cD0=
-golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b/go.mod h1:4QTo5u+SEIbbKW1RacMZq1YEfOBqeXa19JeshGi+zc4=
 golang.org/x/image v0.30.0 h1:jD5RhkmVAnjqaCUXfbGBrn3lpxbknfN9w2UhHHU+5B4=
 golang.org/x/image v0.30.0/go.mod h1:SAEUTxCCMWSrJcCy/4HwavEsfZZJlYxeHLc6tTiAe/c=
 golang.org/x/sync v0.16.0 h1:ycBJEhp9p4vXvUZNszeOq0kGTPghopOL8q0fq3vstxw=

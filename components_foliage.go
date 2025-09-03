@@ -47,7 +47,7 @@ func WithFoliageWindSpeed(speed float64) FoliageOption {
 // WithFoliageWindDirection sets the dominant direction of the wind. The vector will be normalized.
 func WithFoliageWindDirection(x, y float64) FoliageOption {
 	return func(c *FoliageControllerComponent) {
-		c.windDirection = ebimath.Vector{X: x, Y: y}.Normalized()
+		c.windDirection = ebimath.Vector{X: x, Y: y}.Normalize()
 	}
 }
 

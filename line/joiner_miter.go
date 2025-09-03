@@ -15,11 +15,11 @@ func (self *MiterJoiner) createJoint(
 	end1, end2, nextStart1, nextStart2 *ebimath.Vector,
 ) {
 	// Directions of incoming and outgoing segments
-	d1 := segment1.Center.Direction(true).Normalized()
-	d2 := segment2.Center.Direction(true).Normalized()
+	d1 := segment1.Center.Direction(true).Normalize()
+	d2 := segment2.Center.Direction(true).Normalize()
 
 	// Bisector direction (normalized)
-	bisector := d1.Add(d2).Normalized()
+	bisector := d1.Add(d2).Normalize()
 	if bisector.Length() == 0 {
 		// 180° turn — just bevel both sides
 		*end1 = segment1.Edge1.B
@@ -35,7 +35,7 @@ func (self *MiterJoiner) createJoint(
 
 	// --- Side 1 (Edge1 continuity) ---
 	hw1 := segment1.Edge1.B.Sub(segment1.Center.B).Length()
-	miterDir1 := perp1.Add(perp2).Normalized()
+	miterDir1 := perp1.Add(perp2).Normalize()
 	scale1 := hw1 / miterDir1.Dot(perp1) // miter length factor
 	miterPoint1 := segment1.Center.B.Add(miterDir1.ScaleF(scale1))
 
@@ -50,7 +50,7 @@ func (self *MiterJoiner) createJoint(
 
 	// --- Side 2 (Edge2 continuity) ---
 	hw2 := segment1.Edge2.B.Sub(segment1.Center.B).Length()
-	miterDir2 := perp1.ScaleF(-1).Add(perp2.ScaleF(-1)).Normalized()
+	miterDir2 := perp1.ScaleF(-1).Add(perp2.ScaleF(-1)).Normalize()
 	scale2 := hw2 / miterDir2.Dot(perp1.ScaleF(-1))
 	miterPoint2 := segment1.Center.B.Add(miterDir2.ScaleF(scale2))
 

@@ -148,7 +148,7 @@ func (self *basicCamera) TrackObject(target *ebimath.Transform, immediateFocus b
 // CenterOnTarget instantly moves the camera to the target’s position.
 func (self *basicCamera) CenterOnTarget() {
 	if self.target != nil {
-		self.rawFocus = self.target.Position().Add(self.targetOffset.Mul(self.target.Scale()))
+		self.rawFocus = self.target.Position().Add(self.targetOffset.Scale(self.target.Scale()))
 	}
 }
 
@@ -204,7 +204,7 @@ func (self *basicCamera) Update(deltaTime float64) {
 	}
 	self.bumpZoom *= math.Pow(ZoomFriction, deltaTime)
 	if self.target != nil {
-		targetPos := self.target.Position().Add(self.targetOffset.Mul(self.target.Scale()))
+		targetPos := self.target.Position().Add(self.targetOffset.Scale(self.target.Scale()))
 		angle := float64(self.rawFocus.AngleToPoint(targetPos))
 		distX := math.Abs(targetPos.X - self.rawFocus.X)
 		distY := math.Abs(targetPos.Y - self.rawFocus.Y)
@@ -223,9 +223,9 @@ func (self *basicCamera) Update(deltaTime float64) {
 	if self.clampBounds {
 		self.applyBreaking(&frict, deltaTime)
 	}
-	self.rawFocus = self.rawFocus.Add(self.destPoint.MulF(deltaTime))
-	self.destPoint = self.destPoint.MulF(math.Pow(frict, deltaTime))
-	self.bumpOffset = self.bumpOffset.MulF(math.Pow(BumpFriction, deltaTime))
+	self.rawFocus = self.rawFocus.Add(self.destPoint.ScaleF(deltaTime))
+	self.destPoint = self.destPoint.ScaleF(math.Pow(frict, deltaTime))
+	self.bumpOffset = self.bumpOffset.ScaleF(math.Pow(BumpFriction, deltaTime))
 	if self.clampBounds {
 		self.clampedFocus.X = ebimath.Clamp(self.rawFocus.X, self.viewport.X*0.5, math.Max(self.levelBounds.Width()-self.viewport.X*0.5, self.viewport.X*0.5))
 		self.clampedFocus.Y = ebimath.Clamp(self.rawFocus.Y, self.viewport.Y*0.5, math.Max(self.levelBounds.Height()-self.viewport.Y*0.5, self.viewport.Y*0.5))
@@ -261,8 +261,8 @@ func (self *basicCamera) applyBreaking(frict *float64, deltaTime float64) {
 func (self *basicCamera) apply() {
 	zoom := self.GetZoom()
 	screenCenter := ebimath.V(self.originalViewport.X/2, self.originalViewport.Y/2)
-	t := screenCenter.Sub(self.clampedFocus.MulF(zoom))
-	t = t.Sub(self.bumpOffset.MulF(zoom))
+	t := screenCenter.Sub(self.clampedFocus.ScaleF(zoom))
+	t = t.Sub(self.bumpOffset.ScaleF(zoom))
 	if self.cd.Has("shaking") {
 		ftime := float64(frameCount)
 		shakeAmount := self.shakePower * self.cd.GetRatio("shaking")
@@ -270,7 +270,7 @@ func (self *basicCamera) apply() {
 			math.Cos(ftime*ShakeFreqX)*ShakeAmp*shakeAmount,
 			math.Sin(0.3+ftime*ShakeFreqY)*ShakeAmp*shakeAmount,
 		)
-		t = t.Add(shakeOffset.MulF(zoom))
+		t = t.Add(shakeOffset.ScaleF(zoom))
 		if self.cd.GetRatio("shaking") == 0 {
 			self.shakePower = 0
 		}
@@ -361,7 +361,7 @@ func (self *camera) WorldToScreen(worldPos ebimath.Vector) ebimath.Vector {
 	screenCenter := ebimath.V(float64(self.ViewportWidth)/2, float64(self.ViewportHeight)/2)
 	relativePos := worldPos.Sub(self.Position())
 	rotatedPos := relativePos.Rotate(-self.Transform.Rotation())
-	scaledPos := rotatedPos.MulF(self.CurrentZoom)
+	scaledPos := rotatedPos.ScaleF(self.CurrentZoom)
 	return screenCenter.Add(scaledPos)
 }
 

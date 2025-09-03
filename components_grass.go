@@ -82,7 +82,7 @@ func WithGrassWindSpeed(speed float64) GrassOption {
 // WithGrassWindDirection sets the dominant direction of the wind. The vector will be normalized.
 func WithGrassWindDirection(x, y float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.windDirection = ebimath.Vector{X: x, Y: y}.Normalized()
+		self.windDirection = ebimath.Vector{X: x, Y: y}.Normalize()
 	}
 }
 
@@ -276,7 +276,7 @@ func (self *GrassControllerComponent) SetForcePositions(sources []ForceSource) {
 
 // AddStrongWindGust adds a new strong wind gust to the system.
 func (self *GrassControllerComponent) AddStrongWindGust(gust StrongWindGust) {
-	gust.Direction = gust.EndPos.Sub(gust.StartPos).Normalized()
+	gust.Direction = gust.EndPos.Sub(gust.StartPos).Normalize()
 	gust.Active = true
 	self.strongWindGusts = append(self.strongWindGusts, &gust)
 }
