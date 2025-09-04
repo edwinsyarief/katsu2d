@@ -1,4 +1,3 @@
-// line.go
 package line
 
 import (

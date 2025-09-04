@@ -1,4 +1,3 @@
-// joiner_bevel.go
 package line
 
 import (

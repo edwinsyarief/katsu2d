@@ -1,4 +1,3 @@
-// joiner_round.go
 package line
 
 import (

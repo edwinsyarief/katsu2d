@@ -1,4 +1,3 @@
-// shared.go
 package line
 
 import (
