@@ -33,16 +33,8 @@ type LineBuilder struct {
 	Vertices         []ebiten.Vertex
 	Indices          []uint16
 	interpolateColor bool
-	lastIndex        [2]int
 	uvs              []ebimath.Vector
 }
-
-type orientation int
-
-const (
-	up orientation = iota
-	down
-)
 
 func NewLineBuilder() *LineBuilder {
 	return &LineBuilder{
@@ -63,81 +55,75 @@ func (lb *LineBuilder) Build() {
 	lb.interpolateColor = len(lb.Colors) > 1
 	interpolateWidth := len(lb.Widths) > 1
 	var totalDistance float64
+	n := len(lb.Points)
+	nSegments := n - 1
+	isClosed := lb.Closed && n > 2
+	if isClosed {
+		nSegments = n
+	}
 	if lb.interpolateColor || interpolateWidth {
-		for i := 1; i < len(lb.Points); i++ {
-			totalDistance += vecDistanceTo(lb.Points[i], lb.Points[i-1])
+		for i := 0; i < nSegments; i++ {
+			p1 := lb.Points[i%n]
+			p2 := lb.Points[(i+1)%n]
+			totalDistance += p1.DistanceTo(p2)
 		}
 	}
 
 	// --- Initial state ---
 	halfThickness := lb.Width / 2.0
-	sqMiterThreshold := halfThickness * halfThickness * lb.SharpLimit * lb.SharpLimit
+	_ = halfThickness * halfThickness * lb.SharpLimit * lb.SharpLimit
 	var currentDistance float64
-	isClosed := lb.Closed && len(lb.Points) > 2
 
 	// --- Begin Cap ---
 	if !isClosed && lb.BeginCapMode != LineCapNone {
 		pA := lb.Points[0]
 		pB := lb.Points[1]
-		dir := vecNormalized(vecSub(pB, pA))
-		normal := vecOrthogonal(dir)
+		dir := pB.Sub(pA).Normalize()
+		normal := dir.Orthogonal()
 		width := halfThickness
 		if interpolateWidth {
 			width = lb.lerpWidth(0) * halfThickness
 		}
 		color := lb.lerpColor(0)
 
-		v1 := vecAdd(pA, vecMul(normal, width))
-		v2 := vecSub(pA, vecMul(normal, width))
+		v1 := pA.Add(normal.ScaleF(width))
+		v2 := pA.Sub(normal.ScaleF(width))
 
 		switch lb.BeginCapMode {
 		case LineCapBox:
-			v1_box := vecSub(v1, vecMul(dir, width))
-			v2_box := vecSub(v2, vecMul(dir, width))
+			v1_box := v1.Sub(dir.ScaleF(width))
+			v2_box := v2.Sub(dir.ScaleF(width))
 			lb.addTriangle(v1, v2, v1_box, color, color, color)
 			lb.addTriangle(v2, v2_box, v1_box, color, color, color)
 		case LineCapRound:
-			lb.newArc(pA, vecSub(v1, pA), math.Pi, color, Rect{})
+			lb.newArc(pA, v1.Sub(pA), math.Pi, color, Rect{})
 		}
 	}
 
 	// --- Main loop ---
-	var pA, pB, pC ebimath.Vector
-	pA = lb.Points[0]
+	for i := 0; i < nSegments; i++ {
+		paIndex := i % n
+		pbIndex := (i + 1) % n
+		pA := lb.Points[paIndex]
+		pB := lb.Points[pbIndex]
 
-	idxB := 1
-	for idxB < len(lb.Points) && lb.Points[idxB].Equals(pA) {
-		idxB++
-	}
-	if idxB >= len(lb.Points) {
-		return
-	}
-	pB = lb.Points[idxB]
-
-	for i := idxB; i <= len(lb.Points); i++ {
-		if i < len(lb.Points) {
-			pC = lb.Points[i]
-			if pC.Equals(pB) {
-				continue
-			}
-		} else {
-			if isClosed {
-				break
-			}
-			pC = vecAdd(pB, vecSub(pB, pA))
-		}
-
-		dirAB := vecSub(pB, pA)
-		lenAB := vecLength(dirAB)
-		if lenAB < 1e-6 {
-			pA = pB
-			pB = pC
+		if pB.Equals(pA) {
 			continue
 		}
 
-		tA := currentDistance / totalDistance
-		currentDistance += lenAB
-		tB := currentDistance / totalDistance
+		dirAB := pB.Sub(pA)
+		lenAB := dirAB.Length()
+		if lenAB < 1e-6 {
+			continue
+		}
+
+		tA := 0.0
+		tB := 0.0
+		if totalDistance > 0 {
+			tA = currentDistance / totalDistance
+			currentDistance += lenAB
+			tB = currentDistance / totalDistance
+		}
 
 		colorA := lb.lerpColor(tA)
 		colorB := lb.lerpColor(tB)
@@ -149,106 +135,84 @@ func (lb *LineBuilder) Build() {
 			widthB = lb.lerpWidth(tB) * halfThickness
 		}
 
-		normalA := vecOrthogonal(vecNormalized(dirAB))
-		vA1 := vecAdd(pA, vecMul(normalA, widthA))
-		vA2 := vecSub(pA, vecMul(normalA, widthA))
-		vB1 := vecAdd(pB, vecMul(normalA, widthB))
-		vB2 := vecSub(pB, vecMul(normalA, widthB))
+		normal := dirAB.Normalize().Orthogonal()
+		vA1 := pA.Add(normal.ScaleF(widthA))
+		vA2 := pA.Sub(normal.ScaleF(widthA))
+		vB1 := pB.Add(normal.ScaleF(widthB))
+		vB2 := pB.Sub(normal.ScaleF(widthB))
 
 		lb.addTriangle(vA1, vA2, vB1, colorA, colorA, colorB)
 		lb.addTriangle(vA2, vB2, vB1, colorA, colorB, colorB)
 
-		if i >= len(lb.Points) {
-			break
-		}
-		if isClosed && i == len(lb.Points)-1 {
-			pC = lb.Points[0]
-		}
+		// --- Joint ---
+		if lb.JointMode != LineJointSharp {
+			if !isClosed && i >= n-2 {
+				continue
+			}
+			pcIndex := (i + 2) % n
+			pC := lb.Points[pcIndex]
+			if pC.Equals(pB) {
+				continue
+			}
 
-		dirBC := vecSub(pC, pB)
-		lenBC := vecLength(dirBC)
-		if lenBC < 1e-6 {
-			continue
-		}
+			dirBC := pC.Sub(pB)
+			if dirBC.Length() < 1e-6 {
+				continue
+			}
 
-		normalB := vecOrthogonal(vecNormalized(dirBC))
-		zCross := vecCross(dirAB, dirBC)
+			normalB := dirBC.Normalize().Orthogonal()
+			zCross := dirAB.Cross(dirBC)
 
-		if math.Abs(zCross) > 1e-6 {
-			vB1_next := vecAdd(pB, vecMul(normalB, widthB))
-			vB2_next := vecSub(pB, vecMul(normalB, widthB))
+			if math.Abs(zCross) > 1e-6 {
+				vB1_next := pB.Add(normalB.ScaleF(widthB))
+				vB2_next := pB.Sub(normalB.ScaleF(widthB))
 
-			switch lb.JointMode {
-			case LineJointBevel:
-				if zCross < 0 { // Right turn
-					lb.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
-				} else { // Left turn
-					lb.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
-				}
-
-			case LineJointSharp:
-				if zCross < 0 {
-					lb.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
-				} else {
-					lb.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
-				}
-				var miterPoint ebimath.Vector
-				var success bool
-				if zCross < 0 {
-					miterPoint, success = segmentIntersectsSegment(vA1, vB1, vB1_next, vecAdd(pC, vecMul(normalB, widthB)))
-				} else {
-					miterPoint, success = segmentIntersectsSegment(vA2, vB2, vB2_next, vecSub(pC, vecMul(normalB, widthB)))
-				}
-				if success && vecDistanceSquaredTo(miterPoint, pB) <= sqMiterThreshold {
+				switch lb.JointMode {
+				case LineJointBevel:
 					if zCross < 0 {
-						lb.addTriangle(vB1, miterPoint, vB1_next, colorB, colorB, colorB)
+						lb.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
 					} else {
-						lb.addTriangle(vB2, miterPoint, vB2_next, colorB, colorB, colorB)
+						lb.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
 					}
+				case LineJointRound:
+					var vStart, vEnd ebimath.Vector
+					if zCross < 0 {
+						vStart, vEnd = vB1, vB1_next
+					} else {
+						vStart, vEnd = vB2, vB2_next
+					}
+					v1 := vStart.Sub(pB)
+					v2 := vEnd.Sub(pB)
+					angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
+					lb.newArc(pB, v1, angle, colorB, Rect{})
 				}
-
-			case LineJointRound:
-				var vStart, vEnd ebimath.Vector
-				if zCross < 0 { // Right turn
-					vStart = vB1
-					vEnd = vB1_next
-				} else { // Left turn
-					vStart = vB2
-					vEnd = vB2_next
-				}
-				v1 := vecSub(vStart, pB)
-				v2 := vecSub(vEnd, pB)
-				angle := vecAngleTo(v1, v2)
-				lb.newArc(pB, v1, angle, colorB, Rect{})
 			}
 		}
-		pA = pB
-		pB = pC
 	}
 
 	// --- End Cap ---
 	if !isClosed && lb.EndCapMode != LineCapNone {
 		pA := lb.Points[len(lb.Points)-2]
 		pB := lb.Points[len(lb.Points)-1]
-		dir := vecNormalized(vecSub(pB, pA))
-		normal := vecOrthogonal(dir)
+		dir := pB.Sub(pA).Normalize()
+		normal := dir.Orthogonal()
 		width := halfThickness
 		if interpolateWidth {
 			width = lb.lerpWidth(1.0) * halfThickness
 		}
 		color := lb.lerpColor(1.0)
 
-		v1 := vecAdd(pB, vecMul(normal, width))
-		v2 := vecSub(pB, vecMul(normal, width))
+		v1 := pB.Add(normal.ScaleF(width))
+		v2 := pB.Sub(normal.ScaleF(width))
 
 		switch lb.EndCapMode {
 		case LineCapBox:
-			v1_box := vecAdd(v1, vecMul(dir, width))
-			v2_box := vecAdd(v2, vecMul(dir, width))
+			v1_box := v1.Add(dir.ScaleF(width))
+			v2_box := v2.Add(dir.ScaleF(width))
 			lb.addTriangle(v1, v2, v1_box, color, color, color)
 			lb.addTriangle(v2, v2_box, v1_box, color, color, color)
 		case LineCapRound:
-			lb.newArc(pB, vecSub(v1, pB), math.Pi, color, Rect{})
+			lb.newArc(pB, v1.Sub(pB), -math.Pi, color, Rect{})
 		}
 	}
 }
@@ -275,105 +239,32 @@ func (lb *LineBuilder) lerpWidth(t float64) float64 {
 	if len(lb.Widths) < 2 {
 		return 1.0
 	}
-	pos := t * float64(len(lb.Widths)-1)
+	widths := lb.Widths
+	if lb.Closed {
+		widths = append(widths, lb.Widths[0])
+	}
+	pos := t * float64(len(widths)-1)
 	idx1 := int(pos)
 	idx2 := idx1 + 1
-	if idx2 >= len(lb.Widths) {
-		return lb.Widths[len(lb.Widths)-1]
+	if idx2 >= len(widths) {
+		return widths[len(widths)-1]
 	}
 	if idx1 < 0 {
-		return lb.Widths[0]
+		return widths[0]
 	}
 	localT := pos - float64(idx1)
-	return lb.Widths[idx1] + (lb.Widths[idx2]-lb.Widths[idx1])*localT
-}
-
-func (lb *LineBuilder) stripBegin(pUp, pDown ebimath.Vector, clr color.RGBA, uvx float64) {
-	vi := len(lb.Vertices)
-	r, g, b, a := clr.R, clr.G, clr.B, clr.A
-	cr, cg, cb, ca := float32(r)/255, float32(g)/255, float32(b)/255, float32(a)/255
-
-	lb.Vertices = append(lb.Vertices, ebiten.Vertex{DstX: float32(pUp.X), DstY: float32(pUp.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
-	lb.Vertices = append(lb.Vertices, ebiten.Vertex{DstX: float32(pDown.X), DstY: float32(pDown.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
-
-	if lb.TextureMode != LineTextureNone {
-		lb.uvs = append(lb.uvs, ebimath.V(uvx, 0.0), ebimath.V(uvx, 1.0))
-	}
-
-	lb.lastIndex[up] = vi
-	lb.lastIndex[down] = vi + 1
-}
-
-func (lb *LineBuilder) stripAddQuad(pUp, pDown ebimath.Vector, clr color.RGBA, uvx float64) {
-	vi := len(lb.Vertices)
-	r, g, b, a := clr.R, clr.G, clr.B, clr.A
-	cr, cg, cb, ca := float32(r)/255, float32(g)/255, float32(b)/255, float32(a)/255
-
-	lb.Vertices = append(lb.Vertices, ebiten.Vertex{DstX: float32(pUp.X), DstY: float32(pUp.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
-	lb.Vertices = append(lb.Vertices, ebiten.Vertex{DstX: float32(pDown.X), DstY: float32(pDown.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
-
-	if lb.TextureMode != LineTextureNone {
-		lb.uvs = append(lb.uvs, ebimath.V(uvx, 0.0), ebimath.V(uvx, 1.0))
-	}
-
-	lb.Indices = append(lb.Indices, uint16(lb.lastIndex[up]), uint16(vi+1), uint16(lb.lastIndex[down]), uint16(lb.lastIndex[up]), uint16(vi), uint16(vi+1))
-	lb.lastIndex[up] = vi
-	lb.lastIndex[down] = vi + 1
-}
-
-func (lb *LineBuilder) stripAddTri(pUp ebimath.Vector, o orientation) {
-	vi := len(lb.Vertices)
-	v := lb.Vertices[len(lb.Vertices)-1]
-	cr, cg, cb, ca := v.ColorR, v.ColorG, v.ColorB, v.ColorA
-
-	lb.Vertices = append(lb.Vertices, ebiten.Vertex{DstX: float32(pUp.X), DstY: float32(pUp.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
-
-	oppositeO := up
-	if o == up {
-		oppositeO = down
-	}
-
-	if lb.TextureMode != LineTextureNone {
-		lb.uvs = append(lb.uvs, lb.uvs[lb.lastIndex[oppositeO]])
-	}
-
-	lb.Indices = append(lb.Indices, uint16(lb.lastIndex[oppositeO]), uint16(vi), uint16(lb.lastIndex[o]))
-	lb.lastIndex[oppositeO] = vi
-}
-
-func (lb *LineBuilder) stripAddArc(center ebimath.Vector, angleDelta float64, o orientation) {
-	oppositeO := up
-	if o == up {
-		oppositeO = down
-	}
-	vbegin := vecSub(ebimath.V(float64(lb.Vertices[lb.lastIndex[oppositeO]].DstX), float64(lb.Vertices[lb.lastIndex[oppositeO]].DstY)), center)
-	radius := vecLength(vbegin)
-	angleStep := math.Pi / float64(lb.RoundPrecision)
-	steps := int(math.Abs(angleDelta) / angleStep)
-
-	if angleDelta < 0 {
-		angleStep = -angleStep
-	}
-	t := math.Atan2(vbegin.Y, vbegin.X)
-	for i := 0; i < steps; i++ {
-		t += angleStep
-		rpos := vecAdd(center, vecMul(ebimath.V(math.Cos(t), math.Sin(t)), radius))
-		lb.stripAddTri(rpos, o)
-	}
-	endAngle := math.Atan2(vbegin.Y, vbegin.X) + angleDelta
-	rpos := vecAdd(center, vecMul(ebimath.V(math.Cos(endAngle), math.Sin(endAngle)), radius))
-	lb.stripAddTri(rpos, o)
+	return widths[idx1] + (widths[idx2]-widths[idx1])*localT
 }
 
 func (lb *LineBuilder) newArc(center, vbegin ebimath.Vector, angleDelta float64, clr color.RGBA, uvRect Rect) {
-	radius := vecLength(vbegin)
+	radius := vbegin.Length()
 	angleStep := math.Pi / float64(lb.RoundPrecision)
 	steps := int(math.Abs(angleDelta) / angleStep)
 	if angleDelta < 0 {
 		angleStep = -angleStep
 	}
 
-	t := math.Atan2(vbegin.Y, vbegin.X)
+	t := vbegin.Angle()
 	r, g, b, a := clr.R, clr.G, clr.B, clr.A
 	cr, cg, cb, ca := float32(r)/255, float32(g)/255, float32(b)/255, float32(a)/255
 
@@ -388,7 +279,7 @@ func (lb *LineBuilder) newArc(center, vbegin ebimath.Vector, angleDelta float64,
 		if i == steps {
 			angle = t + angleDelta
 		}
-		rpos := vecAdd(center, vecMul(ebimath.V(math.Cos(angle), math.Sin(angle)), radius))
+		rpos := center.Add(ebimath.V(math.Cos(angle), math.Sin(angle)).ScaleF(radius))
 		lb.Vertices = append(lb.Vertices, ebiten.Vertex{DstX: float32(rpos.X), DstY: float32(rpos.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
 	}
 
@@ -434,43 +325,4 @@ func interpolate(r Rect, v ebimath.Vector) ebimath.Vector {
 		r.Position.X+(r.Position.X+r.Size.X-r.Position.X)*v.X,
 		r.Position.Y+(r.Position.Y+r.Size.Y-r.Position.Y)*v.Y,
 	)
-}
-
-func segmentIntersectsSegment(p1, p2, q1, q2 ebimath.Vector) (ebimath.Vector, bool) {
-	d := (p2.X-p1.X)*(q2.Y-q1.Y) - (p2.Y-p1.Y)*(q2.X-q1.X)
-	if math.Abs(d) < 1e-6 {
-		return ebimath.Vector{}, false
-	}
-	t := ((q1.X-p1.X)*(q2.Y-q1.Y) - (q1.Y-p1.Y)*(q2.X-q1.X)) / d
-	u := -((p2.X-p1.X)*(q1.Y-p1.Y) - (p2.Y-p1.Y)*(q1.X-p1.X)) / d
-	if t >= 0 && t <= 1 && u >= 0 && u <= 1 {
-		return ebimath.V(p1.X+t*(p2.X-p1.X), p1.Y+t*(p2.Y-p1.Y)), true
-	}
-	return ebimath.Vector{}, false
-}
-
-func vecLength(v ebimath.Vector) float64                { return math.Sqrt(v.X*v.X + v.Y*v.Y) }
-func vecSub(v1, v2 ebimath.Vector) ebimath.Vector       { return ebimath.V(v1.X-v2.X, v1.Y-v2.Y) }
-func vecAdd(v1, v2 ebimath.Vector) ebimath.Vector       { return ebimath.V(v1.X+v2.X, v1.Y+v2.Y) }
-func vecMul(v ebimath.Vector, s float64) ebimath.Vector { return ebimath.V(v.X*s, v.Y*s) }
-func vecNormalized(v ebimath.Vector) ebimath.Vector {
-	l := vecLength(v)
-	if l == 0 {
-		return ebimath.Vector{}
-	}
-	return ebimath.V(v.X/l, v.Y/l)
-}
-func vecOrthogonal(v ebimath.Vector) ebimath.Vector { return ebimath.V(-v.Y, v.X) }
-func vecDot(v1, v2 ebimath.Vector) float64          { return v1.X*v2.X + v1.Y*v2.Y }
-func vecCross(v1, v2 ebimath.Vector) float64        { return v1.X*v2.Y - v1.Y*v2.X }
-func vecDistanceTo(v1, v2 ebimath.Vector) float64   { return vecLength(vecSub(v1, v2)) }
-func vecDistanceSquaredTo(v1, v2 ebimath.Vector) float64 {
-	dx, dy := v1.X-v2.X, v1.Y-v2.Y
-	return dx*dx + dy*dy
-}
-func vecLerp(v1, v2 ebimath.Vector, t float64) ebimath.Vector {
-	return vecAdd(v1, vecMul(vecSub(v2, v1), t))
-}
-func vecAngleTo(v1, v2 ebimath.Vector) float64 {
-	return math.Atan2(v1.X*v2.Y-v1.Y*v2.X, v1.X*v2.X+v1.Y*v2.Y)
 }
