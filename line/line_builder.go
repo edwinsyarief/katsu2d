@@ -76,7 +76,7 @@ func (lb *LineBuilder) Build() {
 	isClosed := lb.Closed && len(lb.Points) > 2
 
 	// --- Begin Cap ---
-	if !isClosed {
+	if !isClosed && lb.BeginCapMode != LineCapNone {
 		pA := lb.Points[0]
 		pB := lb.Points[1]
 		dir := vecNormalized(vecSub(pB, pA))
@@ -92,11 +92,12 @@ func (lb *LineBuilder) Build() {
 
 		switch lb.BeginCapMode {
 		case LineCapBox:
-			v1 = vecSub(v1, vecMul(dir, width))
-			v2 = vecSub(v2, vecMul(dir, width))
-			lb.addTriangle(v1, v2, pA, color, color, color)
+			v1_box := vecSub(v1, vecMul(dir, width))
+			v2_box := vecSub(v2, vecMul(dir, width))
+			lb.addTriangle(v1, v2, v1_box, color, color, color)
+			lb.addTriangle(v2, v2_box, v1_box, color, color, color)
 		case LineCapRound:
-			lb.newArc(pA, vecSub(v1, pA), -math.Pi, color, Rect{})
+			lb.newArc(pA, vecSub(v1, pA), math.Pi, color, Rect{})
 		}
 	}
 
@@ -122,7 +123,7 @@ func (lb *LineBuilder) Build() {
 		} else {
 			if isClosed {
 				break
-			} // Handled by joint logic
+			}
 			pC = vecAdd(pB, vecSub(pB, pA))
 		}
 
@@ -186,13 +187,11 @@ func (lb *LineBuilder) Build() {
 				}
 
 			case LineJointSharp:
-				// Bevel part
 				if zCross < 0 {
 					lb.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
 				} else {
 					lb.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
 				}
-				// Miter part
 				var miterPoint ebimath.Vector
 				var success bool
 				if zCross < 0 {
@@ -228,7 +227,7 @@ func (lb *LineBuilder) Build() {
 	}
 
 	// --- End Cap ---
-	if !isClosed {
+	if !isClosed && lb.EndCapMode != LineCapNone {
 		pA := lb.Points[len(lb.Points)-2]
 		pB := lb.Points[len(lb.Points)-1]
 		dir := vecNormalized(vecSub(pB, pA))
@@ -244,16 +243,16 @@ func (lb *LineBuilder) Build() {
 
 		switch lb.EndCapMode {
 		case LineCapBox:
-			v1 = vecAdd(v1, vecMul(dir, width))
-			v2 = vecAdd(v2, vecMul(dir, width))
-			lb.addTriangle(v1, v2, pB, color, color, color)
+			v1_box := vecAdd(v1, vecMul(dir, width))
+			v2_box := vecAdd(v2, vecMul(dir, width))
+			lb.addTriangle(v1, v2, v1_box, color, color, color)
+			lb.addTriangle(v2, v2_box, v1_box, color, color, color)
 		case LineCapRound:
 			lb.newArc(pB, vecSub(v1, pB), math.Pi, color, Rect{})
 		}
 	}
 }
 
-// addTriangle is a helper to add a triangle to the mesh.
 func (lb *LineBuilder) addTriangle(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.RGBA) {
 	idx := uint16(len(lb.Vertices))
 
@@ -272,7 +271,6 @@ func (lb *LineBuilder) addTriangle(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.R
 	lb.Indices = append(lb.Indices, idx, idx+1, idx+2)
 }
 
-// lerpWidth performs linear interpolation on the Widths slice.
 func (lb *LineBuilder) lerpWidth(t float64) float64 {
 	if len(lb.Widths) < 2 {
 		return 1.0
