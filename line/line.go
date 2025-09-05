@@ -10,38 +10,41 @@ import (
 )
 
 // Line represents a drawable line with various styling options.
+// It provides functionality for creating and rendering lines with different
+// visual properties like width, color, texture, and joint/cap styles.
 type Line struct {
-	// Mesh data
-	vertices []ebiten.Vertex
-	indices  []uint16
-	isDirty  bool
+	// Mesh data for rendering the line
+	vertices []ebiten.Vertex // Vertex data for the triangle mesh
+	indices  []uint16        // Triangle indices for rendering
+	isDirty  bool            // Tracks if mesh needs rebuilding
 
-	// Line properties
-	points         []ebimath.Vector
-	pointLimit     int
-	width          float64
-	defaultColor   color.RGBA
-	IsClosed       bool
-	JointMode      LineJointMode
-	BeginCapMode   LineCapMode
-	EndCapMode     LineCapMode
-	SharpLimit     float64
-	RoundPrecision int
+	// Core line properties
+	points         []ebimath.Vector // Array of points defining the line path
+	pointLimit     int              // Maximum number of points (0 = unlimited)
+	width          float64          // Base width of the line
+	defaultColor   color.RGBA       // Default color for the entire line
+	isClosed       bool             // Whether the line forms a closed loop
+	jointMode      LineJointMode    // How line segments are joined
+	beginCapMode   LineCapMode      // Style of the start cap
+	endCapMode     LineCapMode      // Style of the end cap
+	sharpLimit     float64          // Angle threshold for sharp corners
+	roundPrecision int              // Number of segments in rounded corners
 
-	// Width interpolation
-	Widths []float64
+	// Width interpolation properties
+	widths []float64 // Per-point width values for width interpolation
 
-	// Color interpolation
-	Colors []color.RGBA
+	// Color interpolation properties
+	colors []color.RGBA // Per-point colors for color interpolation
 
 	// Texture properties
-	texture     *ebiten.Image
-	whiteDot    *ebiten.Image
-	TextureMode LineTextureMode
-	TileAspect  float64
+	texture     *ebiten.Image   // Optional texture for the line
+	whiteDot    *ebiten.Image   // Fallback texture for untextured lines
+	textureMode LineTextureMode // How textures are applied
+	tileAspect  float64         // Aspect ratio for texture tiling
 }
 
-// NewLine creates a new Line instance.
+// NewLine creates a new Line instance with default settings.
+// Returns a line with white color, 10px width, sharp joints, and no caps.
 func NewLine() *Line {
 	line := &Line{
 		defaultColor:   color.RGBA{R: 255, G: 255, B: 255, A: 255},
@@ -50,160 +53,178 @@ func NewLine() *Line {
 		vertices:       make([]ebiten.Vertex, 0),
 		indices:        make([]uint16, 0),
 		isDirty:        true,
-		JointMode:      LineJointSharp,
-		BeginCapMode:   LineCapNone,
-		EndCapMode:     LineCapNone,
-		SharpLimit:     2.0,
-		RoundPrecision: 8,
-		TileAspect:     1.0,
+		jointMode:      LineJointSharp,
+		beginCapMode:   LineCapNone,
+		endCapMode:     LineCapNone,
+		sharpLimit:     2.0,
+		roundPrecision: 8,
+		tileAspect:     1.0,
 	}
 	line.whiteDot = ebiten.NewImage(1, 1)
 	line.whiteDot.Fill(color.White)
 	return line
 }
 
-// Point management
-func (l *Line) AddPoint(pos ebimath.Vector) {
-	if len(l.points) > 0 && l.points[len(l.points)-1].Equals(pos) {
+// AddPoint adds a new point to the line if it's different from the last point.
+// If pointLimit is set, oldest points are removed to maintain the limit.
+func (self *Line) AddPoint(pos ebimath.Vector) {
+	if len(self.points) > 0 && self.points[len(self.points)-1].Equals(pos) {
 		return
 	}
-	l.isDirty = true
-	l.points = append(l.points, pos)
+	self.isDirty = true
+	self.points = append(self.points, pos)
 
-	if l.pointLimit > 0 && len(l.points) > l.pointLimit {
-		l.points = l.points[1:]
+	if self.pointLimit > 0 && len(self.points) > self.pointLimit {
+		self.points = self.points[1:]
 	}
 }
 
-func (l *Line) SetPoint(index int, position ebimath.Vector) {
-	if index < 0 || index >= len(l.points) {
+// SetPoint updates the position of an existing point at the given index.
+// Does nothing if the index is out of bounds.
+func (self *Line) SetPoint(index int, position ebimath.Vector) {
+	if index < 0 || index >= len(self.points) {
 		return
 	}
-	l.isDirty = true
-	l.points[index] = position
+	self.isDirty = true
+	self.points[index] = position
 }
 
-func (l *Line) GetPoints() []ebimath.Vector {
-	return l.points
+// GetPoints returns the current array of line points.
+func (self *Line) GetPoints() []ebimath.Vector {
+	return self.points
 }
 
-func (l *Line) ClearPoints() {
-	l.points = l.points[:0]
-	l.isDirty = true
+// ClearPoints removes all points from the line.
+func (self *Line) ClearPoints() {
+	self.points = self.points[:0]
+	self.isDirty = true
 }
 
-// Style setting methods
-func (l *Line) SetJointMode(mode LineJointMode) {
-	l.isDirty = true
-	l.JointMode = mode
+// SetJointMode defines how line segments are joined together.
+func (self *Line) SetJointMode(mode LineJointMode) {
+	self.isDirty = true
+	self.jointMode = mode
 }
 
-func (l *Line) SetCapMode(begin, end LineCapMode) {
-	l.isDirty = true
-	l.BeginCapMode = begin
-	l.EndCapMode = end
+// SetCapMode sets the style for both start and end caps of the line.
+func (self *Line) SetCapMode(begin, end LineCapMode) {
+	self.isDirty = true
+	self.beginCapMode = begin
+	self.endCapMode = end
 }
 
-func (l *Line) SetIsClosed(isClosed bool) {
-	l.isDirty = true
-	l.IsClosed = isClosed
+// SetIsClosed determines if the line should form a closed loop.
+func (self *Line) SetIsClosed(isClosed bool) {
+	self.isDirty = true
+	self.isClosed = isClosed
 }
 
-func (l *Line) SetTexture(img *ebiten.Image) {
-	l.isDirty = true
-	l.texture = img
+// SetTexture assigns a texture to the line and updates the tile aspect ratio.
+func (self *Line) SetTexture(img *ebiten.Image) {
+	self.isDirty = true
+	self.texture = img
 	if img != nil {
 		bounds := img.Bounds()
-		l.TileAspect = float64(bounds.Dx()) / float64(bounds.Dy())
+		self.tileAspect = float64(bounds.Dx()) / float64(bounds.Dy())
 	}
 }
 
-func (l *Line) SetWidth(width float64) {
-	l.isDirty = true
-	l.width = width
-	l.Widths = nil // Clear interpolated widths
+// SetWidth sets a uniform width for the entire line.
+// Clears any previously set interpolated widths.
+func (self *Line) SetWidth(width float64) {
+	self.isDirty = true
+	self.width = width
+	self.widths = nil // Clear interpolated widths
 }
 
-func (l *Line) SetDefaultColor(c color.RGBA) {
-	l.isDirty = true
-	l.defaultColor = c
-	l.Colors = nil // Clear interpolated colors
+// SetDefaultColor sets a uniform color for the entire line.
+// Clears any previously set interpolated colors.
+func (self *Line) SetDefaultColor(c color.RGBA) {
+	self.isDirty = true
+	self.defaultColor = c
+	self.colors = nil // Clear interpolated colors
 }
 
-func (l *Line) SetInterpolatedColors(colors []color.RGBA) {
-	l.isDirty = true
-	l.Colors = colors
+// SetInterpolatedColors sets per-point colors for gradient effects.
+func (self *Line) SetInterpolatedColors(colors []color.RGBA) {
+	self.isDirty = true
+	self.colors = colors
 }
 
-func (l *Line) SetInterpolatedWidths(widths []float64) {
-	l.isDirty = true
-	l.Widths = widths
+// SetInterpolatedWidths sets per-point widths for variable width lines.
+func (self *Line) SetInterpolatedWidths(widths []float64) {
+	self.isDirty = true
+	self.widths = widths
 }
 
-// BuildMesh generates the vertices and indices for the line.
-func (l *Line) BuildMesh() {
-	if !l.isDirty || len(l.points) < 2 {
+// BuildMesh generates the triangle mesh for rendering the line.
+// Only rebuilds if the line is marked as dirty and has at least 2 points.
+func (self *Line) BuildMesh() {
+	if !self.isDirty || len(self.points) < 2 {
 		return
 	}
-	l.ResetMesh()
+	self.ResetMesh()
 
 	builder := NewLineBuilder()
-	builder.Points = l.points
-	builder.Closed = l.IsClosed
-	builder.Width = l.width
-	builder.Widths = l.Widths
-	builder.DefaultColor = l.defaultColor
-	builder.Colors = l.Colors
-	builder.JointMode = l.JointMode
-	builder.BeginCapMode = l.BeginCapMode
-	builder.EndCapMode = l.EndCapMode
-	builder.SharpLimit = l.SharpLimit
-	builder.RoundPrecision = l.RoundPrecision
-	builder.TextureMode = l.TextureMode
-	builder.TileAspect = l.TileAspect
+	builder.points = self.points
+	builder.closed = self.isClosed
+	builder.width = self.width
+	builder.widths = self.widths
+	builder.defaultColor = self.defaultColor
+	builder.colors = self.colors
+	builder.jointMode = self.jointMode
+	builder.beginCapMode = self.beginCapMode
+	builder.endCapMode = self.endCapMode
+	builder.sharpLimit = self.sharpLimit
+	builder.roundPrecision = self.roundPrecision
+	builder.textureMode = self.textureMode
+	builder.tileAspect = self.tileAspect
 
 	builder.Build()
 
-	l.vertices = builder.Vertices
-	l.indices = builder.Indices
+	self.vertices = builder.vertices
+	self.indices = builder.indices
 
-	l.isDirty = false
+	self.isDirty = false
 }
 
-// Draw renders the line to the screen.
-func (l *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
-	l.BuildMesh()
-	if len(l.vertices) == 0 {
+// Draw renders the line to the specified screen using the provided options.
+// Uses the texture if set, otherwise falls back to a white dot.
+func (self *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
+	self.BuildMesh()
+	if len(self.vertices) == 0 {
 		return
 	}
 
-	img := l.whiteDot
-	if l.TextureMode != LineTextureNone && l.texture != nil {
-		img = l.texture
+	img := self.whiteDot
+	if self.textureMode != LineTextureNone && self.texture != nil {
+		img = self.texture
 	}
 
-	screen.DrawTriangles(l.vertices, l.indices, img, op)
+	screen.DrawTriangles(self.vertices, self.indices, img, op)
 }
 
-func (l *Line) GetBounds() image.Rectangle {
-	if len(l.points) == 0 {
+// GetBounds calculates the bounding rectangle of the line, including its width.
+func (self *Line) GetBounds() image.Rectangle {
+	if len(self.points) == 0 {
 		return image.Rectangle{}
 	}
 	minX, minY := math.MaxFloat64, math.MaxFloat64
 	maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
-	for _, p := range l.points {
+	for _, p := range self.points {
 		minX = math.Min(minX, p.X)
 		minY = math.Min(minY, p.Y)
 		maxX = math.Max(maxX, p.X)
 		maxY = math.Max(maxY, p.Y)
 	}
 	// Add width to bounds
-	h_width := l.width / 2
+	h_width := self.width / 2
 	return image.Rect(int(minX-h_width), int(minY-h_width), int(maxX+h_width), int(maxY+h_width))
 }
 
-func (l *Line) ResetMesh() {
-	l.vertices = l.vertices[:0]
-	l.indices = l.indices[:0]
-	l.isDirty = true
+// ResetMesh clears the current mesh data and marks the line as dirty.
+func (self *Line) ResetMesh() {
+	self.vertices = self.vertices[:0]
+	self.indices = self.indices[:0]
+	self.isDirty = true
 }
