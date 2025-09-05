@@ -65,6 +65,11 @@ func NewLine() *Line {
 	return line
 }
 
+// GetMesh get vertices and indices information
+func (self *Line) GetMesh() ([]ebiten.Vertex, []uint16) {
+	return self.vertices, self.indices
+}
+
 // AddPoint adds a new point to the line if it's different from the last point.
 // If pointLimit is set, oldest points are removed to maintain the limit.
 func (self *Line) AddPoint(pos ebimath.Vector) {
