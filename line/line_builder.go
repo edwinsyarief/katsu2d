@@ -179,49 +179,76 @@ func (self *LineBuilder) Build() {
 
 		// --- Joint ---
 		// Handles the geometry for the connection between line segments.
-		if self.jointMode != LineJointSharp {
-			if !isClosed && i >= n-2 {
-				continue // Skip joint calculation for the last segment of an open line.
-			}
-			pcIndex := (i + 2) % n
-			pC := self.points[pcIndex]
-			if pC.Equals(pB) {
-				continue // Skip if the next point is the same.
-			}
+		if !isClosed && i >= n-2 {
+			continue // Skip joint calculation for the last segment of an open line.
+		}
+		pcIndex := (i + 2) % n
+		pC := self.points[pcIndex]
+		if pC.Equals(pB) {
+			continue // Skip if the next point is the same.
+		}
 
-			dirBC := pC.Sub(pB)
-			if dirBC.Length() < 1e-6 {
-				continue // Skip if the next segment is too short.
-			}
+		dirBC := pC.Sub(pB)
+		if dirBC.Length() < 1e-6 {
+			continue // Skip if the next segment is too short.
+		}
 
-			normalB := dirBC.Normalize().Orthogonal()
-			// The cross product determines the direction of the turn.
-			zCross := dirAB.Cross(dirBC)
+		normalB := dirBC.Normalize().Orthogonal()
+		// The cross product determines the direction of the turn.
+		zCross := dirAB.Cross(dirBC)
 
-			if math.Abs(zCross) > 1e-6 {
-				vB1_next := pB.Add(normalB.ScaleF(widthB))
-				vB2_next := pB.Sub(normalB.ScaleF(widthB))
+		if math.Abs(zCross) > 1e-6 {
+			vB1_next := pB.Add(normalB.ScaleF(widthB))
+			vB2_next := pB.Sub(normalB.ScaleF(widthB))
 
-				switch self.jointMode {
-				case LineJointBevel:
-					// Adds a beveled joint with a single triangle.
-					if zCross < 0 {
-						self.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
-					} else {
-						self.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
-					}
-				case LineJointRound:
-					// Adds a round joint by drawing an arc.
-					var vStart, vEnd ebimath.Vector
-					if zCross < 0 {
-						vStart, vEnd = vB1, vB1_next
-					} else {
-						vStart, vEnd = vB2, vB2_next
-					}
-					v1 := vStart.Sub(pB)
-					v2 := vEnd.Sub(pB)
-					angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
-					self.newArc(pB, v1, angle, colorB, Rect{})
+			switch self.jointMode {
+			case LineJointBevel:
+				// Adds a beveled joint with a single triangle.
+				if zCross < 0 {
+					self.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
+				} else {
+					self.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
+				}
+			case LineJointRound:
+				// Adds a round joint by drawing an arc.
+				var vStart, vEnd ebimath.Vector
+				if zCross < 0 {
+					vStart, vEnd = vB1, vB1_next
+				} else {
+					vStart, vEnd = vB2, vB2_next
+				}
+				v1 := vStart.Sub(pB)
+				v2 := vEnd.Sub(pB)
+				angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
+				self.newArc(pB, v1, angle, colorB, Rect{})
+			case LineJointSharp:
+				// Adds a miter joint, falling back to bevel if over sharp limit.
+				var vB_outer, vB_outer_next ebimath.Vector
+				if zCross < 0 {
+					vB_outer = vB1
+					vB_outer_next = vB1_next
+				} else {
+					vB_outer = vB2
+					vB_outer_next = vB2_next
+				}
+				d := vB_outer_next.Sub(vB_outer)
+				u := dirAB
+				v := dirBC
+				denom := u.Cross(v)
+				if math.Abs(denom) < 1e-6 {
+					continue
+				}
+				t := d.Cross(v) / denom
+				M := vB_outer.Add(u.ScaleF(t))
+				dist := pB.DistanceTo(M)
+				ratio := dist / widthB
+				if ratio > self.sharpLimit {
+					// Fall back to bevel.
+					self.addTriangle(pB, vB_outer, vB_outer_next, colorB, colorB, colorB)
+				} else {
+					// Add miter triangles.
+					self.addTriangle(pB, vB_outer, M, colorB, colorB, colorB)
+					self.addTriangle(pB, M, vB_outer_next, colorB, colorB, colorB)
 				}
 			}
 		}
