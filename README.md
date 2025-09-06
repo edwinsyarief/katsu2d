@@ -18,6 +18,7 @@ This project is currently under active development. While core functionalities a
   - Sound stacking for multiple concurrent instances
   - Independent volume control for each audio source
 - **Smooth Slow Motion Control:** Implement dynamic time scaling with smooth interpolation (lerping) between normal and slow-motion speeds, allowing for compelling gameplay effects.
+- **Flexible Line Renderer:** 2D polyline, easily draw line with color and width interpolation, join and cap options, etc.
 - **Flexible Cooldown System:** Easily manage ability cooldowns or timed events with a dedicated component and system.
 - **Simplified API with Functional Options:** A fluent, chainable API for engine configuration and entity creation, inspired by the "Functional Options" pattern, making setup and game logic development more intuitive.
 - **Modular and Extensible:** Designed with clear separation of concerns, making it easy to add new components, systems, or features.
