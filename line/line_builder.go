@@ -220,7 +220,21 @@ func (self *LineBuilder) Build() {
 				v1 := vStart.Sub(pB)
 				v2 := vEnd.Sub(pB)
 				angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
-				self.newArc(pB, v1, angle, colorB, Rect{})
+
+				// Determine the angle step for the arc.
+				angleStep := math.Pi / float64(self.roundPrecision)
+				// If the total angle is less than one step, the newArc function will not
+				// produce any triangles, leaving a gap. In this case, fall back to a
+				// simple bevel join to fill the space.
+				if math.Abs(angle) < angleStep {
+					if zCross < 0 {
+						self.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
+					} else {
+						self.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
+					}
+				} else {
+					self.newArc(pB, v1, angle, colorB, Rect{})
+				}
 			case LineJointSharp:
 				// Adds a miter joint, falling back to bevel if over sharp limit.
 				var vB_outer, vB_outer_next ebimath.Vector
