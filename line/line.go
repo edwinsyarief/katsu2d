@@ -151,13 +151,13 @@ func (self *Line) SetDefaultColor(c color.RGBA) {
 }
 
 // SetInterpolatedColors sets per-point colors for gradient effects.
-func (self *Line) SetInterpolatedColors(colors []color.RGBA) {
+func (self *Line) SetInterpolatedColors(colors ...color.RGBA) {
 	self.isDirty = true
 	self.colors = colors
 }
 
 // SetInterpolatedWidths sets per-point widths for variable width lines.
-func (self *Line) SetInterpolatedWidths(widths []float64) {
+func (self *Line) SetInterpolatedWidths(widths ...float64) {
 	self.isDirty = true
 	self.widths = widths
 }
