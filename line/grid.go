@@ -65,82 +65,82 @@ func NewGridLine(position ebimath.Vector, size, rows, cols int, thick float64) *
 	return g
 }
 
-func (g *GridLine) buildMesh() {
-	g.vertices = g.vertices[:0]
-	g.indices = g.indices[:0]
+func (self *GridLine) buildMesh() {
+	self.vertices = self.vertices[:0]
+	self.indices = self.indices[:0]
 
-	_ = g.thickness / 2.0
-	totalWidth := float64(g.cols * g.size)
-	totalHeight := float64(g.rows * g.size)
+	_ = self.thickness / 2.0
+	totalWidth := float64(self.cols * self.size)
+	totalHeight := float64(self.rows * self.size)
 	center := ebimath.V(totalWidth/2, totalHeight/2)
 
 	// Inner Horizontal lines
-	for i := 1; i < g.rows; i++ {
-		p1 := ebimath.Vector{X: 0, Y: float64(i * g.size)}
-		p2 := ebimath.Vector{X: totalWidth, Y: float64(i * g.size)}
-		g.addLine(p1, p2, center)
+	for i := 1; i < self.rows; i++ {
+		p1 := ebimath.Vector{X: 0, Y: float64(i * self.size)}
+		p2 := ebimath.Vector{X: totalWidth, Y: float64(i * self.size)}
+		self.addLine(p1, p2, center)
 	}
 
 	// Inner Vertical lines
-	for i := 1; i < g.cols; i++ {
-		p1 := ebimath.Vector{X: float64(i * g.size), Y: 0}
-		p2 := ebimath.Vector{X: float64(i * g.size), Y: totalHeight}
-		g.addLine(p1, p2, center)
+	for i := 1; i < self.cols; i++ {
+		p1 := ebimath.Vector{X: float64(i * self.size), Y: 0}
+		p2 := ebimath.Vector{X: float64(i * self.size), Y: totalHeight}
+		self.addLine(p1, p2, center)
 	}
 
 	// Outer lines
 	// Top horizontal
 	p1 := ebimath.V(0, 0)
 	p2 := ebimath.V(totalWidth, 0)
-	g.addLine(p1, p2, center)
+	self.addLine(p1, p2, center)
 
 	// Bottom horizontal
 	p1 = ebimath.V(0, totalHeight)
 	p2 = ebimath.V(totalWidth, totalHeight)
-	g.addLine(p1, p2, center)
+	self.addLine(p1, p2, center)
 
 	// Left vertical
 	p1 = ebimath.V(0, 0)
 	p2 = ebimath.V(0, totalHeight)
-	g.addLine(p1, p2, center)
+	self.addLine(p1, p2, center)
 
 	// Right vertical
 	p1 = ebimath.V(totalWidth, 0)
 	p2 = ebimath.V(totalWidth, totalHeight)
-	g.addLine(p1, p2, center)
+	self.addLine(p1, p2, center)
 
 	// Add joints for corners
 	corner := ebimath.V(0, 0)
-	clr := g.getColor(corner)
+	clr := self.getColor(corner)
 	dirIn := ebimath.V(0, -1)
 	dirOut := ebimath.V(1, 0)
-	g.addJoint(corner, dirIn, dirOut, g.cornerTL, clr, center)
+	self.addJoint(corner, dirIn, dirOut, self.cornerTL, clr, center)
 
 	corner = ebimath.V(totalWidth, 0)
-	clr = g.getColor(corner)
+	clr = self.getColor(corner)
 	dirIn = ebimath.V(1, 0)
 	dirOut = ebimath.V(0, 1)
-	g.addJoint(corner, dirIn, dirOut, g.cornerTR, clr, center)
+	self.addJoint(corner, dirIn, dirOut, self.cornerTR, clr, center)
 
 	corner = ebimath.V(totalWidth, totalHeight)
-	clr = g.getColor(corner)
+	clr = self.getColor(corner)
 	dirIn = ebimath.V(0, 1)
 	dirOut = ebimath.V(-1, 0)
-	g.addJoint(corner, dirIn, dirOut, g.cornerBR, clr, center)
+	self.addJoint(corner, dirIn, dirOut, self.cornerBR, clr, center)
 
 	corner = ebimath.V(0, totalHeight)
-	clr = g.getColor(corner)
+	clr = self.getColor(corner)
 	dirIn = ebimath.V(-1, 0)
 	dirOut = ebimath.V(0, -1)
-	g.addJoint(corner, dirIn, dirOut, g.cornerBL, clr, center)
+	self.addJoint(corner, dirIn, dirOut, self.cornerBL, clr, center)
 }
 
-func (g *GridLine) addJoint(corner, dirIn, dirOut ebimath.Vector, joinType GridCornerJoinType, clr color.RGBA, cntr ebimath.Vector) {
+func (self *GridLine) addJoint(corner, dirIn, dirOut ebimath.Vector, joinType GridCornerJoinType, clr color.RGBA, cntr ebimath.Vector) {
 	dirAB := dirIn.Normalize()
 	dirBC := dirOut.Normalize()
 	normal := dirAB.Orthogonal()
 	normalB := dirBC.Orthogonal()
-	widthB := g.thickness / 2.0
+	widthB := self.thickness / 2.0
 
 	vB1 := corner.Add(normal.ScaleF(widthB))
 	vB2 := corner.Sub(normal.ScaleF(widthB))
@@ -173,22 +173,22 @@ func (g *GridLine) addJoint(corner, dirIn, dirOut ebimath.Vector, joinType GridC
 		}
 		t := d.Cross(v) / denom
 		M := vB_outer.Add(u.ScaleF(t))
-		g.addTriangleLocal(corner, vB_outer, M, clr, clr, clr, cntr)
-		g.addTriangleLocal(corner, M, vB_outer_next, clr, clr, clr, cntr)
+		self.addTriangleLocal(corner, vB_outer, M, clr, clr, clr, cntr)
+		self.addTriangleLocal(corner, M, vB_outer_next, clr, clr, clr, cntr)
 	case GridCornerBevel:
-		g.addTriangleLocal(corner, vStart, vEnd, clr, clr, clr, cntr)
+		self.addTriangleLocal(corner, vStart, vEnd, clr, clr, clr, cntr)
 	case GridCornerRound:
 		v1 := vStart.Sub(corner)
 		v2 := vEnd.Sub(corner)
 		angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
-		g.newArc(corner, v1, angle, clr, cntr)
+		self.newArc(corner, v1, angle, clr, cntr)
 	}
 }
 
-func (g *GridLine) addTriangleLocal(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.RGBA, center ebimath.Vector) {
-	v1t := g.transformPos(v1, center)
-	v2t := g.transformPos(v2, center)
-	v3t := g.transformPos(v3, center)
+func (self *GridLine) addTriangleLocal(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.RGBA, center ebimath.Vector) {
+	v1t := self.transformPos(v1, center)
+	v2t := self.transformPos(v2, center)
+	v3t := self.transformPos(v3, center)
 
 	r1, g1, b1, a1 := c1.R, c1.G, c1.B, c1.A
 	cr1, cg1, cb1, ca1 := float32(r1)/255, float32(g1)/255, float32(b1)/255, float32(a1)/255
@@ -197,17 +197,17 @@ func (g *GridLine) addTriangleLocal(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.
 	r3, g3, b3, a3 := c3.R, c3.G, c3.B, c3.A
 	cr3, cg3, cb3, ca3 := float32(r3)/255, float32(g3)/255, float32(b3)/255, float32(a3)/255
 
-	idx := uint16(len(g.vertices))
+	idx := uint16(len(self.vertices))
 
-	g.vertices = append(g.vertices,
+	self.vertices = append(self.vertices,
 		ebiten.Vertex{DstX: float32(v1t.X), DstY: float32(v1t.Y), ColorR: cr1, ColorG: cg1, ColorB: cb1, ColorA: ca1, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v2t.X), DstY: float32(v2t.Y), ColorR: cr2, ColorG: cg2, ColorB: cb2, ColorA: ca2, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v3t.X), DstY: float32(v3t.Y), ColorR: cr3, ColorG: cg3, ColorB: cb3, ColorA: ca3, SrcX: 0, SrcY: 0},
 	)
-	g.indices = append(g.indices, idx, idx+1, idx+2)
+	self.indices = append(self.indices, idx, idx+1, idx+2)
 }
 
-func (g *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float64, clr color.RGBA, center ebimath.Vector) {
+func (self *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float64, clr color.RGBA, center ebimath.Vector) {
 	radius := vbegin.Length()
 	angleStep := math.Pi / 8.0
 	steps := int(math.Abs(angleDelta) / angleStep)
@@ -219,9 +219,9 @@ func (g *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float64, 
 	r, gcol, b, a := clr.R, clr.G, clr.B, clr.A
 	cr, cg, cb, ca := float32(r)/255, float32(gcol)/255, float32(b)/255, float32(a)/255
 
-	vi := len(g.vertices)
-	centert := g.transformPos(centerPos, center)
-	g.vertices = append(g.vertices, ebiten.Vertex{DstX: float32(centert.X), DstY: float32(centert.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca, SrcX: 0, SrcY: 0})
+	vi := len(self.vertices)
+	centert := self.transformPos(centerPos, center)
+	self.vertices = append(self.vertices, ebiten.Vertex{DstX: float32(centert.X), DstY: float32(centert.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca, SrcX: 0, SrcY: 0})
 
 	for i := 0; i <= steps; i++ {
 		angle := t + angleStep*float64(i)
@@ -229,22 +229,22 @@ func (g *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float64, 
 			angle = t + angleDelta
 		}
 		rpos := centerPos.Add(ebimath.V(math.Cos(angle), math.Sin(angle)).ScaleF(radius))
-		rpost := g.transformPos(rpos, center)
-		g.vertices = append(g.vertices, ebiten.Vertex{DstX: float32(rpost.X), DstY: float32(rpost.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca, SrcX: 0, SrcY: 0})
+		rpost := self.transformPos(rpos, center)
+		self.vertices = append(self.vertices, ebiten.Vertex{DstX: float32(rpost.X), DstY: float32(rpost.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca, SrcX: 0, SrcY: 0})
 	}
 
 	for i := 0; i < steps; i++ {
-		g.indices = append(g.indices, uint16(vi), uint16(vi+i+1), uint16(vi+i+2))
+		self.indices = append(self.indices, uint16(vi), uint16(vi+i+1), uint16(vi+i+2))
 	}
 }
 
-func (g *GridLine) transformPos(pos, center ebimath.Vector) ebimath.Vector {
-	scaledCenter := center.Scale(g.scale)
-	return pos.Scale(g.scale).Sub(scaledCenter).Rotate(g.rotation).Add(scaledCenter).Add(g.position)
+func (self *GridLine) transformPos(pos, center ebimath.Vector) ebimath.Vector {
+	scaledCenter := center.Scale(self.scale)
+	return pos.Scale(self.scale).Sub(scaledCenter).Rotate(self.rotation).Add(scaledCenter).Add(self.position)
 }
 
-func (g *GridLine) addLine(p1, p2, center ebimath.Vector) {
-	halfThick := g.thickness / 2.0
+func (self *GridLine) addLine(p1, p2, center ebimath.Vector) {
+	halfThick := self.thickness / 2.0
 	dir := p2.Sub(p1)
 	if dir.Length() == 0 {
 		return
@@ -257,21 +257,21 @@ func (g *GridLine) addLine(p1, p2, center ebimath.Vector) {
 	lv3 := p2.Add(normal.ScaleF(halfThick))
 	lv4 := p2.Sub(normal.ScaleF(halfThick))
 
-	v1 := g.transformPos(lv1, center)
-	v2 := g.transformPos(lv2, center)
-	v3 := g.transformPos(lv3, center)
-	v4 := g.transformPos(lv4, center)
+	v1 := self.transformPos(lv1, center)
+	v2 := self.transformPos(lv2, center)
+	v3 := self.transformPos(lv3, center)
+	v4 := self.transformPos(lv4, center)
 
 	var c1, c2, c3, c4 color.RGBA
-	if g.isColorInterpolated {
-		totalWidth := float64(g.cols * g.size)
-		totalHeight := float64(g.rows * g.size)
-		c1 = g.calculateInterpolatedColor(lv1, totalWidth, totalHeight)
-		c2 = g.calculateInterpolatedColor(lv2, totalWidth, totalHeight)
-		c3 = g.calculateInterpolatedColor(lv3, totalWidth, totalHeight)
-		c4 = g.calculateInterpolatedColor(lv4, totalWidth, totalHeight)
+	if self.isColorInterpolated {
+		totalWidth := float64(self.cols * self.size)
+		totalHeight := float64(self.rows * self.size)
+		c1 = self.calculateInterpolatedColor(lv1, totalWidth, totalHeight)
+		c2 = self.calculateInterpolatedColor(lv2, totalWidth, totalHeight)
+		c3 = self.calculateInterpolatedColor(lv3, totalWidth, totalHeight)
+		c4 = self.calculateInterpolatedColor(lv4, totalWidth, totalHeight)
 	} else {
-		c1, c2, c3, c4 = g.color, g.color, g.color, g.color
+		c1, c2, c3, c4 = self.color, self.color, self.color, self.color
 	}
 
 	r1, g1, b1, a1 := c1.R, c1.G, c1.B, c1.A
@@ -283,86 +283,86 @@ func (g *GridLine) addLine(p1, p2, center ebimath.Vector) {
 	r4, g4, b4, a4 := c4.R, c4.G, c4.B, c4.A
 	cr4, cg4, cb4, ca4 := float32(r4)/255, float32(g4)/255, float32(b4)/255, float32(a4)/255
 
-	idx := uint16(len(g.vertices))
+	idx := uint16(len(self.vertices))
 
-	g.vertices = append(g.vertices,
+	self.vertices = append(self.vertices,
 		ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: cr1, ColorG: cg1, ColorB: cb1, ColorA: ca1, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: cr2, ColorG: cg2, ColorB: cb2, ColorA: ca2, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: cr3, ColorG: cg3, ColorB: cb3, ColorA: ca3, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: cr4, ColorG: cg4, ColorB: cb4, ColorA: ca4, SrcX: 0, SrcY: 0},
 	)
-	g.indices = append(g.indices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+	self.indices = append(self.indices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
 }
 
-func (g *GridLine) getColor(pos ebimath.Vector) color.RGBA {
-	if !g.isColorInterpolated {
-		return g.color
+func (self *GridLine) getColor(pos ebimath.Vector) color.RGBA {
+	if !self.isColorInterpolated {
+		return self.color
 	}
-	totalWidth := float64(g.cols * g.size)
-	totalHeight := float64(g.rows * g.size)
-	return g.calculateInterpolatedColor(pos, totalWidth, totalHeight)
+	totalWidth := float64(self.cols * self.size)
+	totalHeight := float64(self.rows * self.size)
+	return self.calculateInterpolatedColor(pos, totalWidth, totalHeight)
 }
 
-func (g *GridLine) calculateInterpolatedColor(pos ebimath.Vector, totalWidth, totalHeight float64) color.RGBA {
+func (self *GridLine) calculateInterpolatedColor(pos ebimath.Vector, totalWidth, totalHeight float64) color.RGBA {
 	tx := pos.X / totalWidth
 	ty := pos.Y / totalHeight
 
 	tx = math.Max(0, math.Min(1, tx))
 	ty = math.Max(0, math.Min(1, ty))
 
-	topColor := utils.LerpPremultipliedRGBA(g.topLeftColor, g.topRightColor, tx)
-	bottomColor := utils.LerpPremultipliedRGBA(g.bottomLeftColor, g.bottomRightColor, tx)
+	topColor := utils.LerpPremultipliedRGBA(self.topLeftColor, self.topRightColor, tx)
+	bottomColor := utils.LerpPremultipliedRGBA(self.bottomLeftColor, self.bottomRightColor, tx)
 	finalColor := utils.LerpPremultipliedRGBA(topColor, bottomColor, ty)
 	return finalColor
 }
 
 // SetColor sets the color of the grid.
-func (g *GridLine) SetColor(c color.RGBA) {
-	g.color = c
-	g.buildMesh()
+func (self *GridLine) SetColor(c color.RGBA) {
+	self.color = c
+	self.buildMesh()
 }
 
 // SetPosition sets the position of the grid.
-func (g *GridLine) SetPosition(pos ebimath.Vector) {
-	g.position = pos
-	g.buildMesh()
+func (self *GridLine) SetPosition(pos ebimath.Vector) {
+	self.position = pos
+	self.buildMesh()
 }
 
 // SetRotation sets the rotation of the grid.
-func (g *GridLine) SetRotation(angle float64) {
-	g.rotation = angle
-	g.buildMesh()
+func (self *GridLine) SetRotation(angle float64) {
+	self.rotation = angle
+	self.buildMesh()
 }
 
 // SetScale sets the scale of the grid.
-func (g *GridLine) SetScale(scale ebimath.Vector) {
-	g.scale = scale
-	g.buildMesh()
+func (self *GridLine) SetScale(scale ebimath.Vector) {
+	self.scale = scale
+	self.buildMesh()
 }
 
 // InterpolateColor sets the corner colors for gradient interpolation across the grid.
-func (g *GridLine) InterpolateColor(topLeft, topRight, bottomLeft, bottomRight color.RGBA) {
-	g.isColorInterpolated = true
-	g.topLeftColor = topLeft
-	g.topRightColor = topRight
-	g.bottomLeftColor = bottomLeft
-	g.bottomRightColor = bottomRight
-	g.buildMesh()
+func (self *GridLine) InterpolateColor(topLeft, topRight, bottomLeft, bottomRight color.RGBA) {
+	self.isColorInterpolated = true
+	self.topLeftColor = topLeft
+	self.topRightColor = topRight
+	self.bottomLeftColor = bottomLeft
+	self.bottomRightColor = bottomRight
+	self.buildMesh()
 }
 
 // SetCornerJoin sets the join types for the four corners of the grid.
-func (g *GridLine) SetCornerJoin(tl, tr, bl, br GridCornerJoinType) {
-	g.cornerTL = tl
-	g.cornerTR = tr
-	g.cornerBL = bl
-	g.cornerBR = br
-	g.buildMesh()
+func (self *GridLine) SetCornerJoin(tl, tr, bl, br GridCornerJoinType) {
+	self.cornerTL = tl
+	self.cornerTR = tr
+	self.cornerBL = bl
+	self.cornerBR = br
+	self.buildMesh()
 }
 
 // Draw renders the grid to the screen.
-func (g *GridLine) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
-	if len(g.vertices) == 0 {
+func (self *GridLine) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
+	if len(self.vertices) == 0 {
 		return
 	}
-	screen.DrawTriangles(g.vertices, g.indices, g.whiteDot, op)
+	screen.DrawTriangles(self.vertices, self.indices, self.whiteDot, op)
 }
