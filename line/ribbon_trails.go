@@ -40,79 +40,79 @@ func NewRibbonTrails() *RibbonTrails {
 }
 
 // SetLifetime sets the lifetime of each segment in seconds.
-func (r *RibbonTrails) SetLifetime(lifetime float64) *RibbonTrails {
+func (self *RibbonTrails) SetLifetime(lifetime float64) *RibbonTrails {
 	if lifetime <= 0 {
-		r.SegmentLifetime = math.MaxFloat64
+		self.SegmentLifetime = math.MaxFloat64
 	} else {
-		r.SegmentLifetime = lifetime
+		self.SegmentLifetime = lifetime
 	}
-	return r
+	return self
 }
 
 // SetWidths sets the widths to be interpolated along the trail.
 // To create a fade-in/out effect on the width, provide a slice like `[]float64{0, 10, 0}`.
-func (r *RibbonTrails) SetWidths(widths ...float64) *RibbonTrails {
-	r.SegmentWidths = widths
-	return r
+func (self *RibbonTrails) SetWidths(widths ...float64) *RibbonTrails {
+	self.SegmentWidths = widths
+	return self
 }
 
 // SetColors sets the colors to be interpolated along the trail.
 // To create a fade-in/out effect on the alpha, modulate the alpha component of the colors in the slice.
-func (r *RibbonTrails) SetColors(colors ...color.RGBA) *RibbonTrails {
-	r.SegmentColors = colors
-	return r
+func (self *RibbonTrails) SetColors(colors ...color.RGBA) *RibbonTrails {
+	self.SegmentColors = colors
+	return self
 }
 
 // SetLimit sets the maximum number of segments in the trail.
-func (r *RibbonTrails) SetLimit(limit int) *RibbonTrails {
-	r.TotalSegmentLimit = limit
-	return r
+func (self *RibbonTrails) SetLimit(limit int) *RibbonTrails {
+	self.TotalSegmentLimit = limit
+	return self
 }
 
 // SetJointMode defines how line segments are joined together.
-func (r *RibbonTrails) SetJointMode(mode LineJointMode) *RibbonTrails {
-	r.line.SetJointMode(mode)
-	return r
+func (self *RibbonTrails) SetJointMode(mode LineJointMode) *RibbonTrails {
+	self.line.SetJointMode(mode)
+	return self
 }
 
 // AddPoint adds a new point to the trail's head.
-func (r *RibbonTrails) AddPoint(pos ebimath.Vector) {
-	if r.TotalSegmentLimit > 0 && len(r.points) >= r.TotalSegmentLimit {
-		r.points = r.points[1:]
+func (self *RibbonTrails) AddPoint(pos ebimath.Vector) {
+	if self.TotalSegmentLimit > 0 && len(self.points) >= self.TotalSegmentLimit {
+		self.points = self.points[1:]
 	}
-	r.points = append(r.points, &trailPoint{pos: pos, creationTime: r.currentTime})
+	self.points = append(self.points, &trailPoint{pos: pos, creationTime: self.currentTime})
 }
 
 // Update updates the state of the ribbon trail.
-func (r *RibbonTrails) Update(deltaTime float64) {
-	r.currentTime += deltaTime
+func (self *RibbonTrails) Update(deltaTime float64) {
+	self.currentTime += deltaTime
 
 	// Remove old points from the tail of the trail.
-	if r.SegmentLifetime != math.MaxFloat64 {
-		alivePoints := r.points[:0]
-		for _, p := range r.points {
-			if r.currentTime-p.creationTime < r.SegmentLifetime {
+	if self.SegmentLifetime != math.MaxFloat64 {
+		alivePoints := self.points[:0]
+		for _, p := range self.points {
+			if self.currentTime-p.creationTime < self.SegmentLifetime {
 				alivePoints = append(alivePoints, p)
 			}
 		}
-		r.points = alivePoints
+		self.points = alivePoints
 	}
 
-	if len(r.points) < 2 {
-		r.line.ClearPoints()
+	if len(self.points) < 2 {
+		self.line.ClearPoints()
 		return
 	}
 
-	linePoints := make([]ebimath.Vector, len(r.points))
-	for i, p := range r.points {
+	linePoints := make([]ebimath.Vector, len(self.points))
+	for i, p := range self.points {
 		linePoints[i] = p.pos
 	}
-	r.line.ClearPoints()
+	self.line.ClearPoints()
 	for _, p := range linePoints {
-		r.line.AddPoint(p)
+		self.line.AddPoint(p)
 	}
 
-	numPoints := len(r.points)
+	numPoints := len(self.points)
 	widths := make([]float64, numPoints)
 	colors := make([]color.RGBA, numPoints)
 
@@ -124,17 +124,17 @@ func (r *RibbonTrails) Update(deltaTime float64) {
 		interpolationProgress := 1.0 - trailProgress
 
 		// Interpolate base width and color from the user-provided slices.
-		widths[i] = interpolateWidth(r.SegmentWidths, interpolationProgress)
-		colors[i] = interpolateColor(r.SegmentColors, interpolationProgress)
+		widths[i] = interpolateWidth(self.SegmentWidths, interpolationProgress)
+		colors[i] = interpolateColor(self.SegmentColors, interpolationProgress)
 	}
 
-	r.line.SetInterpolatedWidths(widths...)
-	r.line.SetInterpolatedColors(colors...)
+	self.line.SetInterpolatedWidths(widths...)
+	self.line.SetInterpolatedColors(colors...)
 }
 
 // Draw renders the ribbon trail to the screen.
-func (r *RibbonTrails) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
-	r.line.Draw(screen, op)
+func (self *RibbonTrails) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
+	self.line.Draw(screen, op)
 }
 
 // interpolateWidth gets the value from a slice based on progress
