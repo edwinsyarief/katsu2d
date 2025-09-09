@@ -41,6 +41,13 @@ type Line struct {
 	whiteDot    *ebiten.Image   // Fallback texture for untextured lines
 	textureMode LineTextureMode // How textures are applied
 	tileAspect  float64         // Aspect ratio for texture tiling
+
+	// -- new
+	stepDistance    float64
+	catmullRom      bool
+	splinePrecision float64
+	debugDraw       bool
+	debugPoints     []ebimath.Vector
 }
 
 // NewLine creates a new Line instance with default settings.
@@ -62,6 +69,14 @@ func NewLine() *Line {
 	}
 	line.whiteDot = ebiten.NewImage(1, 1)
 	line.whiteDot.Fill(color.White)
+
+	// -- new
+	line.stepDistance = 0.0
+	line.catmullRom = false
+	line.splinePrecision = 10
+	line.debugDraw = false
+	line.debugPoints = make([]ebimath.Vector, 0)
+
 	return line
 }
 
@@ -162,6 +177,22 @@ func (self *Line) SetInterpolatedWidths(widths ...float64) {
 	self.widths = widths
 }
 
+// -- new
+func (self *Line) SetStepDistance(distance float64) {
+	self.isDirty = true
+	self.stepDistance = distance
+}
+
+func (self *Line) EnableCatmullRom(enable bool, precision float64) {
+	self.isDirty = true
+	self.catmullRom = enable
+	self.splinePrecision = precision
+}
+
+func (self *Line) SetDebugDraw(enable bool) {
+	self.debugDraw = enable
+}
+
 // BuildMesh generates the triangle mesh for rendering the line.
 // Only rebuilds if the line is marked as dirty and has at least 2 points.
 func (self *Line) BuildMesh() {
@@ -170,8 +201,18 @@ func (self *Line) BuildMesh() {
 	}
 	self.ResetMesh()
 
+	pointsToProcess := self.points
+	if self.catmullRom && len(self.points) >= 4 {
+		pointsToProcess = self.generateSplinePoints(self.points, int(self.splinePrecision))
+	}
+
+	self.debugPoints = pointsToProcess
+	if self.stepDistance > 0 && len(pointsToProcess) > 1 {
+		self.debugPoints = self.resamplePoints(pointsToProcess, self.stepDistance)
+	}
+
 	builder := NewLineBuilder()
-	builder.points = self.points
+	builder.points = self.debugPoints
 	builder.closed = self.isClosed
 	builder.width = self.width
 	builder.widths = self.widths
@@ -207,6 +248,54 @@ func (self *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
 	}
 
 	screen.DrawTriangles(self.vertices, self.indices, img, op)
+
+	if self.debugDraw && len(self.debugPoints) > 0 {
+		debugVerts := make([]ebiten.Vertex, 0)
+		debugIndices := make([]uint16, 0)
+		red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+		yellow := color.RGBA{R: 255, G: 255, B: 0, A: 255}
+
+		// Draw points
+		for _, p := range self.debugPoints {
+			v1 := p.Add(ebimath.V(-2, -2))
+			v2 := p.Add(ebimath.V(2, -2))
+			v3 := p.Add(ebimath.V(-2, 2))
+			v4 := p.Add(ebimath.V(2, 2))
+			idx := uint16(len(debugVerts))
+			debugVerts = append(debugVerts,
+				ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+				ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+				ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+				ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+			)
+			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+		}
+
+		// Draw lines
+		for i := 0; i < len(self.debugPoints)-1; i++ {
+			p1 := self.debugPoints[i]
+			p2 := self.debugPoints[i+1]
+			dir := p2.Sub(p1).Normalize()
+			normal := dir.Orthogonal().ScaleF(0.5) // 1px wide line
+
+			v1 := p1.Add(normal)
+			v2 := p1.Sub(normal)
+			v3 := p2.Add(normal)
+			v4 := p2.Sub(normal)
+			idx := uint16(len(debugVerts))
+			debugVerts = append(debugVerts,
+				ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+				ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+				ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+				ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+			)
+			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+		}
+
+		if len(debugVerts) > 0 {
+			screen.DrawTriangles(debugVerts, debugIndices, self.whiteDot, op)
+		}
+	}
 }
 
 // GetBounds calculates the bounding rectangle of the line, including its width.
@@ -232,4 +321,69 @@ func (self *Line) ResetMesh() {
 	self.vertices = self.vertices[:0]
 	self.indices = self.indices[:0]
 	self.isDirty = true
+}
+
+// -- new
+func (self *Line) generateSplinePoints(points []ebimath.Vector, precision int) []ebimath.Vector {
+	if len(points) < 2 {
+		return points
+	}
+
+	newPoints := make([]ebimath.Vector, 0)
+	newPoints = append(newPoints, points[0])
+
+	for i := 0; i < len(points)-1; i++ {
+		p0 := points[i]
+		if i > 0 {
+			p0 = points[i-1]
+		}
+		p1 := points[i]
+		p2 := points[i+1]
+		p3 := points[i+1]
+		if i < len(points)-2 {
+			p3 = points[i+2]
+		}
+
+		for j := 1; j <= precision; j++ {
+			t := float64(j) / float64(precision)
+			newPos := catmullRomPoint(p0, p1, p2, p3, t)
+			newPoints = append(newPoints, newPos)
+		}
+	}
+
+	return newPoints
+}
+
+func (self *Line) resamplePoints(points []ebimath.Vector, step float64) []ebimath.Vector {
+	if len(points) < 2 || step <= 0 {
+		return points
+	}
+
+	newPoints := make([]ebimath.Vector, 0, len(points))
+	newPoints = append(newPoints, points[0])
+
+	distanceNeeded := step
+	for i := 0; i < len(points)-1; i++ {
+		p1 := points[i]
+		p2 := points[i+1]
+
+		segmentVec := p2.Sub(p1)
+		segmentLen := segmentVec.Length()
+
+		if segmentLen < 1e-6 {
+			continue
+		}
+
+		for segmentLen >= distanceNeeded {
+			t := distanceNeeded / segmentLen
+			newPos := p1.Lerp(p2, t)
+			newPoints = append(newPoints, newPos)
+
+			segmentLen -= distanceNeeded
+			p1 = newPoints[len(newPoints)-1]
+			distanceNeeded = step
+		}
+		distanceNeeded -= segmentLen
+	}
+	return newPoints
 }
