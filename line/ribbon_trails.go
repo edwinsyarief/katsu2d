@@ -23,7 +23,9 @@ type RibbonTrails struct {
 	totalSegmentLimit int
 	currentTime       float64
 
-	stepDistance float64
+	StepDistance    float64
+	catmullRom      bool
+	splinePrecision int
 
 	debugDraw   bool
 	debugPoints []*trailPoint
@@ -48,7 +50,9 @@ func NewRibbonTrails() *RibbonTrails {
 		segmentWidths:     []float64{10.0},
 		segmentColors:     []color.RGBA{{R: 255, G: 255, B: 255, A: 255}},
 		totalSegmentLimit: 0,
-		stepDistance:      0.0,
+		StepDistance:      0.0,
+		catmullRom:        false,
+		splinePrecision:   10, // 10 subdivisions per spline segment
 		jointMode:         LineJointBevel,
 		roundPrecision:    8,
 		sharpLimit:        2.0,
@@ -88,12 +92,20 @@ func (self *RibbonTrails) SetJointMode(mode LineJointMode) *RibbonTrails {
 }
 
 func (self *RibbonTrails) SetStepDistance(distance float64) *RibbonTrails {
-	self.stepDistance = distance
+	self.StepDistance = distance
 	return self
 }
 
 func (self *RibbonTrails) SetDebugDraw(enabled bool) *RibbonTrails {
 	self.debugDraw = enabled
+	return self
+}
+
+func (self *RibbonTrails) EnableCatmullRom(enabled bool, precision int) *RibbonTrails {
+	self.catmullRom = enabled
+	if precision > 0 {
+		self.splinePrecision = precision
+	}
 	return self
 }
 
@@ -122,9 +134,14 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 		self.points = alivePoints
 	}
 
-	self.debugPoints = self.points
-	if self.stepDistance > 0 && len(self.points) > 1 {
-		self.debugPoints = self.resamplePoints(self.points, self.stepDistance)
+	pointsToProcess := self.points
+	if self.catmullRom && len(self.points) >= 4 {
+		pointsToProcess = self.generateSplinePoints(self.points, self.splinePrecision)
+	}
+
+	self.debugPoints = pointsToProcess
+	if self.StepDistance > 0 && len(pointsToProcess) > 1 {
+		self.debugPoints = self.resamplePoints(pointsToProcess, self.StepDistance)
 	}
 
 	self.vertices = self.vertices[:0]
@@ -234,15 +251,71 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 	}
 }
 
-func (self *RibbonTrails) resamplePoints(points []*trailPoint, step float64) []*trailPoint {
+func (self *RibbonTrails) generateSplinePoints(points []*trailPoint, precision int) []*trailPoint {
 	if len(points) < 2 {
+		return points
+	}
+
+	newPoints := make([]*trailPoint, 0)
+
+	// To create a full spline, we need to imagine points before the start and after the end.
+	// A common technique is to duplicate the first and last points.
+
+	// Add the very first point.
+	newPoints = append(newPoints, points[0])
+
+	for i := 0; i < len(points)-1; i++ {
+		// Define the 4 control points (p0, p1, p2, p3)
+		p0 := points[i]
+		if i > 0 {
+			p0 = points[i-1]
+		}
+
+		p1 := points[i]
+		p2 := points[i+1]
+
+		p3 := points[i+1] // Default to p2 if we're at the end
+		if i < len(points)-2 {
+			p3 = points[i+2]
+		}
+
+		for j := 1; j <= precision; j++ {
+			t := float64(j) / float64(precision)
+
+			newPos := catmullRomPoint(p0.pos, p1.pos, p2.pos, p3.pos, t)
+
+			time_t0 := p1.creationTime
+			time_t1 := p2.creationTime
+			newTime := time_t0 + (time_t1-time_t0)*t
+
+			newPoints = append(newPoints, &trailPoint{pos: newPos, creationTime: newTime})
+		}
+	}
+
+	return newPoints
+}
+
+func catmullRomPoint(p0, p1, p2, p3 ebimath.Vector, t float64) ebimath.Vector {
+	t2 := t * t
+	t3 := t2 * t
+
+	c1 := p1.ScaleF(2)
+	c2 := p2.Sub(p0).ScaleF(t)
+	c3 := p0.ScaleF(2).Sub(p1.ScaleF(5)).Add(p2.ScaleF(4)).Sub(p3).ScaleF(t2)
+	c4 := p0.ScaleF(-1).Add(p1.ScaleF(3)).Sub(p2.ScaleF(3)).Add(p3).ScaleF(t3)
+
+	return c1.Add(c2).Add(c3).Add(c4).ScaleF(0.5)
+}
+
+func (self *RibbonTrails) resamplePoints(points []*trailPoint, step float64) []*trailPoint {
+	if len(points) < 2 || step <= 0 {
 		return points
 	}
 
 	newPoints := make([]*trailPoint, 0, len(points))
 	newPoints = append(newPoints, points[0])
 
-	distCovered := 0.0
+	distanceNeeded := step
 	for i := 0; i < len(points)-1; i++ {
 		p1 := points[i]
 		p2 := points[i+1]
@@ -254,19 +327,17 @@ func (self *RibbonTrails) resamplePoints(points []*trailPoint, step float64) []*
 			continue
 		}
 
-		for distCovered+segmentLen >= step {
-			lerpFactor := (step - distCovered) / segmentLen
-			newPos := p1.pos.Lerp(p2.pos, lerpFactor)
-			newTime := p1.creationTime + (p2.creationTime-p1.creationTime)*lerpFactor
-
+		for segmentLen >= distanceNeeded {
+			t := distanceNeeded / segmentLen
+			newPos := p1.pos.Lerp(p2.pos, t)
+			newTime := p1.creationTime + (p2.creationTime-p1.creationTime)*t
 			newPoints = append(newPoints, &trailPoint{pos: newPos, creationTime: newTime})
 
-			segmentVec = p2.pos.Sub(newPos)
-			segmentLen = segmentVec.Length()
+			segmentLen -= distanceNeeded
 			p1 = newPoints[len(newPoints)-1]
-			distCovered = 0
+			distanceNeeded = step
 		}
-		distCovered += segmentLen
+		distanceNeeded -= segmentLen
 	}
 	return newPoints
 }
