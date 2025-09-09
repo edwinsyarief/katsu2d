@@ -17,34 +17,42 @@ type trailPoint struct {
 // RibbonTrails creates a trail effect using a line that fades and scales over time.
 type RibbonTrails struct {
 	points            []*trailPoint
-	SegmentLifetime   float64
-	SegmentWidths     []float64
-	SegmentColors     []color.RGBA
-	TotalSegmentLimit int
+	segmentLifetime   float64
+	segmentWidths     []float64
+	segmentColors     []color.RGBA
+	totalSegmentLimit int
 	currentTime       float64
 
-	// Mesh generation properties, similar to LineBuilder
+	stepDistance float64
+
+	debugDraw   bool
+	debugPoints []*trailPoint
+
 	vertices       []ebiten.Vertex
 	indices        []uint16
 	jointMode      LineJointMode
 	roundPrecision int
 	sharpLimit     float64
 
-	// Texture to use for drawing. If nil, a plain white texture is used.
-	Texture *ebiten.Image
+	texture  *ebiten.Image
+	whiteDot *ebiten.Image
 }
 
 // NewRibbonTrails creates and initializes a new RibbonTrails object with default values.
 func NewRibbonTrails() *RibbonTrails {
+	whiteDotImg := ebiten.NewImage(1, 1)
+	whiteDotImg.Fill(color.White)
 	return &RibbonTrails{
 		points:            make([]*trailPoint, 0),
-		SegmentLifetime:   math.MaxFloat64,
-		SegmentWidths:     []float64{10.0},
-		SegmentColors:     []color.RGBA{{R: 255, G: 255, B: 255, A: 255}},
-		TotalSegmentLimit: 0,
-		jointMode:         LineJointBevel, // Bevel is a safe default
+		segmentLifetime:   math.MaxFloat64,
+		segmentWidths:     []float64{10.0},
+		segmentColors:     []color.RGBA{{R: 255, G: 255, B: 255, A: 255}},
+		totalSegmentLimit: 0,
+		stepDistance:      0.0,
+		jointMode:         LineJointBevel,
 		roundPrecision:    8,
 		sharpLimit:        2.0,
+		whiteDot:          whiteDotImg,
 	}
 }
 
@@ -52,25 +60,25 @@ func NewRibbonTrails() *RibbonTrails {
 
 func (self *RibbonTrails) SetLifetime(lifetime float64) *RibbonTrails {
 	if lifetime <= 0 {
-		self.SegmentLifetime = math.MaxFloat64
+		self.segmentLifetime = math.MaxFloat64
 	} else {
-		self.SegmentLifetime = lifetime
+		self.segmentLifetime = lifetime
 	}
 	return self
 }
 
 func (self *RibbonTrails) SetWidths(widths ...float64) *RibbonTrails {
-	self.SegmentWidths = widths
+	self.segmentWidths = widths
 	return self
 }
 
 func (self *RibbonTrails) SetColors(colors ...color.RGBA) *RibbonTrails {
-	self.SegmentColors = colors
+	self.segmentColors = colors
 	return self
 }
 
 func (self *RibbonTrails) SetLimit(limit int) *RibbonTrails {
-	self.TotalSegmentLimit = limit
+	self.totalSegmentLimit = limit
 	return self
 }
 
@@ -79,14 +87,23 @@ func (self *RibbonTrails) SetJointMode(mode LineJointMode) *RibbonTrails {
 	return self
 }
 
+func (self *RibbonTrails) SetStepDistance(distance float64) *RibbonTrails {
+	self.stepDistance = distance
+	return self
+}
+
+func (self *RibbonTrails) SetDebugDraw(enabled bool) *RibbonTrails {
+	self.debugDraw = enabled
+	return self
+}
+
 // --- Core Logic ---
 
 func (self *RibbonTrails) AddPoint(pos ebimath.Vector) {
-	// Prevent adding duplicate points, which can cause issues with trail generation.
 	if len(self.points) > 0 && self.points[len(self.points)-1].pos.Equals(pos) {
 		return
 	}
-	if self.TotalSegmentLimit > 0 && len(self.points) >= self.TotalSegmentLimit {
+	if self.totalSegmentLimit > 0 && len(self.points) >= self.totalSegmentLimit {
 		self.points = self.points[1:]
 	}
 	self.points = append(self.points, &trailPoint{pos: pos, creationTime: self.currentTime})
@@ -95,41 +112,41 @@ func (self *RibbonTrails) AddPoint(pos ebimath.Vector) {
 func (self *RibbonTrails) Update(deltaTime float64) {
 	self.currentTime += deltaTime
 
-	// 1. Remove old points
-	if self.SegmentLifetime != math.MaxFloat64 {
+	if self.segmentLifetime != math.MaxFloat64 {
 		alivePoints := self.points[:0]
 		for _, p := range self.points {
-			if self.currentTime-p.creationTime < self.SegmentLifetime {
+			if self.currentTime-p.creationTime < self.segmentLifetime {
 				alivePoints = append(alivePoints, p)
 			}
 		}
 		self.points = alivePoints
 	}
 
-	// 2. Rebuild the mesh from scratch every frame
+	self.debugPoints = self.points
+	if self.stepDistance > 0 && len(self.points) > 1 {
+		self.debugPoints = self.resamplePoints(self.points, self.stepDistance)
+	}
+
 	self.vertices = self.vertices[:0]
 	self.indices = self.indices[:0]
 
-	if len(self.points) < 2 {
+	if len(self.debugPoints) < 2 {
 		return
 	}
 
-	n := len(self.points)
-
+	n := len(self.debugPoints)
 	for i := 0; i < n-1; i++ {
-		pA := self.points[i]
-		pB := self.points[i+1]
+		pA := self.debugPoints[i]
+		pB := self.debugPoints[i+1]
 
-		// Calculate lifetime-based properties for the segment's start and end points
-		progressA := (self.currentTime - pA.creationTime) / self.SegmentLifetime
-		progressB := (self.currentTime - pB.creationTime) / self.SegmentLifetime
+		progressA := (self.currentTime - pA.creationTime) / self.segmentLifetime
+		progressB := (self.currentTime - pB.creationTime) / self.segmentLifetime
 
-		colorA := interpolateColor(self.SegmentColors, progressA)
-		colorB := interpolateColor(self.SegmentColors, progressB)
-		widthA := interpolateWidth(self.SegmentWidths, progressA) / 2.0
-		widthB := interpolateWidth(self.SegmentWidths, progressB) / 2.0
+		colorA := interpolateColor(self.segmentColors, progressA)
+		colorB := interpolateColor(self.segmentColors, progressB)
+		widthA := interpolateWidth(self.segmentWidths, progressA) / 2.0
+		widthB := interpolateWidth(self.segmentWidths, progressB) / 2.0
 
-		// Build segment
 		dirAB := pB.pos.Sub(pA.pos)
 		if dirAB.Length() < 1e-6 {
 			continue
@@ -143,11 +160,10 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 		self.addTriangle(vA1, vA2, vB1, colorA, colorA, colorB)
 		self.addTriangle(vA2, vB2, vB1, colorA, colorB, colorB)
 
-		// Build joint
 		if i >= n-2 {
 			continue
 		}
-		pC := self.points[i+2]
+		pC := self.debugPoints[i+2]
 		dirBC := pC.pos.Sub(pB.pos)
 		if dirBC.Length() < 1e-6 {
 			continue
@@ -155,9 +171,8 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 
 		normalB := dirBC.Normalize().Orthogonal()
 		zCross := dirAB.Cross(dirBC)
-
 		if math.Abs(zCross) < 1e-6 {
-			continue // Almost straight, no joint needed
+			continue
 		}
 
 		vB1_next := pB.pos.Add(normalB.ScaleF(widthB))
@@ -181,9 +196,7 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 			v2 := vEnd.Sub(pB.pos)
 			angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
 			angleStep := math.Pi / float64(self.roundPrecision)
-
 			if math.Abs(angle) < angleStep {
-				// Angle too small for an arc, fall back to bevel.
 				if zCross < 0 {
 					self.addTriangle(pB.pos, vB1, vB1_next, colorB, colorB, colorB)
 				} else {
@@ -221,19 +234,102 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 	}
 }
 
-func (self *RibbonTrails) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
-	if len(self.vertices) == 0 {
-		return
+func (self *RibbonTrails) resamplePoints(points []*trailPoint, step float64) []*trailPoint {
+	if len(points) < 2 {
+		return points
 	}
-	texture := self.Texture
-	if texture == nil {
-		texture = ebiten.NewImage(1, 1)
-		texture.Fill(color.White)
+
+	newPoints := make([]*trailPoint, 0, len(points))
+	newPoints = append(newPoints, points[0])
+
+	distCovered := 0.0
+	for i := 0; i < len(points)-1; i++ {
+		p1 := points[i]
+		p2 := points[i+1]
+
+		segmentVec := p2.pos.Sub(p1.pos)
+		segmentLen := segmentVec.Length()
+
+		if segmentLen < 1e-6 {
+			continue
+		}
+
+		for distCovered+segmentLen >= step {
+			lerpFactor := (step - distCovered) / segmentLen
+			newPos := p1.pos.Lerp(p2.pos, lerpFactor)
+			newTime := p1.creationTime + (p2.creationTime-p1.creationTime)*lerpFactor
+
+			newPoints = append(newPoints, &trailPoint{pos: newPos, creationTime: newTime})
+
+			segmentVec = p2.pos.Sub(newPos)
+			segmentLen = segmentVec.Length()
+			p1 = newPoints[len(newPoints)-1]
+			distCovered = 0
+		}
+		distCovered += segmentLen
 	}
-	screen.DrawTriangles(self.vertices, self.indices, texture, op)
+	return newPoints
 }
 
-// --- Mesh Generation Helpers (ported from LineBuilder) ---
+func (self *RibbonTrails) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
+	if len(self.vertices) > 0 {
+		texture := self.texture
+		if texture == nil {
+			texture = self.whiteDot
+		}
+		screen.DrawTriangles(self.vertices, self.indices, texture, op)
+	}
+
+	if self.debugDraw && len(self.debugPoints) > 0 {
+		debugVerts := make([]ebiten.Vertex, 0)
+		debugIndices := make([]uint16, 0)
+		red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+		yellow := color.RGBA{R: 255, G: 255, B: 0, A: 255}
+
+		// Draw points
+		for _, p := range self.debugPoints {
+			v1 := p.pos.Add(ebimath.V(-2, -2))
+			v2 := p.pos.Add(ebimath.V(2, -2))
+			v3 := p.pos.Add(ebimath.V(-2, 2))
+			v4 := p.pos.Add(ebimath.V(2, 2))
+			idx := uint16(len(debugVerts))
+			debugVerts = append(debugVerts,
+				ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+				ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+				ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+				ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
+			)
+			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+		}
+
+		// Draw lines
+		for i := 0; i < len(self.debugPoints)-1; i++ {
+			p1 := self.debugPoints[i].pos
+			p2 := self.debugPoints[i+1].pos
+			dir := p2.Sub(p1).Normalize()
+			normal := dir.Orthogonal().ScaleF(0.5) // 1px wide line
+
+			v1 := p1.Add(normal)
+			v2 := p1.Sub(normal)
+			v3 := p2.Add(normal)
+			v4 := p2.Sub(normal)
+			idx := uint16(len(debugVerts))
+			debugVerts = append(debugVerts,
+				ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+				ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+				ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+				ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
+			)
+			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+		}
+
+		if len(debugVerts) > 0 {
+			screen.DrawTriangles(debugVerts, debugIndices, self.whiteDot, op)
+		}
+	}
+}
+
+// --- Mesh Generation Helpers ---
 
 func (self *RibbonTrails) addTriangle(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.RGBA) {
 	idx := uint16(len(self.vertices))
@@ -281,7 +377,6 @@ func (self *RibbonTrails) addArc(center, vbegin ebimath.Vector, angleDelta float
 	}
 }
 
-// interpolateWidth gets the value from a slice based on progress
 func interpolateWidth(values []float64, progress float64) float64 {
 	if len(values) == 0 {
 		return 0
@@ -289,13 +384,12 @@ func interpolateWidth(values []float64, progress float64) float64 {
 	if len(values) == 1 {
 		return values[0]
 	}
-	if progress <= 0 {
-		return values[0]
+	if progress < 0 {
+		progress = 0
 	}
-	if progress >= 1 {
-		return values[len(values)-1]
+	if progress > 1 {
+		progress = 1
 	}
-
 	idx := progress * float64(len(values)-1)
 	i1 := int(idx)
 	i2 := i1 + 1
@@ -306,7 +400,6 @@ func interpolateWidth(values []float64, progress float64) float64 {
 	return values[i1]*(1-t) + values[i2]*t
 }
 
-// interpolateColor gets the color from a slice based on progress
 func interpolateColor(values []color.RGBA, progress float64) color.RGBA {
 	if len(values) == 0 {
 		return color.RGBA{}
@@ -314,13 +407,12 @@ func interpolateColor(values []color.RGBA, progress float64) color.RGBA {
 	if len(values) == 1 {
 		return values[0]
 	}
-	if progress <= 0 {
-		return values[0]
+	if progress < 0 {
+		progress = 0
 	}
-	if progress >= 1 {
-		return values[len(values)-1]
+	if progress > 1 {
+		progress = 1
 	}
-
 	idx := progress * float64(len(values)-1)
 	i1 := int(idx)
 	i2 := i1 + 1
@@ -328,11 +420,9 @@ func interpolateColor(values []color.RGBA, progress float64) color.RGBA {
 		i2 = len(values) - 1
 	}
 	t := idx - float64(i1)
-
 	rVal := float64(values[i1].R)*(1-t) + float64(values[i2].R)*t
 	gVal := float64(values[i1].G)*(1-t) + float64(values[i2].G)*t
 	bVal := float64(values[i1].B)*(1-t) + float64(values[i2].B)*t
 	aVal := float64(values[i1].A)*(1-t) + float64(values[i2].A)*t
-
 	return color.RGBA{R: uint8(rVal), G: uint8(gVal), B: uint8(bVal), A: uint8(aVal)}
 }
