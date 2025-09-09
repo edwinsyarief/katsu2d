@@ -199,7 +199,7 @@ func (self *Line) BuildMesh() {
 	if !self.isDirty || len(self.points) < 2 {
 		return
 	}
-	self.ResetMesh()
+	self.resetMesh()
 
 	pointsToProcess := self.points
 	if self.catmullRom && len(self.points) >= 4 {
@@ -316,8 +316,13 @@ func (self *Line) GetBounds() image.Rectangle {
 	return image.Rect(int(minX-h_width), int(minY-h_width), int(maxX+h_width), int(maxY+h_width))
 }
 
-// ResetMesh clears the current mesh data and marks the line as dirty.
-func (self *Line) ResetMesh() {
+func (self *Line) Reset() {
+	self.points = self.points[:0]
+	self.resetMesh()
+}
+
+// resetMesh clears the current mesh data and marks the line as dirty.
+func (self *Line) resetMesh() {
 	self.vertices = self.vertices[:0]
 	self.indices = self.indices[:0]
 	self.isDirty = true
