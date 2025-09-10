@@ -74,9 +74,8 @@ func (self *LineBuilder) Build() {
 	}
 
 	// --- Pre-computation for interpolation ---
-	// Check if color interpolation is needed.
+	// Determine if color or width interpolation is needed and calculate the total line distance.
 	self.interpolateColor = len(self.colors) > 1
-	// Check if width interpolation is needed.
 	interpolateWidth := len(self.widths) > 1
 	var totalDistance float64
 	n := len(self.points)
@@ -85,7 +84,7 @@ func (self *LineBuilder) Build() {
 	if isClosed {
 		nSegments = n
 	}
-	// Calculate the total length of the line to normalize distance for interpolation.
+
 	if self.interpolateColor || interpolateWidth {
 		for i := 0; i < nSegments; i++ {
 			p1 := self.points[i%n]
@@ -96,8 +95,6 @@ func (self *LineBuilder) Build() {
 
 	// --- Initial state ---
 	halfThickness := self.width / 2.0
-	// This line seems to be a remnant of a previous logic, as the result is not used.
-	_ = halfThickness * halfThickness * self.sharpLimit * self.sharpLimit
 	var currentDistance float64
 
 	// --- Begin Cap ---
@@ -118,7 +115,7 @@ func (self *LineBuilder) Build() {
 
 		switch self.beginCapMode {
 		case LineCapBox:
-			// Adds a square cap by drawing two triangles.
+			// Adds a square cap by drawing two triangles extending from the line's end.
 			v1_box := v1.Sub(dir.ScaleF(width))
 			v2_box := v2.Sub(dir.ScaleF(width))
 			self.addTriangle(v1, v2, v1_box, color, color, color)
@@ -194,7 +191,7 @@ func (self *LineBuilder) Build() {
 		}
 
 		normalB := dirBC.Normalize().Orthogonal()
-		// The cross product determines the direction of the turn.
+		// The cross product determines the direction of the turn (left or right).
 		zCross := dirAB.Cross(dirBC)
 
 		if math.Abs(zCross) > 1e-6 {
@@ -203,14 +200,14 @@ func (self *LineBuilder) Build() {
 
 			switch self.jointMode {
 			case LineJointBevel:
-				// Adds a beveled joint with a single triangle.
+				// Adds a beveled joint with a single triangle to "cut the corner."
 				if zCross < 0 {
 					self.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
 				} else {
 					self.addTriangle(pB, vB2, vB2_next, colorB, colorB, colorB)
 				}
 			case LineJointRound:
-				// Adds a round joint by drawing an arc.
+				// Adds a round joint by drawing a circular arc.
 				var vStart, vEnd ebimath.Vector
 				if zCross < 0 {
 					vStart, vEnd = vB1, vB1_next
@@ -221,11 +218,8 @@ func (self *LineBuilder) Build() {
 				v2 := vEnd.Sub(pB)
 				angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
 
-				// Determine the angle step for the arc.
+				// If the angle is too small for a full arc segment, fall back to a bevel join.
 				angleStep := math.Pi / float64(self.roundPrecision)
-				// If the total angle is less than one step, the newArc function will not
-				// produce any triangles, leaving a gap. In this case, fall back to a
-				// simple bevel join to fill the space.
 				if math.Abs(angle) < angleStep {
 					if zCross < 0 {
 						self.addTriangle(pB, vB1, vB1_next, colorB, colorB, colorB)
@@ -236,7 +230,7 @@ func (self *LineBuilder) Build() {
 					self.newArc(pB, v1, angle, colorB, Rect{})
 				}
 			case LineJointSharp:
-				// Adds a miter joint, falling back to bevel if over sharp limit.
+				// Adds a miter joint, falling back to a bevel if the corner is too sharp.
 				var vB_outer, vB_outer_next ebimath.Vector
 				if zCross < 0 {
 					vB_outer = vB1
@@ -286,7 +280,7 @@ func (self *LineBuilder) Build() {
 
 		switch self.endCapMode {
 		case LineCapBox:
-			// Adds a square cap by drawing two triangles.
+			// Adds a square cap by drawing two triangles extending from the line's end.
 			v1_box := v1.Add(dir.ScaleF(width))
 			v2_box := v2.Add(dir.ScaleF(width))
 			self.addTriangle(v1, v2, v1_box, color, color, color)

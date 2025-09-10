@@ -16,7 +16,7 @@ type Line struct {
 	// Mesh data for rendering the line
 	vertices []ebiten.Vertex // Vertex data for the triangle mesh
 	indices  []uint16        // Triangle indices for rendering
-	isDirty  bool            // Tracks if mesh needs rebuilding
+	isDirty  bool            // Tracks if the mesh needs to be rebuilt
 
 	// Core line properties
 	points         []ebimath.Vector // Array of points defining the line path
@@ -42,51 +42,50 @@ type Line struct {
 	textureMode LineTextureMode // How textures are applied
 	tileAspect  float64         // Aspect ratio for texture tiling
 
-	// -- new
-	stepDistance    float64
-	catmullRom      bool
-	splinePrecision float64
-	debugDraw       bool
-	debugPoints     []ebimath.Vector
+	// Advanced line generation properties
+	stepDistance    float64          // Distance between points after resampling (0 = disabled)
+	catmullRom      bool             // If true, the line will be smoothed using a Catmull-Rom spline
+	splinePrecision float64          // Number of points to generate between each original point for the spline
+	debugDraw       bool             // If true, draws debug points and lines to visualize the mesh
+	debugPoints     []ebimath.Vector // The points used for building the mesh after processing
 }
 
 // NewLine creates a new Line instance with default settings.
-// Returns a line with white color, 10px width, sharp joints, and no caps.
+// Returns a line with a white color, 10px width, sharp joints, and no caps.
 func NewLine() *Line {
 	line := &Line{
-		defaultColor:   color.RGBA{R: 255, G: 255, B: 255, A: 255},
-		width:          10,
-		points:         make([]ebimath.Vector, 0),
-		vertices:       make([]ebiten.Vertex, 0),
-		indices:        make([]uint16, 0),
-		isDirty:        true,
-		jointMode:      LineJointSharp,
-		beginCapMode:   LineCapNone,
-		endCapMode:     LineCapNone,
-		sharpLimit:     2.0,
-		roundPrecision: 8,
-		tileAspect:     1.0,
+		defaultColor:    color.RGBA{R: 255, G: 255, B: 255, A: 255},
+		width:           10,
+		points:          make([]ebimath.Vector, 0),
+		vertices:        make([]ebiten.Vertex, 0),
+		indices:         make([]uint16, 0),
+		isDirty:         true,
+		jointMode:       LineJointSharp,
+		beginCapMode:    LineCapNone,
+		endCapMode:      LineCapNone,
+		sharpLimit:      2.0,
+		roundPrecision:  8,
+		tileAspect:      1.0,
+		stepDistance:    0.0,
+		catmullRom:      false,
+		splinePrecision: 10,
+		debugDraw:       false,
+		debugPoints:     make([]ebimath.Vector, 0),
 	}
+	// A small white image used as a default texture for untextured lines.
 	line.whiteDot = ebiten.NewImage(1, 1)
 	line.whiteDot.Fill(color.White)
-
-	// -- new
-	line.stepDistance = 0.0
-	line.catmullRom = false
-	line.splinePrecision = 10
-	line.debugDraw = false
-	line.debugPoints = make([]ebimath.Vector, 0)
 
 	return line
 }
 
-// GetMesh get vertices and indices information
+// GetMesh returns the current vertex and index data for the line's mesh.
 func (self *Line) GetMesh() ([]ebiten.Vertex, []uint16) {
 	return self.vertices, self.indices
 }
 
-// AddPoint adds a new point to the line if it's different from the last point.
-// If pointLimit is set, oldest points are removed to maintain the limit.
+// AddPoint adds a new point to the line if it is not a duplicate of the last point.
+// If a point limit is set, the oldest points are removed to maintain the limit.
 func (self *Line) AddPoint(pos ebimath.Vector) {
 	if len(self.points) > 0 && self.points[len(self.points)-1].Equals(pos) {
 		return
@@ -100,7 +99,7 @@ func (self *Line) AddPoint(pos ebimath.Vector) {
 }
 
 // SetPoint updates the position of an existing point at the given index.
-// Does nothing if the index is out of bounds.
+// This function does nothing if the index is out of bounds.
 func (self *Line) SetPoint(index int, position ebimath.Vector) {
 	if index < 0 || index >= len(self.points) {
 		return
@@ -126,7 +125,7 @@ func (self *Line) SetJointMode(mode LineJointMode) {
 	self.jointMode = mode
 }
 
-// SetCapMode sets the style for both start and end caps of the line.
+// SetCapMode sets the style for both the start and end caps of the line.
 func (self *Line) SetCapMode(begin, end LineCapMode) {
 	self.isDirty = true
 	self.beginCapMode = begin
@@ -140,6 +139,7 @@ func (self *Line) SetIsClosed(isClosed bool) {
 }
 
 // SetTexture assigns a texture to the line and updates the tile aspect ratio.
+// Passing a nil image will disable texturing for the line.
 func (self *Line) SetTexture(img *ebiten.Image) {
 	self.isDirty = true
 	self.texture = img
@@ -149,58 +149,62 @@ func (self *Line) SetTexture(img *ebiten.Image) {
 	}
 }
 
-// SetWidth sets a uniform width for the entire line.
-// Clears any previously set interpolated widths.
+// SetWidth sets a uniform width for the entire line and clears any interpolated widths.
 func (self *Line) SetWidth(width float64) {
 	self.isDirty = true
 	self.width = width
 	self.widths = nil // Clear interpolated widths
 }
 
-// SetDefaultColor sets a uniform color for the entire line.
-// Clears any previously set interpolated colors.
+// SetDefaultColor sets a uniform color for the entire line and clears any interpolated colors.
 func (self *Line) SetDefaultColor(c color.RGBA) {
 	self.isDirty = true
 	self.defaultColor = c
 	self.colors = nil // Clear interpolated colors
 }
 
-// SetInterpolatedColors sets per-point colors for gradient effects.
+// SetInterpolatedColors sets per-point colors for creating a gradient effect.
 func (self *Line) SetInterpolatedColors(colors ...color.RGBA) {
 	self.isDirty = true
 	self.colors = colors
 }
 
-// SetInterpolatedWidths sets per-point widths for variable width lines.
+// SetInterpolatedWidths sets per-point widths for creating a line with variable thickness.
 func (self *Line) SetInterpolatedWidths(widths ...float64) {
 	self.isDirty = true
 	self.widths = widths
 }
 
-// -- new
+// SetStepDistance enables point resampling to ensure a minimum distance between vertices.
+// A value of 0.0 disables this feature.
 func (self *Line) SetStepDistance(distance float64) {
 	self.isDirty = true
 	self.stepDistance = distance
 }
 
+// EnableCatmullRom enables or disables Catmull-Rom spline smoothing for the line.
+// The precision parameter controls the number of intermediate points generated for the curve.
 func (self *Line) EnableCatmullRom(enable bool, precision float64) {
 	self.isDirty = true
 	self.catmullRom = enable
 	self.splinePrecision = precision
 }
 
+// SetDebugDraw enables or disables the drawing of debug points and lines to visualize the mesh.
 func (self *Line) SetDebugDraw(enable bool) {
 	self.debugDraw = enable
 }
 
 // BuildMesh generates the triangle mesh for rendering the line.
-// Only rebuilds if the line is marked as dirty and has at least 2 points.
+// It performs spline smoothing and point resampling before building the final mesh.
+// The mesh is only rebuilt if the line is marked as dirty and has at least 2 points.
 func (self *Line) BuildMesh() {
 	if !self.isDirty || len(self.points) < 2 {
 		return
 	}
 	self.resetMesh()
 
+	// Process points based on Catmull-Rom and resampling settings.
 	pointsToProcess := self.points
 	if self.catmullRom && len(self.points) >= 4 {
 		pointsToProcess = self.generateSplinePoints(self.points, int(self.splinePrecision))
@@ -211,6 +215,7 @@ func (self *Line) BuildMesh() {
 		self.debugPoints = self.resamplePoints(pointsToProcess, self.stepDistance)
 	}
 
+	// Use a LineBuilder to construct the mesh from the final set of points.
 	builder := NewLineBuilder()
 	builder.points = self.debugPoints
 	builder.closed = self.isClosed
@@ -235,7 +240,8 @@ func (self *Line) BuildMesh() {
 }
 
 // Draw renders the line to the specified screen using the provided options.
-// Uses the texture if set, otherwise falls back to a white dot.
+// It uses a texture if one is set; otherwise, it falls back to a solid color.
+// If debugDraw is enabled, it will also draw the processed points and segments.
 func (self *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
 	self.BuildMesh()
 	if len(self.vertices) == 0 {
@@ -249,13 +255,14 @@ func (self *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
 
 	screen.DrawTriangles(self.vertices, self.indices, img, op)
 
+	// Draw debug points and lines if enabled.
 	if self.debugDraw && len(self.debugPoints) > 0 {
 		debugVerts := make([]ebiten.Vertex, 0)
 		debugIndices := make([]uint16, 0)
 		red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
 		yellow := color.RGBA{R: 255, G: 255, B: 0, A: 255}
 
-		// Draw points
+		// Draw points as small red squares.
 		for _, p := range self.debugPoints {
 			v1 := p.Add(ebimath.V(-2, -2))
 			v2 := p.Add(ebimath.V(2, -2))
@@ -271,7 +278,7 @@ func (self *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
 			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
 		}
 
-		// Draw lines
+		// Draw lines as thin yellow segments.
 		for i := 0; i < len(self.debugPoints)-1; i++ {
 			p1 := self.debugPoints[i]
 			p2 := self.debugPoints[i+1]
@@ -298,7 +305,7 @@ func (self *Line) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
 	}
 }
 
-// GetBounds calculates the bounding rectangle of the line, including its width.
+// GetBounds calculates the bounding rectangle of the line, taking its width into account.
 func (self *Line) GetBounds() image.Rectangle {
 	if len(self.points) == 0 {
 		return image.Rectangle{}
@@ -311,11 +318,12 @@ func (self *Line) GetBounds() image.Rectangle {
 		maxX = math.Max(maxX, p.X)
 		maxY = math.Max(maxY, p.Y)
 	}
-	// Add width to bounds
+	// Expand the bounds by half the line width to ensure the entire line is contained.
 	h_width := self.width / 2
 	return image.Rect(int(minX-h_width), int(minY-h_width), int(maxX+h_width), int(maxY+h_width))
 }
 
+// Reset clears the line's points and mesh data.
 func (self *Line) Reset() {
 	self.points = self.points[:0]
 	self.resetMesh()
@@ -328,7 +336,8 @@ func (self *Line) resetMesh() {
 	self.isDirty = true
 }
 
-// -- new
+// generateSplinePoints creates a new set of points from the original points
+// by interpolating a smooth Catmull-Rom spline.
 func (self *Line) generateSplinePoints(points []ebimath.Vector, precision int) []ebimath.Vector {
 	if len(points) < 2 {
 		return points
@@ -359,6 +368,8 @@ func (self *Line) generateSplinePoints(points []ebimath.Vector, precision int) [
 	return newPoints
 }
 
+// resamplePoints creates a new slice of points with a uniform distance between them.
+// This is useful for effects like dashed lines or uniform texture tiling.
 func (self *Line) resamplePoints(points []ebimath.Vector, step float64) []ebimath.Vector {
 	if len(points) < 2 || step <= 0 {
 		return points

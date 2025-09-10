@@ -9,39 +9,70 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// GridCornerJoinType defines the type of join to use for the corners of a grid.
+// This allows for different visual styles like sharp corners, beveled edges, or rounded joints.
 type GridCornerJoinType int
 
 const (
+	// GridCornerSharp creates a sharp, pointed corner where two lines meet.
 	GridCornerSharp GridCornerJoinType = iota
+	// GridCornerBevel creates a beveled or flat corner, effectively cutting off the sharp point.
 	GridCornerBevel
+	// GridCornerRound creates a smooth, rounded corner using an arc.
 	GridCornerRound
 )
 
 // GridLine represents a grid of lines that can be rendered efficiently in a single draw call.
+// The grid is built as a mesh of triangles, which can be transformed and drawn as a single unit.
 type GridLine struct {
-	vertices            []ebiten.Vertex
-	indices             []uint16
-	whiteDot            *ebiten.Image
-	position            ebimath.Vector
-	size                int
-	rows                int
-	cols                int
-	thickness           float64
-	color               color.RGBA
-	rotation            float64
-	scale               ebimath.Vector
+	// vertices holds the slice of ebiten.Vertex objects that make up the grid's mesh.
+	vertices []ebiten.Vertex
+	// indices holds the slice of uint16 indices that define the triangles from the vertices slice.
+	indices []uint16
+	// whiteDot is a single-pixel image used as a texture for drawing the colored vertices.
+	whiteDot *ebiten.Image
+
+	// position is the top-left coordinate of the grid in the world.
+	position ebimath.Vector
+	// size is the pixel size of a single cell in the grid (e.g., a 10x10 grid with a size of 10 would be 100x100 pixels).
+	size int
+	// rows is the number of horizontal grid lines.
+	rows int
+	// cols is the number of vertical grid lines.
+	cols int
+	// thickness is the width of the grid lines in pixels.
+	thickness float64
+	// color is the single color applied to the entire grid if color interpolation is not used.
+	color color.RGBA
+
+	// rotation is the angle of rotation for the entire grid in radians.
+	rotation float64
+	// scale is the scaling vector applied to the grid along the X and Y axes.
+	scale ebimath.Vector
+
+	// isColorInterpolated determines if color interpolation is enabled.
 	isColorInterpolated bool
-	topLeftColor        color.RGBA
-	topRightColor       color.RGBA
-	bottomLeftColor     color.RGBA
-	bottomRightColor    color.RGBA
-	cornerTL            GridCornerJoinType
-	cornerTR            GridCornerJoinType
-	cornerBL            GridCornerJoinType
-	cornerBR            GridCornerJoinType
+	// topLeftColor is the color for the top-left corner for color interpolation.
+	topLeftColor color.RGBA
+	// topRightColor is the color for the top-right corner for color interpolation.
+	topRightColor color.RGBA
+	// bottomLeftColor is the color for the bottom-left corner for color interpolation.
+	bottomLeftColor color.RGBA
+	// bottomRightColor is the color for the bottom-right corner for color interpolation.
+	bottomRightColor color.RGBA
+
+	// cornerTL specifies the join type for the top-left corner.
+	cornerTL GridCornerJoinType
+	// cornerTR specifies the join type for the top-right corner.
+	cornerTR GridCornerJoinType
+	// cornerBL specifies the join type for the bottom-left corner.
+	cornerBL GridCornerJoinType
+	// cornerBR specifies the join type for the bottom-right corner.
+	cornerBR GridCornerJoinType
 }
 
 // NewGridLine creates a new grid with the specified dimensions and properties.
+// It initializes the object and builds the initial mesh geometry.
 func NewGridLine(position ebimath.Vector, size, rows, cols int, thick float64) *GridLine {
 	g := &GridLine{
 		position:  position,
@@ -60,21 +91,28 @@ func NewGridLine(position ebimath.Vector, size, rows, cols int, thick float64) *
 		cornerBL:  GridCornerSharp,
 		cornerBR:  GridCornerSharp,
 	}
+	// The single-pixel image is filled with white, and the vertex colors will tint it.
 	g.whiteDot.Fill(color.White)
+	// Build the initial mesh from the given properties.
 	g.buildMesh()
 	return g
 }
 
+// buildMesh regenerates the entire vertex and index mesh for the grid.
+// This function is called whenever a property that affects the grid's geometry (like position, size, or color) is changed.
 func (self *GridLine) buildMesh() {
+	// Clear existing mesh data to rebuild from scratch.
 	self.vertices = self.vertices[:0]
 	self.indices = self.indices[:0]
 
+	// Calculate the total dimensions of the grid.
 	_ = self.thickness / 2.0
 	totalWidth := float64(self.cols * self.size)
 	totalHeight := float64(self.rows * self.size)
 	center := ebimath.V(totalWidth/2, totalHeight/2)
 
 	// Inner Horizontal lines
+	// Add line segments for all internal horizontal grid lines.
 	for i := 1; i < self.rows; i++ {
 		p1 := ebimath.Vector{X: 0, Y: float64(i * self.size)}
 		p2 := ebimath.Vector{X: totalWidth, Y: float64(i * self.size)}
@@ -82,6 +120,7 @@ func (self *GridLine) buildMesh() {
 	}
 
 	// Inner Vertical lines
+	// Add line segments for all internal vertical grid lines.
 	for i := 1; i < self.cols; i++ {
 		p1 := ebimath.Vector{X: float64(i * self.size), Y: 0}
 		p2 := ebimath.Vector{X: float64(i * self.size), Y: totalHeight}
@@ -89,27 +128,25 @@ func (self *GridLine) buildMesh() {
 	}
 
 	// Outer lines
-	// Top horizontal
+	// Add line segments for the four outer boundary lines of the grid.
 	p1 := ebimath.V(0, 0)
 	p2 := ebimath.V(totalWidth, 0)
 	self.addLine(p1, p2, center)
 
-	// Bottom horizontal
 	p1 = ebimath.V(0, totalHeight)
 	p2 = ebimath.V(totalWidth, totalHeight)
 	self.addLine(p1, p2, center)
 
-	// Left vertical
 	p1 = ebimath.V(0, 0)
 	p2 = ebimath.V(0, totalHeight)
 	self.addLine(p1, p2, center)
 
-	// Right vertical
 	p1 = ebimath.V(totalWidth, 0)
 	p2 = ebimath.V(totalWidth, totalHeight)
 	self.addLine(p1, p2, center)
 
 	// Add joints for corners
+	// Add the appropriate corner geometry based on the specified corner join types.
 	corner := ebimath.V(0, 0)
 	clr := self.getColor(corner)
 	dirIn := ebimath.V(0, -1)
@@ -135,6 +172,8 @@ func (self *GridLine) buildMesh() {
 	self.addJoint(corner, dirIn, dirOut, self.cornerBL, clr, center)
 }
 
+// addJoint creates the triangles needed to form the specified corner joint type.
+// It handles sharp, bevel, and round joints.
 func (self *GridLine) addJoint(corner, dirIn, dirOut ebimath.Vector, joinType GridCornerJoinType, clr color.RGBA, cntr ebimath.Vector) {
 	dirAB := dirIn.Normalize()
 	dirBC := dirOut.Normalize()
@@ -185,11 +224,14 @@ func (self *GridLine) addJoint(corner, dirIn, dirOut ebimath.Vector, joinType Gr
 	}
 }
 
+// addTriangleLocal adds a single triangle to the grid's mesh, applying local transformations and color data.
 func (self *GridLine) addTriangleLocal(v1, v2, v3 ebimath.Vector, c1, c2, c3 color.RGBA, center ebimath.Vector) {
+	// Apply transformations (scale, rotation, position) to each vertex.
 	v1t := self.transformPos(v1, center)
 	v2t := self.transformPos(v2, center)
 	v3t := self.transformPos(v3, center)
 
+	// Convert RGBA colors to a float32 representation (0.0 - 1.0) for the vertices.
 	r1, g1, b1, a1 := c1.R, c1.G, c1.B, c1.A
 	cr1, cg1, cb1, ca1 := float32(r1)/255, float32(g1)/255, float32(b1)/255, float32(a1)/255
 	r2, g2, b2, a2 := c2.R, c2.G, c2.B, c2.A
@@ -197,19 +239,25 @@ func (self *GridLine) addTriangleLocal(v1, v2, v3 ebimath.Vector, c1, c2, c3 col
 	r3, g3, b3, a3 := c3.R, c3.G, c3.B, c3.A
 	cr3, cg3, cb3, ca3 := float32(r3)/255, float32(g3)/255, float32(b3)/255, float32(a3)/255
 
+	// Get the current index for the first vertex to define the new triangle.
 	idx := uint16(len(self.vertices))
 
+	// Append the three new vertices to the main vertices slice.
 	self.vertices = append(self.vertices,
 		ebiten.Vertex{DstX: float32(v1t.X), DstY: float32(v1t.Y), ColorR: cr1, ColorG: cg1, ColorB: cb1, ColorA: ca1, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v2t.X), DstY: float32(v2t.Y), ColorR: cr2, ColorG: cg2, ColorB: cb2, ColorA: ca2, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v3t.X), DstY: float32(v3t.Y), ColorR: cr3, ColorG: cg3, ColorB: cb3, ColorA: ca3, SrcX: 0, SrcY: 0},
 	)
+	// Append the indices to define the new triangle from the appended vertices.
 	self.indices = append(self.indices, idx, idx+1, idx+2)
 }
 
+// newArc generates the triangles for a rounded corner. It uses a series of small triangles to approximate a smooth arc.
 func (self *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float64, clr color.RGBA, center ebimath.Vector) {
 	radius := vbegin.Length()
+	// Define the step size for the arc's segments.
 	angleStep := math.Pi / 8.0
+	// Calculate the number of steps needed to draw the arc.
 	steps := int(math.Abs(angleDelta) / angleStep)
 	if angleDelta < 0 {
 		angleStep = -angleStep
@@ -219,12 +267,16 @@ func (self *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float6
 	r, gcol, b, a := clr.R, clr.G, clr.B, clr.A
 	cr, cg, cb, ca := float32(r)/255, float32(gcol)/255, float32(b)/255, float32(a)/255
 
+	// Store the current vertex count to use as a starting index for the new triangles.
 	vi := len(self.vertices)
+	// Add the center of the arc as the first vertex.
 	centert := self.transformPos(centerPos, center)
 	self.vertices = append(self.vertices, ebiten.Vertex{DstX: float32(centert.X), DstY: float32(centert.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca, SrcX: 0, SrcY: 0})
 
+	// Generate vertices along the arc's curve.
 	for i := 0; i <= steps; i++ {
 		angle := t + angleStep*float64(i)
+		// Ensure the last angle is exactly angleDelta to prevent minor inaccuracies.
 		if i == steps {
 			angle = t + angleDelta
 		}
@@ -233,16 +285,21 @@ func (self *GridLine) newArc(centerPos, vbegin ebimath.Vector, angleDelta float6
 		self.vertices = append(self.vertices, ebiten.Vertex{DstX: float32(rpost.X), DstY: float32(rpost.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca, SrcX: 0, SrcY: 0})
 	}
 
+	// Create triangles by connecting the center vertex to pairs of arc vertices.
 	for i := 0; i < steps; i++ {
 		self.indices = append(self.indices, uint16(vi), uint16(vi+i+1), uint16(vi+i+2))
 	}
 }
 
+// transformPos applies the grid's scale, rotation, and position to a given local vector.
 func (self *GridLine) transformPos(pos, center ebimath.Vector) ebimath.Vector {
+	// Transform in the following order: scale, rotate, then translate.
 	scaledCenter := center.Scale(self.scale)
 	return pos.Scale(self.scale).Sub(scaledCenter).Rotate(self.rotation).Add(scaledCenter).Add(self.position)
 }
 
+// addLine generates and adds the vertices and indices for a single thick line segment to the grid's mesh.
+// A line is represented as a rectangle made of two triangles.
 func (self *GridLine) addLine(p1, p2, center ebimath.Vector) {
 	halfThick := self.thickness / 2.0
 	dir := p2.Sub(p1)
@@ -252,16 +309,19 @@ func (self *GridLine) addLine(p1, p2, center ebimath.Vector) {
 	dir = dir.Normalize()
 	normal := dir.Orthogonal()
 
+	// Calculate the four corners of the line rectangle.
 	lv1 := p1.Add(normal.ScaleF(halfThick))
 	lv2 := p1.Sub(normal.ScaleF(halfThick))
 	lv3 := p2.Add(normal.ScaleF(halfThick))
 	lv4 := p2.Sub(normal.ScaleF(halfThick))
 
+	// Transform the local coordinates to world coordinates.
 	v1 := self.transformPos(lv1, center)
 	v2 := self.transformPos(lv2, center)
 	v3 := self.transformPos(lv3, center)
 	v4 := self.transformPos(lv4, center)
 
+	// Determine the color for each vertex, either a single color or an interpolated one.
 	var c1, c2, c3, c4 color.RGBA
 	if self.isColorInterpolated {
 		totalWidth := float64(self.cols * self.size)
@@ -274,6 +334,7 @@ func (self *GridLine) addLine(p1, p2, center ebimath.Vector) {
 		c1, c2, c3, c4 = self.color, self.color, self.color, self.color
 	}
 
+	// Convert colors to float32.
 	r1, g1, b1, a1 := c1.R, c1.G, c1.B, c1.A
 	cr1, cg1, cb1, ca1 := float32(r1)/255, float32(g1)/255, float32(b1)/255, float32(a1)/255
 	r2, g2, b2, a2 := c2.R, c2.G, c2.B, c2.A
@@ -283,17 +344,22 @@ func (self *GridLine) addLine(p1, p2, center ebimath.Vector) {
 	r4, g4, b4, a4 := c4.R, c4.G, c4.B, c4.A
 	cr4, cg4, cb4, ca4 := float32(r4)/255, float32(g4)/255, float32(b4)/255, float32(a4)/255
 
+	// Get the starting index for the new vertices.
 	idx := uint16(len(self.vertices))
 
+	// Append the four vertices for the line rectangle.
 	self.vertices = append(self.vertices,
 		ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: cr1, ColorG: cg1, ColorB: cb1, ColorA: ca1, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: cr2, ColorG: cg2, ColorB: cb2, ColorA: ca2, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: cr3, ColorG: cg3, ColorB: cb3, ColorA: ca3, SrcX: 0, SrcY: 0},
 		ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: cr4, ColorG: cg4, ColorB: cb4, ColorA: ca4, SrcX: 0, SrcY: 0},
 	)
+	// Append the six indices to form two triangles from the four vertices.
 	self.indices = append(self.indices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
 }
 
+// getColor returns the color for a given position on the grid.
+// If color interpolation is enabled, it calculates the interpolated color; otherwise, it returns the single grid color.
 func (self *GridLine) getColor(pos ebimath.Vector) color.RGBA {
 	if !self.isColorInterpolated {
 		return self.color
@@ -303,44 +369,55 @@ func (self *GridLine) getColor(pos ebimath.Vector) color.RGBA {
 	return self.calculateInterpolatedColor(pos, totalWidth, totalHeight)
 }
 
+// calculateInterpolatedColor performs bilinear interpolation to determine the color at a given position within the grid.
+// The interpolation is based on the four corner colors.
 func (self *GridLine) calculateInterpolatedColor(pos ebimath.Vector, totalWidth, totalHeight float64) color.RGBA {
+	// Calculate the normalized position (0.0 to 1.0) of the point within the grid.
 	tx := pos.X / totalWidth
 	ty := pos.Y / totalHeight
 
+	// Clamp the normalized coordinates to ensure they are within the 0.0 to 1.0 range.
 	tx = math.Max(0, math.Min(1, tx))
 	ty = math.Max(0, math.Min(1, ty))
 
+	// Perform linear interpolation horizontally (top colors and bottom colors).
 	topColor := utils.LerpPremultipliedRGBA(self.topLeftColor, self.topRightColor, tx)
 	bottomColor := utils.LerpPremultipliedRGBA(self.bottomLeftColor, self.bottomRightColor, tx)
+	// Perform linear interpolation vertically on the results to get the final color.
 	finalColor := utils.LerpPremultipliedRGBA(topColor, bottomColor, ty)
 	return finalColor
 }
 
-// SetColor sets the color of the grid.
+// SetColor sets the single, uniform color for the grid.
+// It also triggers a rebuild of the mesh to apply the new color.
 func (self *GridLine) SetColor(c color.RGBA) {
 	self.color = c
 	self.buildMesh()
 }
 
-// SetPosition sets the position of the grid.
+// SetPosition sets the top-left position of the grid.
+// This triggers a rebuild of the mesh to apply the new position.
 func (self *GridLine) SetPosition(pos ebimath.Vector) {
 	self.position = pos
 	self.buildMesh()
 }
 
-// SetRotation sets the rotation of the grid.
+// SetRotation sets the rotation angle for the grid in radians.
+// This triggers a rebuild of the mesh to apply the new rotation.
 func (self *GridLine) SetRotation(angle float64) {
 	self.rotation = angle
 	self.buildMesh()
 }
 
-// SetScale sets the scale of the grid.
+// SetScale sets the scaling factor for the grid along the X and Y axes.
+// This triggers a rebuild of the mesh to apply the new scale.
 func (self *GridLine) SetScale(scale ebimath.Vector) {
 	self.scale = scale
 	self.buildMesh()
 }
 
 // InterpolateColor sets the corner colors for gradient interpolation across the grid.
+// It also enables color interpolation and triggers a mesh rebuild.
 func (self *GridLine) InterpolateColor(topLeft, topRight, bottomLeft, bottomRight color.RGBA) {
 	self.isColorInterpolated = true
 	self.topLeftColor = topLeft
@@ -351,6 +428,7 @@ func (self *GridLine) InterpolateColor(topLeft, topRight, bottomLeft, bottomRigh
 }
 
 // SetCornerJoin sets the join types for the four corners of the grid.
+// This triggers a mesh rebuild to apply the new corner styles.
 func (self *GridLine) SetCornerJoin(tl, tr, bl, br GridCornerJoinType) {
 	self.cornerTL = tl
 	self.cornerTR = tr
@@ -359,10 +437,13 @@ func (self *GridLine) SetCornerJoin(tl, tr, bl, br GridCornerJoinType) {
 	self.buildMesh()
 }
 
-// Draw renders the grid to the screen.
+// Draw renders the grid's mesh to the screen using a single DrawTriangles call.
+// This is an efficient way to draw a large number of lines.
 func (self *GridLine) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
+	// Avoid drawing if there are no vertices in the mesh.
 	if len(self.vertices) == 0 {
 		return
 	}
+	// Use ebiten's optimized triangle drawing function.
 	screen.DrawTriangles(self.vertices, self.indices, self.whiteDot, op)
 }
