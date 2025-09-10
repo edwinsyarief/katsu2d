@@ -247,11 +247,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		} else if totalSway < -maxSway {
 			totalSway = -maxSway
 		}
-		grass.CurrentSway = lerp(grass.CurrentSway, totalSway, 1-math.Pow(0.001, dt))
+		grass.CurrentSway = ebimath.Lerp(grass.CurrentSway, totalSway, 1-math.Pow(0.001, dt))
 		transform.SetRotation(grass.CurrentSway)
 	}
-}
-
-func lerp(a, b, t float64) float64 {
-	return a + t*(b-a)
 }
