@@ -76,16 +76,29 @@ func getDefaultPivot(pivot ebimath.Vector) ebimath.Vector {
 func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerComponent,
 	foliage *FoliageComponent, minY float32, height float64, pivot ebimath.Vector) {
 
+	swayFreq := 1.0 + controller.noise.Noise3D(foliage.SwaySeed, 0, 0)*0.2
+
 	for i, baseVertex := range sprite.baseVertices {
 		normalizedY := (baseVertex.DstY - minY) / float32(height)
 		swayFactor := math.Pow(math.Abs(float64(normalizedY)-pivot.Y), 1.5)
 
 		// Calculate wind displacement
-		swayNoise := controller.noise.Noise3D(controller.windTime*controller.windSpeed*0.1+foliage.SwaySeed, 0, 0)
-		rippleNoise := controller.noise.Noise3D(controller.windTime*controller.windSpeed+float64(baseVertex.DstX)*0.05, 0, 0)
-		swayValue := math.Sin(controller.windTime*controller.windSpeed*0.1 + swayNoise*10)
+		swayNoise := controller.noise.Noise3D(controller.windTime*controller.windSpeed*0.1*swayFreq+foliage.SwaySeed, 0, 0)
 
-		displacement := (swayValue * controller.windForce) + (rippleNoise * controller.rippleStrength)
+		// Primary ripple: a smooth wave traveling with the wind.
+		dotProduct := controller.windDirection.X*float64(baseVertex.DstX) + controller.windDirection.Y*float64(baseVertex.DstY)
+		ripplePhase := controller.windTime*controller.windSpeed*2.0 - dotProduct*0.05
+		primaryRipple := math.Sin(ripplePhase)
+
+		// Secondary ripple: slower, more subtle Perlin noise to add randomness.
+		secondaryRipple := controller.noise.Noise3D(controller.windTime*controller.windSpeed*0.5, float64(baseVertex.DstX)*0.02, float64(baseVertex.DstY)*0.02)
+
+		// Combine the ripples.
+		rippleNoise := primaryRipple*0.7 + secondaryRipple*0.3
+
+		swayValue := math.Sin(controller.windTime*controller.windSpeed*0.1*swayFreq + foliage.SwaySeed + swayNoise*10)
+
+		displacement := (swayValue*0.25+0.75)*controller.windForce + rippleNoise*controller.rippleStrength
 
 		// Calculate final displacement
 		dispX := calculateDisplacement(displacement, swayFactor, controller.windDirection.X)
@@ -100,10 +113,9 @@ func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerCompo
 func calculateDisplacement(displacement, swayFactor, direction float64) float64 {
 	disp := displacement * swayFactor * direction
 	if direction > 0 {
-		return math.Abs(disp)
-	}
-	if direction < 0 && disp > 0 {
-		return -disp
+		return math.Max(0, disp)
+	} else if direction < 0 {
+		return math.Min(0, disp)
 	}
 	return disp
 }
