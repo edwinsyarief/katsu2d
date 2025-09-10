@@ -15,6 +15,7 @@ type GrassComponent struct {
 	InteractionSway  float64
 	SwayVelocity     float64
 	AccumulatedForce float64
+	CurrentSway      float64
 }
 
 type ForceSource struct {
@@ -221,6 +222,7 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 						SwaySeed:        rand.Float64() * 2 * math.Pi,
 						InteractionSway: 0,
 						SwayVelocity:    0,
+						CurrentSway:     0,
 					}
 					entity := world.CreateEntity()
 					transform := NewTransformComponent()
@@ -270,7 +272,7 @@ func (self *GrassControllerComponent) getWindForceAt(x, y float64) float64 {
 }
 
 // SetForcePositions updates the external force sources affecting the grass.
-func (self *GrassControllerComponent) SetForcePositions(sources []ForceSource) {
+func (self *GrassControllerComponent) SetForcePositions(sources ...ForceSource) {
 	self.externalForceSources = sources
 }
 
