@@ -282,10 +282,17 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					}
 
 					img := self.tm.Get(textureID)
-					// Set the sprite's offset so that the base of the grass blade is at the correct position.
-					transform.SetOffset(ebimath.V(float64(img.Bounds().Dx())/2, float64(img.Bounds().Dy())))
-
 					sprite := NewSpriteComponent(textureID, img.Bounds())
+
+					// Manually adjust the vertices to set the anchor to the bottom-center.
+					// This ensures the physics position (at the base) aligns with the visual representation.
+					sprite.GenerateMesh()
+					offsetX := float32(img.Bounds().Dx()) / 2
+					offsetY := float32(img.Bounds().Dy())
+					for i := range sprite.Vertices {
+						sprite.Vertices[i].DstX -= offsetX
+						sprite.Vertices[i].DstY -= offsetY
+					}
 
 					// Add all necessary components to the new grass entity.
 					world.AddComponent(entity, grassComp)
