@@ -2,8 +2,10 @@ package katsu2d
 
 import (
 	"math"
+	"time"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/edwinsyarief/katsu2d/opensimplex"
 	"github.com/edwinsyarief/katsu2d/utils"
 )
 
@@ -94,14 +96,13 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 	particleData.InitialColor = utils.GetInterpolatedColor(emitter.InitialColorMin, emitter.InitialColorMax)
 	particleData.TargetColor = utils.GetInterpolatedColor(emitter.TargetColorMin, emitter.TargetColorMax)
 	particleData.InitialScale = particleTransform.Scale().X
-	if emitter.EnableScaling {
-		particleData.TargetScale = ebimath.Lerp(emitter.TargetScaleMin, emitter.TargetScaleMax, self.r.Float64())
-	} else {
-		particleData.TargetScale = particleData.InitialScale
-	}
+	particleData.TargetScale = ebimath.Lerp(emitter.TargetScaleMin, emitter.TargetScaleMax, self.r.Float64())
 	particleData.InitialRotation = particleTransform.Rotation()
 	particleData.TargetRotation = ebimath.Lerp(emitter.EndRotationMin, emitter.EndRotationMax, self.r.Float64())
+	particleData.RotationSpeed = ebimath.Lerp(emitter.RotationSpeedMin, emitter.RotationSpeedMax, self.r.Float64())
 	particleData.Gravity = emitter.Gravity
+	particleData.NoiseOffsetX = self.r.Float64() * 1000
+	particleData.NoiseOffsetY = self.r.Float64() * 1000
 
 	particleSprite.TextureID = texID
 	particleSprite.Color = particleData.InitialColor
@@ -118,36 +119,100 @@ func (self *ParticleEmitterSystem) spawnParticle(world *World, emitterEntity Ent
 }
 
 // ParticleUpdateSystem is an UpdateSystem that handles the movement and lifecycle of particles.
-type ParticleUpdateSystem struct{}
+type ParticleUpdateSystem struct {
+	noise opensimplex.Noise
+	time  float64
+}
 
 // NewParticleUpdateSystem creates a new system for updating particles.
 func NewParticleUpdateSystem() *ParticleUpdateSystem {
-	return &ParticleUpdateSystem{}
+	return &ParticleUpdateSystem{
+		noise: opensimplex.New(time.Now().Unix()),
+	}
 }
 
 // Update implements the UpdateSystem interface.
 func (self *ParticleUpdateSystem) Update(world *World, dt float64) {
+	self.time += dt
 	var toRemove []Entity
-	for _, entity := range world.Query(CTTransform, CTParticle, CTSprite) {
+	for _, entity := range world.Query(CTTransform, CTParticle, CTSprite, CTParent) {
 		transform, _ := world.GetComponent(entity, CTTransform)
 		t := transform.(*TransformComponent)
 		particle, _ := world.GetComponent(entity, CTParticle)
 		p := particle.(*ParticleComponent)
 		sprite, _ := world.GetComponent(entity, CTSprite)
 		s := sprite.(*SpriteComponent)
+		parent, _ := world.GetComponent(entity, CTParent)
+		parentComponent := parent.(*ParentComponent)
+		emitter, ok := world.GetComponent(parentComponent.Parent, CTParticleEmitter)
+		if !ok {
+			continue
+		}
+		em := emitter.(*ParticleEmitterComponent)
 
 		p.Velocity = p.Velocity.Add(p.Gravity.ScaleF(dt))
+
+		switch em.DirectionMode {
+		case ParticleDirectionModeZigZag:
+			perp := ebimath.V(-p.Velocity.Y, p.Velocity.X).Normalize()
+			zigZag := math.Sin(self.time*em.ZigZagFrequency) * em.ZigZagMagnitude
+			p.Velocity = p.Velocity.Add(perp.ScaleF(zigZag))
+		case ParticleDirectionModeNoise:
+			noiseValX := self.noise.Eval2(p.NoiseOffsetX, self.time*em.NoiseFactor)
+			noiseValY := self.noise.Eval2(p.NoiseOffsetY, self.time*em.NoiseFactor)
+			p.Velocity = p.Velocity.Add(ebimath.V(noiseValX, noiseValY))
+		}
+
 		t.SetPosition(t.Position().Add(p.Velocity.ScaleF(dt)))
 		p.Lifetime -= dt
 
 		tp := 1.0 - (p.Lifetime / p.TotalLifetime)
-		s.Color = utils.LerpPremultipliedRGBA(p.InitialColor, p.TargetColor, tp)
 
-		t.SetScale(ebimath.V(
-			ebimath.Lerp(p.InitialScale, p.TargetScale, tp),
-			ebimath.Lerp(p.InitialScale, p.TargetScale, tp),
-		))
-		t.SetRotation(ebimath.Lerp(p.InitialRotation, p.TargetRotation, tp))
+		// Fading
+		initialA := p.InitialColor.A
+		targetA := p.TargetColor.A
+		var currentA uint8
+		switch em.FadeMode {
+		case ParticleFadeModeFadeIn:
+			currentA = uint8(ebimath.Lerp(0, float64(initialA), tp))
+		case ParticleFadeModeFadeOut:
+			currentA = uint8(ebimath.Lerp(float64(initialA), float64(targetA), tp))
+		case ParticleFadeModeFadeInOut:
+			if tp < 0.5 {
+				currentA = uint8(ebimath.Lerp(0, float64(initialA), tp*2))
+			} else {
+				currentA = uint8(ebimath.Lerp(float64(initialA), float64(targetA), (tp-0.5)*2))
+			}
+		default: // ParticleFadeModeNone
+			currentA = initialA
+		}
+		s.Color = utils.LerpPremultipliedRGBA(p.InitialColor, p.TargetColor, tp)
+		s.Color.A = currentA
+
+		// Scaling
+		var currentScale float64
+		switch em.ScaleMode {
+		case ParticleScaleModeScaleIn:
+			currentScale = ebimath.Lerp(0, p.InitialScale, tp)
+		case ParticleScaleModeScaleOut:
+			currentScale = ebimath.Lerp(p.InitialScale, p.TargetScale, tp)
+		case ParticleScaleModeScaleInOut:
+			if tp < 0.5 {
+				currentScale = ebimath.Lerp(0, p.InitialScale, tp*2)
+			} else {
+				currentScale = ebimath.Lerp(p.InitialScale, p.TargetScale, (tp-0.5)*2)
+			}
+		default: // ParticleScaleModeNone
+			currentScale = p.InitialScale
+		}
+		t.SetScale(ebimath.V(currentScale, currentScale))
+
+		// Rotation
+		if em.RotationSpeedMin != 0 || em.RotationSpeedMax != 0 {
+			t.SetRotation(t.Rotation() + p.RotationSpeed*dt)
+		} else {
+			t.SetRotation(ebimath.Lerp(p.InitialRotation, p.TargetRotation, tp))
+		}
 
 		if p.Lifetime <= 0 {
 			toRemove = append(toRemove, entity)

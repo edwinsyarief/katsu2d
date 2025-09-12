@@ -20,6 +20,9 @@ type ParticleComponent struct {
 	TargetScale       float64        // Final scale the particle will grow/shrink to
 	InitialRotation   float64        // Starting rotation angle in radians
 	TargetRotation    float64        // Final rotation angle the particle will rotate to
+	RotationSpeed     float64        // Speed of rotation
+	NoiseOffsetX      float64        // Noise offset for random direction
+	NoiseOffsetY      float64        // Noise offset for random direction
 }
 
 // ParticleEmitterComponent manages the emission and properties of multiple particles
@@ -40,7 +43,6 @@ type ParticleEmitterComponent struct {
 	InitialColorMin, InitialColorMax color.RGBA // Starting color range
 	TargetColorMin, TargetColorMax   color.RGBA // Ending color range
 
-	FadeOut    bool           // Whether particles should fade out over lifetime
 	Gravity    ebimath.Vector // Gravity force applied to particles
 	TextureIDs []int          // Available textures for particles
 	BlendMode  ebiten.Blend   // How particles blend with the background
@@ -48,11 +50,23 @@ type ParticleEmitterComponent struct {
 	// Scale ranges for particles
 	MinScale, MaxScale             float64 // Initial scale range
 	TargetScaleMin, TargetScaleMax float64 // Final scale range
-	EnableScaling                  bool    // Whether particles should scale out over lifetime
 
 	// Rotation ranges for particles (in radians)
-	MinRotation, MaxRotation       float64 // Initial rotation range
-	EndRotationMin, EndRotationMax float64 // Final rotation range
+	MinRotation, MaxRotation           float64 // Initial rotation range
+	EndRotationMin, EndRotationMax     float64 // Final rotation range
+	RotationSpeedMin, RotationSpeedMax float64
+
+	// Fade, Scale, Direction modes
+	FadeMode      ParticleFadeMode
+	ScaleMode     ParticleScaleMode
+	DirectionMode ParticleDirectionMode
+
+	// ZigZag movement properties
+	ZigZagFrequency float64
+	ZigZagMagnitude float64
+
+	// Noise movement properties
+	NoiseFactor float64
 
 	// Internal state
 	lastEmitTime time.Time // Tracks last particle emission time
@@ -80,5 +94,9 @@ func NewParticleEmitterComponent(textureIDs []int) *ParticleEmitterComponent {
 		MaxRotation:    0,
 		EndRotationMin: 0,
 		EndRotationMax: 0,
+		// Default modes
+		FadeMode:      ParticleFadeModeNone,
+		ScaleMode:     ParticleScaleModeNone,
+		DirectionMode: ParticleDirectionModeLinear,
 	}
 }
