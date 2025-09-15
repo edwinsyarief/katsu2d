@@ -43,6 +43,8 @@ go get github.com/edwinsyarief/katsu2d
 
 Here is the example repo: [https://github.com/edwinsyarief/katsu2d-simple-demo](https://github.com/edwinsyarief/katsu2d-simple-demo)
 
+Various examples repo: [https://github.com/edwinsyarief/katsu2d-examples](https://github.com/edwinsyarief/katsu2d-examples)
+
 #### Screenshot
 
 ![Simple Demo](./screenshot.png)
@@ -59,9 +61,119 @@ The `katsu2d.NewEngine` function accepts various Option functions to configure t
 - `katsu2d.WithCursorMode(ebiten.CursorModeType)`: Overrides the default cursor mode.
 - `katsu2d.WithClearScreenEachFrame(bool)`: Overrides the default clear screen every frame.
 
+### Managing Assets (Textures and Fonts)
+
+It's a common and recommended practice to load all your necessary assets, like images and fonts, when the game first starts. This prevents stuttering and lag during gameplay that can be caused by loading files from disk.
+
+Katsu2D provides a `TextureManager` and a `FontManager` accessible from the `Engine` object. You can use these to load your assets and get back a numeric ID for each one. You can then store these IDs in a global `assets` package or struct for easy access throughout your game.
+
+Here is an example of a function that loads several assets at initialization:
+
+```go
+// A struct to hold all our asset IDs
+var (
+    EbitengineLogoTextureID int
+    DefaultFontID           int
+    // ... add more asset IDs here
+)
+
+func loadAssets(e *katsu2d.Engine) {
+    // Load textures and get their IDs
+    EbitengineLogoTextureID = e.TextureManager().LoadEmbedded("embedded/images/ebitengine_logo.png")
+    
+    // Load fonts and get their IDs
+    DefaultFontID = e.FontManager().LoadEmbedded("embedded/fonts/default.ttf")
+}
+```
+
+By calling a function like this at startup, you can refer to your assets using the stored IDs (e.g., `assets.EbitengineLogoTextureID`) when creating components later.
+
 ### Working with Entities and Components
 
-TODO
+The ECS (Entity Component System) is the core of Katsu2D. It allows you to organize your game objects in a data-oriented way, which is great for performance and keeping your code clean.
+
+#### Creating an Entity
+
+An entity is just a unique ID. You can create one using the `world.CreateEntity()` method:
+
+```go
+// Assuming 'world' is your *katsu2d.World instance
+entity := world.CreateEntity()
+```
+
+#### Adding a Component
+
+Once you have an entity, you can add components to it using constructor functions.
+
+**TransformComponent:**
+The `TransformComponent` manages an entity's position, scale, and rotation.
+
+```go
+// Create a new transform component
+t := katsu2d.NewTransformComponent()
+// Set its position in the world
+t.SetPosition(ebimath.V(consts.WindowWidth/2, consts.WindowHeight/2))
+// Add the component to the entity
+world.AddComponent(entity, t)
+```
+
+**SpriteComponent:**
+The `SpriteComponent` allows an entity to be rendered as a sprite. It requires a `textureID` that you get from the `TextureManager` when you load your assets.
+
+```go
+// Get the texture info from the manager
+// (Assuming EbitengineLogoTextureID was loaded as shown in the "Managing Assets" section)
+textureInfo := e.TextureManager().Get(EbitengineLogoTextureID)
+
+// Create the sprite component using the texture ID and the texture's bounds
+s := katsu2d.NewSpriteComponent(EbitengineLogoTextureID, textureInfo.Bounds())
+
+// Add the component to the entity
+world.AddComponent(entity, s)
+```
+
+#### Component IDs
+
+For operations like removing components or querying entities, you need a way to refer to a component's *type*. Katsu2D provides a set of built-in constants for this purpose. Each constant represents a unique `ComponentID`.
+
+Here are some of the most common ones:
+
+- `katsu2d.CTTransform`: ID for `TransformComponent`
+- `katsu2d.CTSprite`: ID for `SpriteComponent`
+- `katsu2d.CTAnimation`: ID for `AnimationComponent`
+- `katsu2d.CTText`: ID for `TextComponent`
+- `katsu2d.CTInput`: ID for `InputComponent`
+
+You can find the full list of built-in component IDs in `components.go`.
+
+#### Removing a Component
+
+You can remove a component from an entity using its `ComponentID`.
+
+```go
+// Remove the TransformComponent from the entity
+world.RemoveComponent(entity, katsu2d.CTTransform)
+```
+
+#### Filtering Entities (Querying)
+
+Systems use queries to find entities that have a specific set of components. The `world.Query()` method takes one or more `ComponentID`s and returns a slice of all entities that have *all* of the specified components.
+
+```go
+// Find all entities that have both a TransformComponent and a SpriteComponent
+entities := world.Query(katsu2d.CTTransform, katsu2d.CTSprite)
+
+// You can now loop through the returned entities
+for _, entity := range entities {
+    // Get a specific component from the entity
+    transform, _ := world.GetComponent(entity, katsu2d.CTTransform)
+    
+    // Cast it to the correct type to use it
+    t := transform.(*katsu2d.TransformComponent)
+    
+    // ... do something with the transform ...
+}
+```
 
 ## Why Katsu2D?
 
