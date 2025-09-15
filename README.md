@@ -43,6 +43,8 @@ go get github.com/edwinsyarief/katsu2d
 
 Here is the example repo: [https://github.com/edwinsyarief/katsu2d-simple-demo](https://github.com/edwinsyarief/katsu2d-simple-demo)
 
+Various examples repo: [https://github.com/edwinsyarief/katsu2d-examples](https://github.com/edwinsyarief/katsu2d-examples)
+
 #### Screenshot
 
 ![Simple Demo](./screenshot.png)
