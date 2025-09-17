@@ -2,6 +2,7 @@ package dualgrid
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"log"
 
@@ -122,7 +123,8 @@ func (self *DualGrid) SetTile(x, y int, value TileType) {
 // AddMaterial adds a new material to the grid, creating the necessary variants from a mask.
 func (self *DualGrid) AddMaterial(material, mask *ebiten.Image) {
 	if material.Bounds().Dx() != self.tileSize || material.Bounds().Dy() != self.tileSize {
-		log.Fatal(errors.New("Material isn't the right dimension"))
+		errMsh := fmt.Sprintf("Material isn't the right dimension: %dx%d, tile size: %d", material.Bounds().Dx(), material.Bounds().Dy(), self.tileSize)
+		log.Fatal(errors.New(errMsh))
 	}
 
 	side := 4

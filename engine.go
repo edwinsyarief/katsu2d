@@ -33,6 +33,10 @@ type Engine struct {
 	clearScreenEachFrame bool
 	clearColor           color.Color
 	cursorMode           ebiten.CursorModeType
+
+	// Atlas settings
+	atlasWidth  int
+	atlasHeight int
 }
 
 // Option is a functional option for configuring the engine.
@@ -95,6 +99,14 @@ func WithClearColor(col color.Color) Option {
 	}
 }
 
+// WithTextureAtlasSize sets the dimensions for the internal texture atlases.
+func WithTextureAtlasSize(w, h int) Option {
+	return func(e *Engine) {
+		e.atlasWidth = w
+		e.atlasHeight = h
+	}
+}
+
 // WithBackgroundDrawSystem adds a DrawSystem that renders before the scene.
 func WithBackgroundDrawSystem(sys any) Option {
 	return func(e *Engine) {
@@ -120,7 +132,6 @@ func WithUpdateSystem(sys UpdateSystem) Option {
 func NewEngine(opts ...Option) *Engine {
 	e := &Engine{
 		world:    NewWorld(),
-		tm:       NewTextureManager(),
 		fm:       NewFontManager(),
 		am:       NewAudioManager(44100),
 		sm:       NewSceneManager(),
@@ -133,11 +144,19 @@ func NewEngine(opts ...Option) *Engine {
 		windowWidth:           800,
 		windowHeight:          600,
 		windowTitle:           "Game",
+		atlasWidth:            2048, // Default atlas size
+		atlasHeight:           2048,
 		// ... default settings
 	}
+
+	// Apply all the functional options. This might override the defaults.
 	for _, opt := range opts {
 		opt(e)
 	}
+
+	// Initialize the texture manager with the (possibly overridden) atlas size.
+	e.tm = NewTextureManagerWithOptions(e.atlasWidth, e.atlasHeight)
+
 	return e
 }
 
