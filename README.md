@@ -175,6 +175,56 @@ for _, entity := range entities {
 }
 ```
 
+### Creating Custom Components
+
+While Katsu2D provides several built-in components, you'll often need to create your own to manage game-specific data.
+
+#### 1. Defining a Component
+
+A component is simply a Go struct that holds data. It's best practice to keep components as plain data objects, without any logic or methods.
+
+For example, if you wanted to create a component to manage player-specific attributes, you could define it like this:
+
+```go
+// in file mygame/components/player.go
+package components
+
+// PlayerComponent holds data specific to the player entity.
+type PlayerComponent struct {
+    Health int
+    Score  int
+    Speed  float64
+}
+```
+
+#### 2. Registering the Component
+
+Before you can use a custom component, you must register it with the Katsu2D engine. This assigns a unique `ComponentID` to your component type, which is necessary for the ECS to manage it efficiently.
+
+Registration should be done once at startup. The recommended way is to use an `init()` function in a centralized components package within your game.
+
+```go
+// in file mygame/components/components.go
+package components
+
+import (
+    "github.com/edwinsyarief/katsu2d"
+)
+
+var (
+    // CTPlayer will hold the ComponentID for our custom component.
+    CTPlayer katsu2d.ComponentID
+)
+
+func init() {
+    // Register the component and store its ID.
+    // The component type is passed as a type parameter.
+    CTPlayer = katsu2d.RegisterComponent[*PlayerComponent]()
+}
+```
+
+Once registered, you can use `components.CTPlayer` just like you would with a built-in component ID. You can add it to entities, query for it in systems, and manage your game logic in a clean, data-oriented way.
+
 ## Why Katsu2D?
 
 The name **Katsu2D** draws a playful and fitting analogy to the beloved Japanese dish (カツ), often a perfectly breaded and fried cutlet.
