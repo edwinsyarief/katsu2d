@@ -35,6 +35,7 @@ type Engine struct {
 	cursorMode           ebiten.CursorModeType
 
 	// Atlas settings
+	useAtlas    bool
 	atlasWidth  int
 	atlasHeight int
 }
@@ -99,9 +100,18 @@ func WithClearColor(col color.Color) Option {
 	}
 }
 
+// WithTextureAtlas enables or disables the texture atlas system.
+func WithTextureAtlas(enabled bool) Option {
+	return func(e *Engine) {
+		e.useAtlas = enabled
+	}
+}
+
 // WithTextureAtlasSize sets the dimensions for the internal texture atlases.
+// This implicitly enables the atlas system.
 func WithTextureAtlasSize(w, h int) Option {
 	return func(e *Engine) {
+		e.useAtlas = true
 		e.atlasWidth = w
 		e.atlasHeight = h
 	}
@@ -144,7 +154,8 @@ func NewEngine(opts ...Option) *Engine {
 		windowWidth:           800,
 		windowHeight:          600,
 		windowTitle:           "Game",
-		atlasWidth:            2048, // Default atlas size
+		useAtlas:              false, // Default atlas usage
+		atlasWidth:            2048,  // Default atlas size
 		atlasHeight:           2048,
 		// ... default settings
 	}
@@ -154,8 +165,13 @@ func NewEngine(opts ...Option) *Engine {
 		opt(e)
 	}
 
-	// Initialize the texture manager with the (possibly overridden) atlas size.
-	e.tm = NewTextureManagerWithOptions(e.atlasWidth, e.atlasHeight)
+	// Configure and initialize the texture manager.
+	var tmOpts []TextureManagerOption
+	if e.useAtlas {
+		tmOpts = append(tmOpts, WithAtlas(true))
+		tmOpts = append(tmOpts, WithAtlasSize(e.atlasWidth, e.atlasHeight))
+	}
+	e.tm = NewTextureManager(tmOpts...)
 
 	return e
 }

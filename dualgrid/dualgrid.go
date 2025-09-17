@@ -123,8 +123,8 @@ func (self *DualGrid) SetTile(x, y int, value TileType) {
 // AddMaterial adds a new material to the grid, creating the necessary variants from a mask.
 func (self *DualGrid) AddMaterial(material, mask *ebiten.Image) {
 	if material.Bounds().Dx() != self.tileSize || material.Bounds().Dy() != self.tileSize {
-		errMsh := fmt.Sprintf("Material isn't the right dimension: %dx%d, tile size: %d", material.Bounds().Dx(), material.Bounds().Dy(), self.tileSize)
-		log.Fatal(errors.New(errMsh))
+		errMsg := fmt.Sprintf("Material isn't the right dimension: %dx%d, tile size: %d", material.Bounds().Dx(), material.Bounds().Dy(), self.tileSize)
+		log.Fatal(errors.New(errMsg))
 	}
 
 	side := 4
@@ -132,7 +132,8 @@ func (self *DualGrid) AddMaterial(material, mask *ebiten.Image) {
 	num := side * side
 
 	if mask.Bounds().Dx() != side*self.tileSize || mask.Bounds().Dy() != side*self.tileSize {
-		log.Fatal(errors.New("Mask isn't the right dimension"))
+		errMsg := fmt.Sprintf("Mask isn't the right dimension: %dx%d, tile size: %d", mask.Bounds().Dx(), mask.Bounds().Dy(), self.tileSize)
+		log.Fatal(errors.New(errMsg))
 	}
 
 	opts := &ebiten.DrawImageOptions{}
