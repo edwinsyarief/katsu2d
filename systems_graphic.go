@@ -35,7 +35,7 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		case TextAlignmentTopCenter, TextAlignmentMiddleCenter, TextAlignmentBottomCenter:
 			op.PrimaryAlign = text.AlignCenter
 		default:
-			op.PrimaryAlign = text.AlignStart
+			op.PrimaryAlign = text.AlignEnd
 		}
 
 		op.GeoM = t.Transform.Matrix()

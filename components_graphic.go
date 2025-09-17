@@ -210,15 +210,15 @@ const (
 )
 
 var alignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
-	TextAlignmentTopRight:     func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentTopRight:     func(w, h float64) (float64, float64) { return 0, -h },
 	TextAlignmentMiddleRight:  func(w, h float64) (float64, float64) { return 0, -h / 2 },
-	TextAlignmentBottomRight:  func(w, h float64) (float64, float64) { return 0, -h },
-	TextAlignmentTopCenter:    func(w, h float64) (float64, float64) { return -w / 2, 0 },
-	TextAlignmentMiddleCenter: func(w, h float64) (float64, float64) { return -w / 2, -h / 2 },
-	TextAlignmentBottomCenter: func(w, h float64) (float64, float64) { return -w / 2, -h },
-	TextAlignmentTopLeft:      func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentBottomRight:  func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentTopCenter:    func(w, h float64) (float64, float64) { return 0, -h },
+	TextAlignmentMiddleCenter: func(w, h float64) (float64, float64) { return 0, -h / 2 },
+	TextAlignmentBottomCenter: func(w, h float64) (float64, float64) { return 0, 0 },
+	TextAlignmentTopLeft:      func(w, h float64) (float64, float64) { return 0, -h },
 	TextAlignmentMiddleLeft:   func(w, h float64) (float64, float64) { return 0, -h / 2 },
-	TextAlignmentBottomLeft:   func(w, h float64) (float64, float64) { return 0, -h },
+	TextAlignmentBottomLeft:   func(w, h float64) (float64, float64) { return 0, 0 },
 }
 
 type TextComponent struct {
