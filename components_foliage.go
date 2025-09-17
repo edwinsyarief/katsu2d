@@ -3,8 +3,8 @@ package katsu2d
 import (
 	"time"
 
-	"github.com/aquilax/go-perlin"
 	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/edwinsyarief/katsu2d/opensimplex"
 )
 
 // FoliageComponent stores the unique state and properties for a single piece of foliage.
@@ -34,7 +34,7 @@ type FoliageControllerComponent struct {
 	// rippleStrength sets the intensity of the rippling effect that travels through the foliage.
 	rippleStrength float64
 	// noise is the Perlin noise generator used to create complex, natural-looking wind patterns.
-	noise *perlin.Perlin
+	noise opensimplex.Noise
 }
 
 // FoliageOption is a functional option type for configuring a FoliageControllerComponent.
@@ -75,7 +75,7 @@ func NewFoliageControllerComponent(opts ...FoliageOption) *FoliageControllerComp
 	// Initialize a new Perlin noise generator with a random seed based on the current time.
 	// Alpha, Beta, and N control the frequency, amplitude, and number of octaves,
 	// which define the complexity and texture of the wind patterns.
-	noiseGenerator := perlin.NewPerlin(2, 2, 3, time.Now().UnixNano())
+	noiseGenerator := opensimplex.New(time.Now().UnixNano())
 
 	c := &FoliageControllerComponent{
 		windDirection:  ebimath.Vector{X: 1.0, Y: 0.0},

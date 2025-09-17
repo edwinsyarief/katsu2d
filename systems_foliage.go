@@ -86,7 +86,7 @@ func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerCompo
 	foliage *FoliageComponent, minY float32, height float64, pivot ebimath.Vector) {
 
 	// Add a small amount of variation to the sway frequency for each foliage instance.
-	swayFreq := 1.0 + controller.noise.Noise3D(foliage.SwaySeed, 0, 0)*0.2
+	swayFreq := 1.0 + controller.noise.Eval3(foliage.SwaySeed, 0, 0)*0.2
 
 	for i, baseVertex := range sprite.baseVertices {
 		// Calculate a normalized Y-coordinate (0.0 at the top, 1.0 at the bottom).
@@ -96,7 +96,7 @@ func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerCompo
 		swayFactor := math.Pow(math.Abs(float64(normalizedY)-pivot.Y), 1.5)
 
 		// Sample Perlin noise to add randomness to the sway.
-		swayNoise := controller.noise.Noise3D(controller.windTime*controller.windSpeed*0.1*swayFreq+foliage.SwaySeed, 0, 0)
+		swayNoise := controller.noise.Eval3(controller.windTime*controller.windSpeed*0.1*swayFreq+foliage.SwaySeed, 0, 0)
 
 		// Primary ripple: a smooth wave traveling with the wind direction.
 		// The dot product projects the vertex position onto the wind direction vector.
@@ -105,7 +105,7 @@ func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerCompo
 		primaryRipple := math.Sin(ripplePhase)
 
 		// Secondary ripple: slower, more subtle Perlin noise to add randomness to the overall ripple.
-		secondaryRipple := controller.noise.Noise3D(controller.windTime*controller.windSpeed*0.5, float64(baseVertex.DstX)*0.02, float64(baseVertex.DstY)*0.02)
+		secondaryRipple := controller.noise.Eval3(controller.windTime*controller.windSpeed*0.5, float64(baseVertex.DstX)*0.02, float64(baseVertex.DstY)*0.02)
 
 		// Combine the two ripple noise sources with different weights.
 		rippleNoise := primaryRipple*0.7 + secondaryRipple*0.3
