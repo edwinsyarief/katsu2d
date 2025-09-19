@@ -1,24 +1,21 @@
-package canvas
+package katsu2d
 
 import (
-	"image/color"
-	"math"
-
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-type Canvas struct {
+type canvas struct {
 	width, height           int
 	stretched, pixelPerfect bool
 	topLeft, scale          ebimath.Vector
 	buffer                  *ebiten.Image
-	filter                  ScalingFilter
+	filter                  scalingFilter
 	renderers               []func(*ebiten.Image)
 }
 
-func NewCanvas(width, height int, stretched, pixelPerfect bool) *Canvas {
-	result := &Canvas{
+func newCanvas(width, height int, stretched, pixelPerfect bool) *canvas {
+	result := &canvas{
 		width:        width,
 		height:       height,
 		stretched:    stretched,
@@ -27,17 +24,12 @@ func NewCanvas(width, height int, stretched, pixelPerfect bool) *Canvas {
 		renderers:    make([]func(*ebiten.Image), 0),
 	}
 
-	result.SetFilter(AASamplingSoft)
+	result.SetFilter(_AASamplingSoft)
 
 	return result
 }
 
-// GetHeight - return 16:9 height from specified width
-func GetHeight(width int) int {
-	return int(math.Floor(float64(width) / (16.0 / 9.0)))
-}
-
-func (self *Canvas) SetFilter(filter ScalingFilter) {
+func (self *canvas) SetFilter(filter scalingFilter) {
 	self.filter = filter
 
 	if shaders[filter] == nil {
@@ -45,19 +37,19 @@ func (self *Canvas) SetFilter(filter ScalingFilter) {
 	}
 }
 
-func (self *Canvas) AddRenderer(renderer func(*ebiten.Image)) {
+func (self *canvas) AddRenderer(renderer func(*ebiten.Image)) {
 	self.renderers = append(self.renderers, renderer)
 }
 
-func (self *Canvas) GetTopLeft() ebimath.Vector {
+func (self *canvas) GetTopLeft() ebimath.Vector {
 	return self.topLeft
 }
 
-func (self *Canvas) GetScale() ebimath.Vector {
+func (self *canvas) GetScale() ebimath.Vector {
 	return self.scale
 }
 
-func (self *Canvas) Resize(width, height int) {
+func (self *canvas) Resize(width, height int) {
 	scale := ebimath.V(
 		float64(width)/float64(self.width),
 		float64(height)/float64(self.height),
@@ -84,7 +76,7 @@ func (self *Canvas) Resize(width, height int) {
 	}
 }
 
-func (self *Canvas) ScaleCursorPosition() ebimath.Vector {
+func (self *canvas) ScaleCursorPosition() ebimath.Vector {
 	x, y := ebiten.CursorPosition()
 	return ebimath.V(
 		(float64(x)-self.topLeft.X)/self.scale.X,
@@ -92,13 +84,7 @@ func (self *Canvas) ScaleCursorPosition() ebimath.Vector {
 	)
 }
 
-func (self *Canvas) Draw(screen *ebiten.Image) {
-	self.buffer.Fill(color.Transparent)
-
-	for _, r := range self.renderers {
-		r(self.buffer)
-	}
-
+func (self *canvas) Draw(source, destination *ebiten.Image) {
 	p0 := self.topLeft
 	p1 := p0.Add(ebimath.V(self.scale.X*float64(self.width), 0))
 	p2 := p0.Add(ebimath.V(self.scale.X*float64(self.width), self.scale.Y*float64(self.height)))
@@ -113,7 +99,7 @@ func (self *Canvas) Draw(screen *ebiten.Image) {
 	shaderVertices[3].DstX = float32(p3.X)
 	shaderVertices[3].DstY = float32(p3.Y)
 
-	sourceBounds := self.buffer.Bounds()
+	sourceBounds := source.Bounds()
 	shaderVertices[0].SrcX = float32(sourceBounds.Min.X)
 	shaderVertices[0].SrcY = float32(sourceBounds.Min.Y)
 	shaderVertices[1].SrcX = float32(sourceBounds.Max.X)
@@ -123,10 +109,10 @@ func (self *Canvas) Draw(screen *ebiten.Image) {
 	shaderVertices[3].SrcX = shaderVertices[0].SrcX
 	shaderVertices[3].SrcY = shaderVertices[2].SrcY
 
-	shaderOpts.Images[0] = self.buffer
-	shaderOpts.Uniforms["SourceRelativeTextureUnitX"] = float32(float64(self.width) / float64(screen.Bounds().Dx()))
-	shaderOpts.Uniforms["SourceRelativeTextureUnitY"] = float32(float64(self.height) / float64(screen.Bounds().Dy()))
-	screen.DrawTrianglesShader(
+	shaderOpts.Images[0] = source
+	shaderOpts.Uniforms["SourceRelativeTextureUnitX"] = float32(float64(self.width) / float64(destination.Bounds().Dx()))
+	shaderOpts.Uniforms["SourceRelativeTextureUnitY"] = float32(float64(self.height) / float64(destination.Bounds().Dy()))
+	destination.DrawTrianglesShader(
 		shaderVertices, shaderVertIndices,
 		shaders[self.filter], &shaderOpts,
 	)

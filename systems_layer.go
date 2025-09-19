@@ -6,31 +6,51 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// LayerRendererOption is a function type for configuring LayerRendererSystem
+// LayerOption is a function type for configuring LayerRendererSystem
 // using the functional options pattern
-type LayerRendererOption func(*LayerRendererSytem)
+type LayerOption func(*LayerSytem)
 
 // AddDrawSystem creates an option to add a drawing system to the layer renderer.
 // This allows for modular addition of different drawing systems.
-func AddDrawSystem(ds DrawSystem) LayerRendererOption {
-	return func(ls *LayerRendererSytem) {
-		ls.drawSystems = append(ls.drawSystems, ds)
+func AddSystem(sys any) LayerOption {
+	return func(ls *LayerSytem) {
+		if us, ok := sys.(UpdateSystem); ok {
+			ls.updateSystems = append(ls.updateSystems, us)
+		}
+		if ds, ok := sys.(DrawSystem); ok {
+			ls.drawSystems = append(ls.drawSystems, ds)
+		}
 	}
 }
 
-// LayerRendererSytem manages the rendering of multiple drawing systems
-// onto a single buffer layer. It handles scaling and positioning of the final output.
-type LayerRendererSytem struct {
-	batchRenderer *BatchRenderer // Handles batch rendering operations
-	buffer        *ebiten.Image  // Off-screen buffer for compositing
-	drawSystems   []DrawSystem   // Collection of drawing systems to be executed
+func Stretched(stretch bool) LayerOption {
+	return func(ls *LayerSytem) {
+		ls.stretched = stretch
+	}
 }
 
-// NewLayerRendererSystem creates a new layer renderer with specified dimensions
+func PixelPerfect(pixelPerfect bool) LayerOption {
+	return func(ls *LayerSytem) {
+		ls.pixelPerfect = pixelPerfect
+	}
+}
+
+// LayerSytem manages the rendering of multiple drawing systems
+// onto a single buffer layer. It handles scaling and positioning of the final output.
+type LayerSytem struct {
+	batchRenderer           *BatchRenderer // Handles batch rendering operations
+	buffer                  *ebiten.Image  // Off-screen buffer for compositing
+	canvas                  *canvas
+	drawSystems             []DrawSystem   // Collection of drawing systems to be executed
+	updateSystems           []UpdateSystem // Collection of update systems to be executed
+	stretched, pixelPerfect bool
+}
+
+// NewLayerSystem creates a new layer renderer with specified dimensions
 // and optional configuration through LayerRendererOptions
-func NewLayerRendererSystem(width, height int, opts ...LayerRendererOption) *LayerRendererSytem {
+func NewLayerSystem(world *World, width, height int, opts ...LayerOption) *LayerSytem {
 	buffer := ebiten.NewImage(width, height)
-	ls := &LayerRendererSytem{
+	ls := &LayerSytem{
 		batchRenderer: NewBatchRenderer(),
 		buffer:        buffer,
 		drawSystems:   make([]DrawSystem, 0),
@@ -41,12 +61,28 @@ func NewLayerRendererSystem(width, height int, opts ...LayerRendererOption) *Lay
 		opt(ls)
 	}
 
+	ls.canvas = newCanvas(width, height, ls.stretched, ls.pixelPerfect)
+
+	eb := world.GetEventBus()
+	eb.Subscribe(EngineLayoutChangedEvent{}, ls.onEngineLayoutChanged)
+
 	return ls
+}
+
+func (self *LayerSytem) onEngineLayoutChanged(obj interface{}) {
+	data := obj.(EngineLayoutChangedEvent)
+	self.canvas.Resize(data.Width, data.Height)
+}
+
+func (self *LayerSytem) Update(world *World, dt float64) {
+	for _, us := range self.updateSystems {
+		us.Update(world, dt)
+	}
 }
 
 // Draw executes all registered render systems and handles scaling of the final output.
 // It maintains aspect ratio while scaling and centers the result on the screen.
-func (self *LayerRendererSytem) Draw(world *World, renderer *BatchRenderer) {
+func (self *LayerSytem) Draw(world *World, renderer *BatchRenderer) {
 	// Clear the buffer with transparency
 	self.buffer.Fill(color.Transparent)
 
@@ -62,33 +98,5 @@ func (self *LayerRendererSytem) Draw(world *World, renderer *BatchRenderer) {
 	self.batchRenderer.Flush()
 	renderer.Flush()
 
-	// Calculate dimensions for source and destination
-	srcWidth := float64(self.batchRenderer.screen.Bounds().Dx())
-	srcHeight := float64(self.batchRenderer.screen.Bounds().Dy())
-	dstWidth := float64(renderer.screen.Bounds().Dx())
-	dstHeight := float64(renderer.screen.Bounds().Dy())
-
-	// Calculate scale factors while preserving aspect ratio
-	scaleX := dstWidth / srcWidth
-	scaleY := dstHeight / srcHeight
-
-	// Choose the smaller scale to maintain aspect ratio
-	scale := scaleX
-	if scaleY < scaleX {
-		scale = scaleY
-	}
-
-	// Set up transformation for the final draw operation
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-
-	// Calculate position to center the scaled image
-	scaledWidth := srcWidth * scale
-	scaledHeight := srcHeight * scale
-	x := (dstWidth - scaledWidth) / 2
-	y := (dstHeight - scaledHeight) / 2
-	op.GeoM.Translate(x, y)
-
-	// Draw the final scaled and positioned buffer to the screen
-	renderer.screen.DrawImage(self.buffer, op)
+	self.canvas.Draw(self.buffer, renderer.screen)
 }

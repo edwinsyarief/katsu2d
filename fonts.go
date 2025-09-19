@@ -2,9 +2,13 @@ package katsu2d
 
 import (
 	"bytes"
+	_ "embed"
 
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
+
+//go:embed internal_assets/fonts/pixel_code.otf
+var _DefaultFont []byte
 
 type FontManager struct {
 	fonts []*text.GoTextFaceSource

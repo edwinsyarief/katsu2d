@@ -75,7 +75,7 @@ func NewWorld() *World {
 	return w
 }
 
-func (self *World) NewEventBus() *event.EventBus {
+func (self *World) initEventBus() *event.EventBus {
 	if eb, ok := self.Resources.Load(event_bus); ok {
 		return eb.(*event.EventBus)
 	}

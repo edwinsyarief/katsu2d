@@ -1,4 +1,4 @@
-package canvas
+package katsu2d
 
 import (
 	_ "embed"
@@ -6,31 +6,31 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed shaders/aa_sampling_soft.kage
+//go:embed internal_assets/shaders/aa_sampling_soft.kage
 var _aaSamplingSoft []byte
 
-//go:embed shaders/aa_sampling_sharp.kage
+//go:embed internal_assets/shaders/aa_sampling_sharp.kage
 var _aaSamplingSharp []byte
 
-//go:embed shaders/nearest.kage
+//go:embed internal_assets/shaders/nearest.kage
 var _nearest []byte
 
-//go:embed shaders/hermite.kage
+//go:embed internal_assets/shaders/hermite.kage
 var _hermite []byte
 
-//go:embed shaders/bicubic.kage
+//go:embed internal_assets/shaders/bicubic.kage
 var _bicubic []byte
 
-//go:embed shaders/bilinear.kage
+//go:embed internal_assets/shaders/bilinear.kage
 var _bilinear []byte
 
-//go:embed shaders/src_hermite.kage
+//go:embed internal_assets/shaders/src_hermite.kage
 var _srcHermite []byte
 
-//go:embed shaders/src_bicubic.kage
+//go:embed internal_assets/shaders/src_bicubic.kage
 var _srcBicubic []byte
 
-//go:embed shaders/src_bilinear.kage
+//go:embed internal_assets/shaders/src_bilinear.kage
 var _srcBilinear []byte
 
 var (
@@ -42,18 +42,18 @@ var (
 )
 
 func init() {
-	shaderSources[Nearest] = _nearest
-	shaderSources[AASamplingSoft] = _aaSamplingSoft
-	shaderSources[AASamplingSharp] = _aaSamplingSharp
-	shaderSources[Hermite] = _hermite
-	shaderSources[Bicubic] = _bicubic
-	shaderSources[Bilinear] = _bilinear
-	shaderSources[SrcHermite] = _srcHermite
-	shaderSources[SrcBicubic] = _srcBicubic
-	shaderSources[SrcBilinear] = _srcBilinear
+	shaderSources[_Nearest] = _nearest
+	shaderSources[_AASamplingSoft] = _aaSamplingSoft
+	shaderSources[_AASamplingSharp] = _aaSamplingSharp
+	shaderSources[_Hermite] = _hermite
+	shaderSources[_Bicubic] = _bicubic
+	shaderSources[_Bilinear] = _bilinear
+	shaderSources[_SrcHermite] = _srcHermite
+	shaderSources[_SrcBicubic] = _srcBicubic
+	shaderSources[_SrcBilinear] = _srcBilinear
 }
 
-func compileShader(filter ScalingFilter) {
+func compileShader(filter scalingFilter) {
 	var err error
 	shaders[filter], err = ebiten.NewShader(shaderSources[filter])
 	if err != nil {

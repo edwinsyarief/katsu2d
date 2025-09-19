@@ -1,6 +1,7 @@
 package katsu2d
 
 import (
+	"bytes"
 	"image"
 	"image/color"
 
@@ -247,6 +248,14 @@ func NewTextComponent(source *text.GoTextFaceSource, caption string, size float6
 	}
 	result.updateCache()
 	return result
+}
+
+func NewDefaultTextComponent(caption string, size float64, col color.RGBA) *TextComponent {
+	font, err := text.NewGoTextFaceSource(bytes.NewReader(_DefaultFont))
+	if err != nil {
+		panic(err)
+	}
+	return NewTextComponent(font, caption, size, col)
 }
 
 func (self *TextComponent) updateCache() {

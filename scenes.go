@@ -6,6 +6,7 @@ import "github.com/hajimehoshi/ebiten/v2"
 // with its own World, systems, and lifecycle hooks.
 type Scene struct {
 	World         *World
+	Width, Height int
 	UpdateSystems []UpdateSystem
 	DrawSystems   []DrawSystem
 	OnEnter       func(*Engine)
@@ -17,9 +18,12 @@ type Scene struct {
 
 // NewScene creates a new scene with its own dedicated World.
 func NewScene() *Scene {
-	return &Scene{
+	scn := &Scene{
 		World: NewWorld(),
 	}
+	scn.World.initEventBus()
+
+	return scn
 }
 
 // AddSystem adds an update and/or draw system to the scene.
@@ -50,6 +54,18 @@ func (self *Scene) Update(world *World, dt float64) {
 	}
 	// Process event bus
 	self.World.ProcessEventBus()
+}
+
+// OnLayoutChanged publishes an engine layout change event
+func (self *Scene) OnLayoutChanged(width, height int) {
+	self.Width = width
+	self.Height = height
+
+	eb := self.World.GetEventBus()
+	eb.Publish(EngineLayoutChangedEvent{
+		Width:  width,
+		Height: height,
+	})
 }
 
 // Draw runs all the scene's draw systems using the engine's shared renderer.
@@ -108,5 +124,7 @@ func (self *SceneManager) SwitchTo(e *Engine, name string) {
 	self.current = newScene
 	if self.current.OnEnter != nil {
 		self.current.OnEnter(e)
+		w, h := e.HiResSize()
+		self.current.OnLayoutChanged(w, h)
 	}
 }

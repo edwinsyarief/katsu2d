@@ -144,19 +144,20 @@ func NewSpriteRenderSystem(world *World, tm *TextureManager, opts ...SpriteRende
 	for _, opt := range opts {
 		opt(srs)
 	}
+	eb := world.GetEventBus()
+	if eb != nil {
+		eb.Subscribe(TransformZDirtyEvent{}, srs.onTransformZDirty)
+	}
 	return srs
+}
+
+// onTransformZDirty sets zSortNeeded into true
+func (self *SpriteRenderSystem) onTransformZDirty(_ interface{}) {
+	self.zSortNeeded = true
 }
 
 // Update checks if a re-sort is needed for the drawables list.
 func (self *SpriteRenderSystem) Update(world *World, dt float64) {
-	eb := world.GetEventBus()
-	if eb != nil {
-		eb.Subscribe(TransformZDirtyEvent{}, func(_ interface{}) {
-			// Mark entity for sorting
-			self.zSortNeeded = true
-		})
-	}
-
 	includeComponents := make([]ComponentID, 0, len(self.includes)+2)
 	includeComponents = append(includeComponents, CTSprite, CTTransform)
 	for _, comp := range self.includes {

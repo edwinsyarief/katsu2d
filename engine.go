@@ -3,6 +3,7 @@ package katsu2d
 import (
 	"embed"
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -38,6 +39,11 @@ type Engine struct {
 	useAtlas    bool
 	atlasWidth  int
 	atlasHeight int
+
+	// Layout properties
+	layoutHasChanged bool
+	hiResWidth       int
+	hiResHeight      int
 }
 
 // Option is a functional option for configuring the engine.
@@ -159,6 +165,7 @@ func NewEngine(opts ...Option) *Engine {
 		atlasHeight:           2048,
 		// ... default settings
 	}
+	e.World().initEventBus()
 
 	// Apply all the functional options. This might override the defaults.
 	for _, opt := range opts {
@@ -258,6 +265,14 @@ func (self *Engine) Update() error {
 	// Process deferred removals for the engine's world.
 	self.World().processRemovals()
 
+	if self.layoutHasChanged {
+		eb := self.World().GetEventBus()
+		eb.Publish(EngineLayoutChangedEvent{
+			Width:  self.hiResWidth,
+			Height: self.hiResHeight,
+		})
+	}
+
 	// Update the engine's global systems first.
 	for _, us := range self.updateSystems {
 		us.Update(self.world, dt)
@@ -268,6 +283,11 @@ func (self *Engine) Update() error {
 
 	// Then, update the active scene's systems.
 	if self.sm.current != nil {
+		if self.layoutHasChanged {
+			self.layoutHasChanged = false
+			self.sm.current.OnLayoutChanged(self.hiResWidth, self.hiResHeight)
+		}
+
 		self.sm.current.Update(self.sm.current.World, dt)
 
 		if self.sm.current.OnUpdate != nil {
@@ -320,8 +340,34 @@ func (self *Engine) Draw(screen *ebiten.Image) {
 }
 
 // Layout implements ebiten.Game.Layout.
-func (self *Engine) Layout(outWidth, outHeight int) (int, int) {
-	return self.windowWidth, self.windowHeight
+func (self *Engine) Layout(logicWinWidth, logicWinHeight int) (int, int) {
+	monitor := ebiten.Monitor()
+	scale := monitor.DeviceScaleFactor()
+	hiResWidth := int(float64(logicWinWidth) * scale)
+	hiResHeight := int(float64(logicWinHeight) * scale)
+	if hiResWidth != self.hiResWidth || hiResHeight != self.hiResHeight {
+		self.layoutHasChanged = true
+		self.hiResWidth, self.hiResHeight = hiResWidth, hiResHeight
+	}
+	return self.hiResWidth, self.hiResHeight
+}
+
+// LayoufF implements ebiten.Game.LayoutF.
+func (self *Engine) LayoutF(logicWinWidth, logicWinHeight float64) (float64, float64) {
+	monitor := ebiten.Monitor()
+	scale := monitor.DeviceScaleFactor()
+	outWidth := math.Ceil(logicWinWidth * scale)
+	outHeight := math.Ceil(logicWinHeight * scale)
+	if int(outWidth) != self.hiResWidth || int(outHeight) != self.hiResHeight {
+		self.layoutHasChanged = true
+		self.hiResWidth, self.hiResHeight = int(outWidth), int(outHeight)
+	}
+	return outWidth, outHeight
+}
+
+// HiResSize returns hiResWidth, hiResHeight
+func (self *Engine) HiResSize() (int, int) {
+	return self.hiResWidth, self.hiResHeight
 }
 
 // Run runs the game.
