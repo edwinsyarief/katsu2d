@@ -3,6 +3,7 @@ package katsu2d
 import (
 	"sort"
 
+	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -38,9 +39,9 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			op.PrimaryAlign = text.AlignEnd
 		}
 
-		op.GeoM = t.Transform.Matrix()
 		offsetX, offsetY := textComp.GetOffset()
-		op.GeoM.Translate(offsetX, offsetY)
+		t.SetOffset(ebimath.V(offsetX, offsetY))
+		op.GeoM = t.Transform.Matrix()
 		op.ColorScale = utils.RGBAToColorScale(textComp.Color)
 		text.Draw(renderer.screen, textComp.Caption, textComp.fontFace, op)
 	}

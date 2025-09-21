@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"math"
 
 	"github.com/edwinsyarief/katsu2d/utils"
@@ -151,7 +152,12 @@ func (self *AudioManager) fromBytes(content []byte, ext string) (io.ReadSeeker, 
 	case "ogg":
 		return vorbis.DecodeF32(bytes.NewReader(content))
 	case "wav":
-		return wav.DecodeF32(bytes.NewReader(content))
+		s, err := wav.DecodeF32(bytes.NewReader(content))
+		if err != nil {
+			// Provide a more helpful error message for the common PCM issue.
+			return nil, fmt.Errorf("failed to decode .wav file. Ensure it is in Linear PCM format. You can convert it with ffmpeg: `ffmpeg -i input.wav -acodec pcm_s16le -ar 44100 output.wav`. Original error: %w", err)
+		}
+		return s, nil
 	case "mp3":
 		return mp3.DecodeF32(bytes.NewReader(content))
 	default:
@@ -310,7 +316,7 @@ func (self *AudioManager) internalPlay(trackID TrackID, pan float64, loop bool, 
 		if len(active) >= stackConfig.MaxStack {
 			oldest := active[0]
 			if err := self.Stop(oldest); err != nil {
-				panic(fmt.Errorf("error stopping playback ID %d: %v\n", oldest, err))
+				log.Printf("error stopping oldest playback ID %d: %v\n", oldest, err)
 			}
 			stackArray.playbackIDs = active[1:]
 		}
@@ -479,7 +485,7 @@ func (self *AudioManager) Update(dt float64) {
 
 		if !source.player.IsPlaying() && !source.isFading {
 			if err := self.Stop(id); err != nil {
-				panic(fmt.Errorf("error stopping playback ID %d: %v\n", id, err))
+				log.Printf("error stopping playback ID %d: %v\n", id, err)
 			}
 		}
 	}
