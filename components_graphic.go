@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	"math"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -328,4 +329,130 @@ func (self *TextComponent) SetOpacity(opacity float64) *TextComponent {
 	col.A = uint8(255 * val)
 	self.SetColor(col)
 	return self
+}
+
+type RectangleComponent struct {
+	Width, Height     float32
+	Color             color.RGBA
+	TopLeftRadius     float32
+	TopRightRadius    float32
+	BottomLeftRadius  float32
+	BottomRightRadius float32
+	StrokeWidth       float32
+	StrokeColor       color.RGBA
+	Vertices          []ebiten.Vertex
+	Indices           []uint16
+	dirty             bool
+}
+
+func NewRectangleComponent(width, height float32, color color.RGBA) *RectangleComponent {
+	return &RectangleComponent{
+		Width:       width,
+		Height:      height,
+		Color:       color,
+		StrokeColor: color,
+		dirty:       true,
+	}
+}
+
+func (self *RectangleComponent) SetRadii(topLeft, topRight, bottomLeft, bottomRight float32) {
+	self.TopLeftRadius = topLeft
+	self.TopRightRadius = topRight
+	self.BottomLeftRadius = bottomLeft
+	self.BottomRightRadius = bottomRight
+	self.dirty = true
+}
+
+func (self *RectangleComponent) SetStroke(width float32, color color.RGBA) {
+	self.StrokeWidth = width
+	self.StrokeColor = color
+	self.dirty = true
+}
+
+func (self *RectangleComponent) Rebuild() {
+	if !self.dirty {
+		return
+	}
+	self.dirty = false
+
+	self.Vertices = nil
+	self.Indices = nil
+
+	if self.StrokeWidth > 0 {
+		self.appendStroke()
+	}
+	self.appendFill()
+}
+
+func (self *RectangleComponent) appendFill() {
+	cr, cg, cb, ca := self.Color.RGBA()
+	fillColor := ebiten.Vertex{
+		ColorR: float32(cr) / 0xffff,
+		ColorG: float32(cg) / 0xffff,
+		ColorB: float32(cb) / 0xffff,
+		ColorA: float32(ca) / 0xffff,
+	}
+	self.appendRect(self.Width, self.Height, self.TopLeftRadius, self.TopRightRadius, self.BottomLeftRadius, self.BottomRightRadius, fillColor)
+}
+
+func (self *RectangleComponent) appendStroke() {
+	sr, sg, sb, sa := self.StrokeColor.RGBA()
+	strokeColor := ebiten.Vertex{
+		ColorR: float32(sr) / 0xffff,
+		ColorG: float32(sg) / 0xffff,
+		ColorB: float32(sb) / 0xffff,
+		ColorA: float32(sa) / 0xffff,
+	}
+	self.appendRect(self.Width+self.StrokeWidth*2, self.Height+self.StrokeWidth*2, self.TopLeftRadius+self.StrokeWidth, self.TopRightRadius+self.StrokeWidth, self.BottomLeftRadius+self.StrokeWidth, self.BottomRightRadius+self.StrokeWidth, strokeColor)
+}
+
+func (self *RectangleComponent) appendRect(width, height, tl, tr, bl, br float32, color ebiten.Vertex) {
+	offsetX := (self.Width - width) / 2
+	offsetY := (self.Height - height) / 2
+
+	baseIndex := uint16(len(self.Vertices))
+
+	// Center vertex
+	self.Vertices = append(self.Vertices, ebiten.Vertex{
+		DstX:   width/2 + offsetX,
+		DstY:   height/2 + offsetY,
+		SrcX:   0,
+		SrcY:   0,
+		ColorR: color.ColorR,
+		ColorG: color.ColorG,
+		ColorB: color.ColorB,
+		ColorA: color.ColorA,
+	})
+
+	// Generate vertices for the corners
+	self.generateCorner(width-br, height-br, br, 0, 90, color, offsetX, offsetY)
+	self.generateCorner(bl, height-bl, bl, 90, 180, color, offsetX, offsetY)
+	self.generateCorner(tl, tl, tl, 180, 270, color, offsetX, offsetY)
+	self.generateCorner(width-tr, tr, tr, 270, 360, color, offsetX, offsetY)
+
+	// Create indices
+	for i := uint16(1); i < uint16(len(self.Vertices))-baseIndex; i++ {
+		self.Indices = append(self.Indices, baseIndex, baseIndex+i, baseIndex+i+1)
+	}
+	self.Indices = append(self.Indices, baseIndex, uint16(len(self.Vertices))-1, baseIndex+1)
+}
+
+func (self *RectangleComponent) generateCorner(cx, cy, radius, startAngle, endAngle float32, color ebiten.Vertex, offsetX, offsetY float32) {
+	const segments = 10
+	for i := 0; i <= segments; i++ {
+		angle := float64(startAngle) + float64(i)*(float64(endAngle-startAngle))/float64(segments)
+		rad := angle * math.Pi / 180
+		x := cx + radius*float32(math.Cos(rad))
+		y := cy + radius*float32(math.Sin(rad))
+		self.Vertices = append(self.Vertices, ebiten.Vertex{
+			DstX:   x + offsetX,
+			DstY:   y + offsetY,
+			SrcX:   0,
+			SrcY:   0,
+			ColorR: color.ColorR,
+			ColorG: color.ColorG,
+			ColorB: color.ColorB,
+			ColorA: color.ColorA,
+		})
+	}
 }
