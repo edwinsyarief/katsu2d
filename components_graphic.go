@@ -94,6 +94,11 @@ func (self *SpriteComponent) SetGrid(rows, cols int) *SpriteComponent {
 	return self
 }
 
+// IsDirty returns true if the mesh needs to be regeerated.
+func (self *SpriteComponent) IsDirty() bool {
+	return self.dirty
+}
+
 // GetSourceRect returns the source rectangle for drawing.
 func (self *SpriteComponent) GetSourceRect() image.Rectangle {
 	if self.SrcRect != nil {
@@ -246,7 +251,7 @@ func NewTextComponent(source *text.GoTextFaceSource, caption string, size float6
 		Color:    col,
 		fontFace: fontFace,
 	}
-	result.updateCache()
+	result.UpdateCache()
 	return result
 }
 
@@ -258,7 +263,7 @@ func NewDefaultTextComponent(caption string, size float64, col color.RGBA) *Text
 	return NewTextComponent(font, caption, size, col)
 }
 
-func (self *TextComponent) updateCache() {
+func (self *TextComponent) UpdateCache() {
 	if self.cachedText != self.Caption {
 		self.cachedWidth, self.cachedHeight = text.Measure(self.Caption, self.fontFace, self.lineSpacing)
 		self.cachedText = self.Caption
@@ -271,7 +276,7 @@ func (self *TextComponent) LineSpacing() float64 {
 
 func (self *TextComponent) SetLineSpacing(spacing float64) *TextComponent {
 	self.lineSpacing = spacing
-	self.updateCache()
+	self.UpdateCache()
 	return self
 }
 
@@ -291,14 +296,14 @@ func (self *TextComponent) GetOffset() (float64, float64) {
 func (self *TextComponent) SetText(text string) *TextComponent {
 	if self.Caption != text {
 		self.Caption = text
-		self.updateCache()
+		self.UpdateCache()
 	}
 	return self
 }
 
 func (self *TextComponent) SetFontFace(fontFace *text.GoTextFace) *TextComponent {
 	self.fontFace = fontFace
-	self.updateCache()
+	self.UpdateCache()
 	return self
 }
 
@@ -308,7 +313,7 @@ func (self *TextComponent) FontFace() *text.GoTextFace {
 
 func (self *TextComponent) SetSize(size float64) *TextComponent {
 	self.fontFace.Size = size
-	self.updateCache()
+	self.UpdateCache()
 	return self
 }
 

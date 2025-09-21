@@ -26,7 +26,7 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		txt, _ := world.GetComponent(entity, CTText)
 		textComp := txt.(*TextComponent)
 		renderer.Flush()
-		textComp.updateCache()
+		textComp.UpdateCache()
 		op := &text.DrawOptions{}
 		op.LineSpacing = textComp.LineSpacing()
 
@@ -108,42 +108,22 @@ func (self *AnimationSystem) Update(world *World, dt float64) {
 	}
 }
 
-type SpriteRenderOption func(*SpriteRenderSystem)
-
-func WithInclude(componentId ComponentID) SpriteRenderOption {
-	return func(sr *SpriteRenderSystem) {
-		sr.includes = append(sr.includes, componentId)
-	}
-}
-
-func WithExclude(componentId ComponentID) SpriteRenderOption {
-	return func(sr *SpriteRenderSystem) {
-		sr.excludes = append(sr.excludes, componentId)
-	}
-}
-
 // SpriteRenderSystem renders sprite components.
 type SpriteRenderSystem struct {
 	world             *World
 	tm                *TextureManager
 	drawableEntities  []Entity
 	lastFrameEntities map[Entity]struct{}
-	includes          []ComponentID
-	excludes          []ComponentID
-	zSortNeeded       bool
+
+	zSortNeeded bool
 }
 
 // NewSpriteRenderSystem creates a new SpriteRenderSystem with the given texture manager.
-func NewSpriteRenderSystem(world *World, tm *TextureManager, opts ...SpriteRenderOption) *SpriteRenderSystem {
+func NewSpriteRenderSystem(world *World, tm *TextureManager) *SpriteRenderSystem {
 	srs := &SpriteRenderSystem{
 		world:             world,
 		tm:                tm,
 		lastFrameEntities: make(map[Entity]struct{}),
-		includes:          make([]ComponentID, 0),
-		excludes:          make([]ComponentID, 0),
-	}
-	for _, opt := range opts {
-		opt(srs)
 	}
 	eb := world.GetEventBus()
 	if eb != nil {
@@ -159,20 +139,8 @@ func (self *SpriteRenderSystem) onTransformZDirty(_ interface{}) {
 
 // Update checks if a re-sort is needed for the drawables list.
 func (self *SpriteRenderSystem) Update(world *World, dt float64) {
-	includeComponents := make([]ComponentID, 0, len(self.includes)+2)
-	includeComponents = append(includeComponents, CTSprite, CTTransform)
-	for _, comp := range self.includes {
-		if comp != CTSprite && comp != CTTransform {
-			includeComponents = append(includeComponents, comp)
-		}
-	}
-
-	var currentEntities []Entity
-	if len(self.excludes) == 0 {
-		currentEntities = world.Query(includeComponents...)
-	} else {
-		currentEntities = world.QueryWithExclusion(includeComponents, self.excludes)
-	}
+	includeComponents := []ComponentID{CTTransform, CTSprite}
+	currentEntities := world.Query(includeComponents...)
 
 	zSortNeeded := self.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
 	if !zSortNeeded && len(currentEntities) > 0 {

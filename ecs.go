@@ -385,6 +385,82 @@ func (self *World) Query(componentIDs ...ComponentID) []Entity {
 	return res
 }
 
+// QueryExact returns entities that have exactly the specified components (no more, no less).
+func (self *World) QueryExact(componentIDs ...ComponentID) []Entity {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	res := make([]Entity, 0)
+	var mask uint64
+	for _, id := range componentIDs {
+		mask |= 1 << uint64(id)
+	}
+
+	// Only return entities from archetypes that match the exact mask
+	if arch, exists := self.archetypes[mask]; exists {
+		res = append(res, arch.entities...)
+	}
+
+	return res
+}
+
+// QueryWithExclusion returns entities that have any components from includes
+// but none of the components from excludes.
+func (self *World) QueryWithExclusion(includes []ComponentID, excludes []ComponentID) []Entity {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	res := make([]Entity, 0)
+
+	// Create masks for include and exclude components
+	var includeMask uint64
+	for _, id := range includes {
+		includeMask |= 1 << uint64(id)
+	}
+
+	var excludeMask uint64
+	for _, id := range excludes {
+		excludeMask |= 1 << uint64(id)
+	}
+
+	// Check each archetype
+	for archMask, arch := range self.archetypes {
+		// Check if archetype has ANY of the included components
+		// AND NONE of the excluded components
+		if (archMask&includeMask != 0) && (archMask&excludeMask == 0) {
+			res = append(res, arch.entities...)
+		}
+	}
+
+	return res
+}
+
+// QueryTag queries all entities which has a tag component and whose tag value is available in tags
+func (self *World) QueryTag(tags ...string) []Entity {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	res := make([]Entity, 0)
+	tagSet := make(map[string]struct{})
+	for _, tag := range tags {
+		tagSet[tag] = struct{}{}
+	}
+
+	tagQuery := self.Query(CTTag)
+
+	for _, entity := range tagQuery {
+		if component, ok := self.GetComponent(entity, CTTag); ok {
+			if tagComponent, ok := component.(*TagComponent); ok {
+				if _, ok := tagSet[tagComponent.Tag]; ok {
+					res = append(res, entity)
+				}
+			}
+		}
+	}
+
+	return res
+}
+
 // QueryExclude queries all entities that has one of component, but without tag or tag is not in the list
 func (self *World) QueryWithTagExclusion(componentIDs []ComponentID, excludedTags ...string) []Entity {
 	self.mu.RLock()
@@ -421,82 +497,6 @@ func (self *World) QueryWithTagExclusion(componentIDs []ComponentID, excludedTag
 					}
 				}
 			}
-		}
-	}
-
-	return res
-}
-
-// QueryExact returns entities that have exactly the specified components (no more, no less).
-func (self *World) QueryExact(componentIDs ...ComponentID) []Entity {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
-
-	res := make([]Entity, 0)
-	var mask uint64
-	for _, id := range componentIDs {
-		mask |= 1 << uint64(id)
-	}
-
-	// Only return entities from archetypes that match the exact mask
-	if arch, exists := self.archetypes[mask]; exists {
-		res = append(res, arch.entities...)
-	}
-
-	return res
-}
-
-// QueryTag queries all entities which has a tag component and whose tag value is available in tags
-func (self *World) QueryTag(tags ...string) []Entity {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
-
-	res := make([]Entity, 0)
-	tagSet := make(map[string]struct{})
-	for _, tag := range tags {
-		tagSet[tag] = struct{}{}
-	}
-
-	tagQuery := self.Query(CTTag)
-
-	for _, entity := range tagQuery {
-		if component, ok := self.GetComponent(entity, CTTag); ok {
-			if tagComponent, ok := component.(*TagComponent); ok {
-				if _, ok := tagSet[tagComponent.Tag]; ok {
-					res = append(res, entity)
-				}
-			}
-		}
-	}
-
-	return res
-}
-
-// QueryWithExclusion returns entities that have any components from includes
-// but none of the components from excludes.
-func (self *World) QueryWithExclusion(includes []ComponentID, excludes []ComponentID) []Entity {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
-
-	res := make([]Entity, 0)
-
-	// Create masks for include and exclude components
-	var includeMask uint64
-	for _, id := range includes {
-		includeMask |= 1 << uint64(id)
-	}
-
-	var excludeMask uint64
-	for _, id := range excludes {
-		excludeMask |= 1 << uint64(id)
-	}
-
-	// Check each archetype
-	for archMask, arch := range self.archetypes {
-		// Check if archetype has ANY of the included components
-		// AND NONE of the excluded components
-		if (archMask&includeMask != 0) && (archMask&excludeMask == 0) {
-			res = append(res, arch.entities...)
 		}
 	}
 
