@@ -385,6 +385,48 @@ func (self *World) Query(componentIDs ...ComponentID) []Entity {
 	return res
 }
 
+// QueryExclude queries all entities that has one of component, but without tag or tag is not in the list
+func (self *World) QueryWithTagExclusion(componentIDs []ComponentID, excludedTags ...string) []Entity {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	res := make([]Entity, 0)
+	tagSet := make(map[string]struct{})
+	for _, tag := range excludedTags {
+		tagSet[tag] = struct{}{}
+	}
+
+	var includeMask uint64
+	for _, id := range componentIDs {
+		includeMask |= 1 << uint64(id)
+	}
+
+	for archMask, arch := range self.archetypes {
+		if archMask&includeMask != 0 {
+			// Archetype has at least one of the included components.
+			// Now, check for tag exclusion.
+			if (archMask & (1 << uint64(CTTag))) == 0 {
+				// Archetype does not have a tag component, so all entities are included.
+				res = append(res, arch.entities...)
+			} else {
+				// Archetype has a tag component, so we need to check each entity.
+				for _, entity := range arch.entities {
+					if component, ok := self.GetComponent(entity, CTTag); ok {
+						if tagComponent, ok := component.(*TagComponent); ok {
+							if _, ok := tagSet[tagComponent.Tag]; !ok {
+								// Tag is not in the exclusion list, so include the entity.
+								res = append(res, entity)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return res
+}
+
 // QueryExact returns entities that have exactly the specified components (no more, no less).
 func (self *World) QueryExact(componentIDs ...ComponentID) []Entity {
 	self.mu.RLock()
@@ -399,6 +441,32 @@ func (self *World) QueryExact(componentIDs ...ComponentID) []Entity {
 	// Only return entities from archetypes that match the exact mask
 	if arch, exists := self.archetypes[mask]; exists {
 		res = append(res, arch.entities...)
+	}
+
+	return res
+}
+
+// QueryTag queries all entities which has a tag component and whose tag value is available in tags
+func (self *World) QueryTag(tags ...string) []Entity {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	res := make([]Entity, 0)
+	tagSet := make(map[string]struct{})
+	for _, tag := range tags {
+		tagSet[tag] = struct{}{}
+	}
+
+	tagQuery := self.Query(CTTag)
+
+	for _, entity := range tagQuery {
+		if component, ok := self.GetComponent(entity, CTTag); ok {
+			if tagComponent, ok := component.(*TagComponent); ok {
+				if _, ok := tagSet[tagComponent.Tag]; ok {
+					res = append(res, entity)
+				}
+			}
+		}
 	}
 
 	return res
