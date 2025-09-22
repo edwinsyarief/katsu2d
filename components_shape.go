@@ -67,14 +67,6 @@ func (self *RectangleComponent) SetStroke(width float32, col color.RGBA) {
 	self.dirty = true
 }
 
-func (self *RectangleComponent) GetVertices() []ebiten.Vertex {
-	return self.Vertices
-}
-
-func (self *RectangleComponent) GetIndices() []uint16 {
-	return self.Indices
-}
-
 func (self *RectangleComponent) Rebuild() {
 	if !self.dirty {
 		return
@@ -576,8 +568,8 @@ func (self *TriangleComponent) generateStroke() {
 func (self *TriangleComponent) generatePath(width, height, radius float32, colors [4]color.RGBA, segments ...int) []ebiten.Vertex {
 	points := []struct{ x, y float32 }{
 		{width / 2, 0},
-		{width, height},
 		{0, height},
+		{width, height},
 	}
 
 	if radius > 0 {
@@ -746,60 +738,96 @@ func (self *PolygonComponent) generateMiterPath(points []ebiten.Vertex, strokeWi
 	return generateMiterPathForPolygon(points, strokeWidth)
 }
 
-func generateRoundedPathForPolygon(points []struct{ x, y float32 }, radius float32, colors [4]color.RGBA, width, height float32, segments int, calculateSegments func(radius float32) int) []ebiten.Vertex {
+func generateRoundedPathForPolygon(points []struct{ x, y float32 }, cornerRadius float32, colors [4]color.RGBA, width, height float32, segments int, calculateSegments func(radius float32) int) []ebiten.Vertex {
 	path := make([]ebiten.Vertex, 0)
 	numPoints := len(points)
 
 	if segments == 0 {
-		segments = calculateSegments(radius)
+		segments = calculateSegments(cornerRadius)
 	}
 
 	for i := 0; i < numPoints; i++ {
-		p1 := points[i]
-		p2 := points[(i+1)%numPoints]
-		p3 := points[(i+2)%numPoints]
+		p1 := points[(i+numPoints-1)%numPoints] // Previous
+		p2 := points[i]                         // Current (the corner)
+		p3 := points[(i+1)%numPoints]           // Next
 
 		v1 := struct{ x, y float32 }{p1.x - p2.x, p1.y - p2.y}
 		v2 := struct{ x, y float32 }{p3.x - p2.x, p3.y - p2.y}
 
 		len1 := float32(math.Sqrt(float64(v1.x*v1.x + v1.y*v1.y)))
-		v1.x /= len1
-		v1.y /= len1
+		if len1 > 0 {
+			v1.x /= len1
+			v1.y /= len1
+		}
 
 		len2 := float32(math.Sqrt(float64(v2.x*v2.x + v2.y*v2.y)))
-		v2.x /= len2
-		v2.y /= len2
+		if len2 > 0 {
+			v2.x /= len2
+			v2.y /= len2
+		}
 
 		angle := float32(math.Acos(float64(v1.x*v2.x + v1.y*v2.y)))
-		dist := radius / float32(math.Tan(float64(angle/2)))
 
+		// When angle is close to 0 or Pi, it's a straight line or a 180-degree turn.
+		// Rounding is not well-defined here and can cause huge floating point errors.
+		// So we just draw a sharp corner by adding the vertex p2.
+		// To maintain the same number of vertices for stroke calculations, we add it 'segments' times.
+		if math.IsNaN(float64(angle)) || angle < 1e-4 || angle > math.Pi-1e-4 {
+			vColor := interpolateColor(p2.x, p2.y, width, height, colors)
+			cr, cg, cb, ca := vColor.RGBA()
+			vert := ebiten.Vertex{
+				DstX:   p2.x,
+				DstY:   p2.y,
+				ColorR: float32(cr) / 0xffff, ColorG: float32(cg) / 0xffff, ColorB: float32(cb) / 0xffff, ColorA: float32(ca) / 0xffff,
+			}
+			for j := 0; j < segments; j++ {
+				path = append(path, vert)
+			}
+			continue
+		}
+
+		dist := cornerRadius / float32(math.Tan(float64(angle/2)))
 		startPt := struct{ x, y float32 }{p2.x + dist*v1.x, p2.y + dist*v1.y}
 		endPt := struct{ x, y float32 }{p2.x + dist*v2.x, p2.y + dist*v2.y}
 
-		center_x := p2.x + (v1.x+v2.x)/2*dist
-		center_y := p2.y + (v1.y+v2.y)/2*dist
+		bisector := struct{ x, y float32 }{v1.x + v2.x, v1.y + v2.y}
+		len_bisector := float32(math.Sqrt(float64(bisector.x*bisector.x + bisector.y*bisector.y)))
+		if len_bisector > 0 {
+			bisector.x /= len_bisector
+			bisector.y /= len_bisector
+		}
 
-		startAngle := float32(math.Atan2(float64(startPt.y-center_y), float64(startPt.x-center_x)))
-		endAngle := float32(math.Atan2(float64(endPt.y-center_y), float64(endPt.x-center_x)))
+		center_dist := cornerRadius / float32(math.Sin(float64(angle/2)))
+		arcCenter := struct{ x, y float32 }{p2.x + bisector.x*center_dist, p2.y + bisector.y*center_dist}
 
-		if v1.x*v2.y-v1.y*v2.x < 0 {
+		startAngle := float32(math.Atan2(float64(startPt.y-arcCenter.y), float64(startPt.x-arcCenter.x)))
+		endAngle := float32(math.Atan2(float64(endPt.y-arcCenter.y), float64(endPt.x-arcCenter.x)))
+
+		// For a convex corner on a CCW polygon, the cross product of incoming vectors is negative.
+		cross_product := v1.x*v2.y - v1.y*v2.x
+		if cross_product < 0 {
 			startAngle, endAngle = endAngle, startAngle
 		}
 
-		for j := 0; j < segments; j++ {
-			ratio := float32(j) / float32(segments-1)
-			interpAngle := startAngle + ratio*(endAngle-startAngle)
-			if endAngle < startAngle {
-				interpAngle = startAngle - ratio*(startAngle-endAngle)
-			}
+		if endAngle < startAngle {
+			endAngle += 2 * math.Pi
+		}
 
-			x := center_x + radius*float32(math.Cos(float64(interpAngle)))
-			y := center_y + radius*float32(math.Sin(float64(interpAngle)))
+		for j := 0; j < segments; j++ {
+			var ratio float32
+			if segments > 1 {
+				ratio = float32(j) / float32(segments-1)
+			}
+			interpAngle := startAngle + ratio*(endAngle-startAngle)
+
+			x := arcCenter.x + cornerRadius*float32(math.Cos(float64(interpAngle)))
+			y := arcCenter.y + cornerRadius*float32(math.Sin(float64(interpAngle)))
 
 			vColor := interpolateColor(x, y, width, height, colors)
 			cr, cg, cb, ca := vColor.RGBA()
 			path = append(path, ebiten.Vertex{
-				DstX: x, DstY: y,
+				DstX:   x,
+				DstY:   y,
 				ColorR: float32(cr) / 0xffff, ColorG: float32(cg) / 0xffff, ColorB: float32(cb) / 0xffff, ColorA: float32(ca) / 0xffff,
 			})
 		}
@@ -843,59 +871,57 @@ func (self *PolygonComponent) triangulateFill(fillPath []ebiten.Vertex, colors [
 	}
 }
 
-// FIX: This function has been rewritten using a more robust algorithm to correctly
-// calculate the miter join for sharp corners on polygons with a clockwise vertex order.
 func generateMiterPathForPolygon(points []ebiten.Vertex, strokeWidth float32) []ebiten.Vertex {
+	path := make([]ebiten.Vertex, len(points))
 	numPoints := len(points)
+
 	if numPoints < 3 {
 		return points
 	}
-	path := make([]ebiten.Vertex, numPoints)
 
 	for i := 0; i < numPoints; i++ {
-		p_prev := points[i]
-		p_curr := points[(i+1)%numPoints]
-		p_next := points[(i+2)%numPoints]
+		p_prev := points[(i+numPoints-1)%numPoints]
+		p_curr := points[i]
+		p_next := points[(i+1)%numPoints]
 
-		// Get tangent vectors pointing along the path direction
-		t1 := struct{ x, y float32 }{p_curr.DstX - p_prev.DstX, p_curr.DstY - p_prev.DstY}
-		t2 := struct{ x, y float32 }{p_next.DstX - p_curr.DstX, p_next.DstY - p_curr.DstY}
+		e1 := struct{ x, y float32 }{p_curr.DstX - p_prev.DstX, p_curr.DstY - p_prev.DstY}
+		e2 := struct{ x, y float32 }{p_next.DstX - p_curr.DstX, p_next.DstY - p_curr.DstY}
 
-		// Normalize tangents
-		len1 := float32(math.Sqrt(float64(t1.x*t1.x + t1.y*t1.y)))
-		if len1 > 1e-6 {
-			t1.x /= len1
-			t1.y /= len1
-		}
-		len2 := float32(math.Sqrt(float64(t2.x*t2.x + t2.y*t2.y)))
-		if len2 > 1e-6 {
-			t2.x /= len2
-			t2.y /= len2
+		len1 := float32(math.Sqrt(float64(e1.x*e1.x + e1.y*e1.y)))
+		if len1 > 0 {
+			e1.x /= len1
+			e1.y /= len1
 		}
 
-		// Get the right-hand normal for each tangent. For a CW path, this points outwards.
-		n1 := struct{ x, y float32 }{t1.y, -t1.x}
-		n2 := struct{ x, y float32 }{t2.y, -t2.x}
+		len2 := float32(math.Sqrt(float64(e2.x*e2.x + e2.y*e2.y)))
+		if len2 > 0 {
+			e2.x /= len2
+			e2.y /= len2
+		}
 
-		// The miter direction is the normalized sum of the two normals.
-		miter_dir := struct{ x, y float32 }{n1.x + n2.x, n1.y + n2.y}
-		len_miter := float32(math.Sqrt(float64(miter_dir.x*miter_dir.x + miter_dir.y*miter_dir.y)))
+		// Assuming CCW winding order for polygons, outward normal is (-dy, dx)
+		normal1 := struct{ x, y float32 }{-e1.y, e1.x}
+		normal2 := struct{ x, y float32 }{-e2.y, e2.x}
+
+		miter_vec := struct{ x, y float32 }{normal1.x + normal2.x, normal1.y + normal2.y}
+		len_miter := float32(math.Sqrt(float64(miter_vec.x*miter_vec.x + miter_vec.y*miter_vec.y)))
+
 		if len_miter > 1e-6 {
-			miter_dir.x /= len_miter
-			miter_dir.y /= len_miter
+			miter_vec.x /= len_miter
+			miter_vec.y /= len_miter
+		} else {
+			miter_vec = normal1
 		}
 
-		// The length of the miter is strokeWidth / dot(miter_dir, normal).
-		// This correctly scales the miter vector to the corner.
-		dot := miter_dir.x*n1.x + miter_dir.y*n1.y
-		miterLen := strokeWidth
-		if math.Abs(float64(dot)) > 1e-6 {
-			miterLen = strokeWidth / dot
+		dot_product := miter_vec.x*normal1.x + miter_vec.y*normal1.y
+		miter_len := strokeWidth
+		if math.Abs(float64(dot_product)) > 1e-6 {
+			miter_len = strokeWidth / dot_product
 		}
 
-		path[(i+1)%numPoints] = ebiten.Vertex{
-			DstX:   p_curr.DstX + miter_dir.x*miterLen,
-			DstY:   p_curr.DstY + miter_dir.y*miterLen,
+		path[i] = ebiten.Vertex{
+			DstX:   p_curr.DstX + miter_vec.x*miter_len,
+			DstY:   p_curr.DstY + miter_vec.y*miter_len,
 			ColorR: p_curr.ColorR, ColorG: p_curr.ColorG, ColorB: p_curr.ColorB, ColorA: p_curr.ColorA,
 		}
 	}
