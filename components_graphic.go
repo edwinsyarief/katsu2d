@@ -378,125 +378,144 @@ func (self *RectangleComponent) Rebuild() {
 	self.Vertices = nil
 	self.Indices = nil
 
-	if self.StrokeWidth > 0 {
-		self.appendStroke()
-	}
-	self.appendFill()
-}
-
-func (self *RectangleComponent) appendFill() {
-	cr, cg, cb, ca := self.Color.RGBA()
-	fillColor := ebiten.Vertex{
-		ColorR: float32(cr) / 0xffff,
-		ColorG: float32(cg) / 0xffff,
-		ColorB: float32(cb) / 0xffff,
-		ColorA: float32(ca) / 0xffff,
-	}
-	self.appendRect(self.Width, self.Height, self.TopLeftRadius, self.TopRightRadius, self.BottomLeftRadius, self.BottomRightRadius, fillColor)
-}
-
-func (self *RectangleComponent) appendStroke() {
-	sr, sg, sb, sa := self.StrokeColor.RGBA()
-	strokeColor := ebiten.Vertex{
-		ColorR: float32(sr) / 0xffff,
-		ColorG: float32(sg) / 0xffff,
-		ColorB: float32(sb) / 0xffff,
-		ColorA: float32(sa) / 0xffff,
-	}
-
 	sw := self.StrokeWidth
-	outerTl := self.TopLeftRadius
-	if outerTl != 0 {
-		outerTl += sw
+	innerRadii := radii{self.TopLeftRadius, self.TopRightRadius, self.BottomLeftRadius, self.BottomRightRadius}
+
+	outerRadii := innerRadii
+	if innerRadii.tl > 0 {
+		outerRadii.tl += sw
 	}
-	outerTr := self.TopRightRadius
-	if outerTr != 0 {
-		outerTr += sw
+	if innerRadii.tr > 0 {
+		outerRadii.tr += sw
 	}
-	outerBl := self.BottomLeftRadius
-	if outerBl != 0 {
-		outerBl += sw
+	if innerRadii.bl > 0 {
+		outerRadii.bl += sw
 	}
-	outerBr := self.BottomRightRadius
-	if outerBr != 0 {
-		outerBr += sw
+	if innerRadii.br > 0 {
+		outerRadii.br += sw
 	}
 
-	self.appendRect(self.Width+sw*2, self.Height+sw*2, outerTl, outerTr, outerBl, outerBr, strokeColor)
+	seg := segments{
+		tl: self.calculateSegments(outerRadii.tl),
+		tr: self.calculateSegments(outerRadii.tr),
+		bl: self.calculateSegments(outerRadii.bl),
+		br: self.calculateSegments(outerRadii.br),
+	}
+
+	// Generate fill mesh
+	innerPath := self.generatePath(self.Width, self.Height, innerRadii, seg)
+	self.triangulateFill(innerPath)
+
+	// Generate stroke mesh
+	if sw > 0 {
+		outerPath := self.generatePath(self.Width+sw*2, self.Height+sw*2, outerRadii, seg)
+		self.triangulateStroke(outerPath, innerPath)
+	}
 }
 
-func (self *RectangleComponent) appendRect(width, height, tl, tr, bl, br float32, color ebiten.Vertex) {
-	offsetX := (self.Width - width) / 2
-	offsetY := (self.Height - height) / 2
+type radii struct{ tl, tr, bl, br float32 }
+type segments struct{ tl, tr, bl, br int }
 
-	baseIndex := uint16(len(self.Vertices))
-
-	// Center vertex
-	self.Vertices = append(self.Vertices, ebiten.Vertex{
-		DstX:   width/2 + offsetX,
-		DstY:   height/2 + offsetY,
-		SrcX:   0,
-		SrcY:   0,
-		ColorR: color.ColorR,
-		ColorG: color.ColorG,
-		ColorB: color.ColorB,
-		ColorA: color.ColorA,
-	})
-
-	// Generate vertices for the corners
-	self.generateCorner(width-br, height-br, br, 0, 90, color, offsetX, offsetY)
-	self.generateCorner(bl, height-bl, bl, 90, 180, color, offsetX, offsetY)
-	self.generateCorner(tl, tl, tl, 180, 270, color, offsetX, offsetY)
-	self.generateCorner(width-tr, tr, tr, 270, 360, color, offsetX, offsetY)
-
-	// Create indices
-	numPartVertices := uint16(len(self.Vertices)) - baseIndex
-	if numPartVertices <= 2 {
-		self.Vertices = self.Vertices[:baseIndex]
-		return
-	}
-	for i := uint16(1); i < numPartVertices-1; i++ {
-		self.Indices = append(self.Indices, baseIndex, baseIndex+i, baseIndex+i+1)
-	}
-	self.Indices = append(self.Indices, baseIndex, baseIndex+numPartVertices-1, baseIndex+1)
-}
-
-func (self *RectangleComponent) generateCorner(cx, cy, radius, startAngle, endAngle float32, color ebiten.Vertex, offsetX, offsetY float32) {
+func (self *RectangleComponent) calculateSegments(radius float32) int {
 	if radius <= 0 {
-		self.Vertices = append(self.Vertices, ebiten.Vertex{
-			DstX:   cx + offsetX,
-			DstY:   cy + offsetY,
-			SrcX:   0,
-			SrcY:   0,
-			ColorR: color.ColorR,
-			ColorG: color.ColorG,
-			ColorB: color.ColorB,
-			ColorA: color.ColorA,
-		})
-		return
+		return 1
 	}
-
-	// Calculate the number of segments based on the radius to ensure a smooth curve.
-	// We aim for each segment to be approximately 1.0 pixels long.
-	arcLength := float32(radius * math.Pi / 2) // Length of a 90-degree arc
-	segments := int(arcLength)
+	arcLength := float32(radius * math.Pi / 2)
+	segments := int(arcLength / 1.5)
 	if segments < 4 {
 		segments = 4
 	}
-	for i := 0; i <= segments; i++ {
-		angle := float64(startAngle) + float64(i)*(float64(endAngle-startAngle))/float64(segments)
+	if segments > 50 {
+		segments = 50
+	}
+	return segments
+}
+
+func (self *RectangleComponent) generatePath(width, height float32, rd radii, seg segments) []ebiten.Vertex {
+	path := make([]ebiten.Vertex, 0)
+
+	// Top-left corner
+	path = append(path, self.generateCorner(rd.tl, rd.tl, rd.tl, 180, 270, seg.tl)...)
+	// Top-right corner
+	path = append(path, self.generateCorner(width-rd.tr, rd.tr, rd.tr, 270, 360, seg.tr)...)
+	// Bottom-right corner
+	path = append(path, self.generateCorner(width-rd.br, height-rd.br, rd.br, 0, 90, seg.br)...)
+	// Bottom-left corner
+	path = append(path, self.generateCorner(rd.bl, height-rd.bl, rd.bl, 90, 180, seg.bl)...)
+
+	return path
+}
+
+func (self *RectangleComponent) generateCorner(cx, cy, radius, startAngle, endAngle float32, segments int) []ebiten.Vertex {
+	cornerVerts := make([]ebiten.Vertex, 0, segments)
+	for i := 0; i < segments; i++ {
+		angle := float64(startAngle)
+		if segments > 1 {
+			angle += float64(i) * (float64(endAngle - startAngle)) / float64(segments-1)
+		}
 		rad := angle * math.Pi / 180
 		x := cx + radius*float32(math.Cos(rad))
 		y := cy + radius*float32(math.Sin(rad))
-		self.Vertices = append(self.Vertices, ebiten.Vertex{
-			DstX:   x + offsetX,
-			DstY:   y + offsetY,
-			SrcX:   0,
-			SrcY:   0,
-			ColorR: color.ColorR,
-			ColorG: color.ColorG,
-			ColorB: color.ColorB,
-			ColorA: color.ColorA,
-		})
+		cornerVerts = append(cornerVerts, ebiten.Vertex{DstX: x, DstY: y})
+	}
+	return cornerVerts
+}
+
+func (self *RectangleComponent) triangulateStroke(outerPath, innerPath []ebiten.Vertex) {
+	cr, cg, cb, ca := self.StrokeColor.RGBA()
+	colorR, colorG, colorB, colorA := float32(cr)/0xffff, float32(cg)/0xffff, float32(cb)/0xffff, float32(ca)/0xffff
+
+	baseIndex := uint16(len(self.Vertices))
+
+	if len(outerPath) != len(innerPath) {
+		return
+	}
+	numVerts := len(outerPath)
+
+	sw := self.StrokeWidth
+	for _, v := range outerPath {
+		v.DstX -= sw
+		v.DstY -= sw
+		v.ColorR, v.ColorG, v.ColorB, v.ColorA = colorR, colorG, colorB, colorA
+		self.Vertices = append(self.Vertices, v)
+	}
+
+	for _, v := range innerPath {
+		v.ColorR, v.ColorG, v.ColorB, v.ColorA = colorR, colorG, colorB, colorA
+		self.Vertices = append(self.Vertices, v)
+	}
+
+	for i := 0; i < numVerts; i++ {
+		p0 := baseIndex + uint16(i)
+		p1 := baseIndex + uint16((i+1)%numVerts)
+		p2 := baseIndex + uint16(i) + uint16(numVerts)
+		p3 := baseIndex + uint16((i+1)%numVerts) + uint16(numVerts)
+
+		self.Indices = append(self.Indices, p0, p2, p1, p1, p2, p3)
+	}
+}
+
+func (self *RectangleComponent) triangulateFill(fillPath []ebiten.Vertex) {
+	cr, cg, cb, ca := self.Color.RGBA()
+	colorR, colorG, colorB, colorA := float32(cr)/0xffff, float32(cg)/0xffff, float32(cb)/0xffff, float32(ca)/0xffff
+
+	baseIndex := uint16(len(self.Vertices))
+
+	center := ebiten.Vertex{
+		DstX: self.Width / 2, DstY: self.Height / 2,
+		ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA,
+	}
+	self.Vertices = append(self.Vertices, center)
+
+	for _, v := range fillPath {
+		v.ColorR, v.ColorG, v.ColorB, v.ColorA = colorR, colorG, colorB, colorA
+		self.Vertices = append(self.Vertices, v)
+	}
+
+	numPerimeterVerts := len(fillPath)
+	for i := 0; i < numPerimeterVerts; i++ {
+		p1 := baseIndex + 1 + uint16(i)
+		p2 := baseIndex + 1 + uint16((i+1)%numPerimeterVerts)
+		self.Indices = append(self.Indices, baseIndex, p1, p2)
 	}
 }
