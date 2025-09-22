@@ -379,7 +379,7 @@ func (self *RectangleComponent) Rebuild() {
 	self.Indices = nil
 
 	sw := self.StrokeWidth
-	innerRadii := radii{self.TopLeftRadius, self.TopRightRadius, self.BottomLeftRadius, self.BottomRightRadius}
+	innerRadii := rectCornerRadii{self.TopLeftRadius, self.TopRightRadius, self.BottomLeftRadius, self.BottomRightRadius}
 
 	outerRadii := innerRadii
 	if innerRadii.tl > 0 {
@@ -395,7 +395,7 @@ func (self *RectangleComponent) Rebuild() {
 		outerRadii.br += sw
 	}
 
-	seg := segments{
+	seg := rectCornerSegments{
 		tl: self.calculateSegments(outerRadii.tl),
 		tr: self.calculateSegments(outerRadii.tr),
 		bl: self.calculateSegments(outerRadii.bl),
@@ -413,8 +413,8 @@ func (self *RectangleComponent) Rebuild() {
 	}
 }
 
-type radii struct{ tl, tr, bl, br float32 }
-type segments struct{ tl, tr, bl, br int }
+type rectCornerRadii struct{ tl, tr, bl, br float32 }
+type rectCornerSegments struct{ tl, tr, bl, br int }
 
 func (self *RectangleComponent) calculateSegments(radius float32) int {
 	if radius <= 0 {
@@ -431,7 +431,7 @@ func (self *RectangleComponent) calculateSegments(radius float32) int {
 	return segments
 }
 
-func (self *RectangleComponent) generatePath(width, height float32, rd radii, seg segments) []ebiten.Vertex {
+func (self *RectangleComponent) generatePath(width, height float32, rd rectCornerRadii, seg rectCornerSegments) []ebiten.Vertex {
 	path := make([]ebiten.Vertex, 0)
 
 	// Top-left corner
