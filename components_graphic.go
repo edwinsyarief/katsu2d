@@ -403,7 +403,26 @@ func (self *RectangleComponent) appendStroke() {
 		ColorB: float32(sb) / 0xffff,
 		ColorA: float32(sa) / 0xffff,
 	}
-	self.appendRect(self.Width+self.StrokeWidth*2, self.Height+self.StrokeWidth*2, self.TopLeftRadius+self.StrokeWidth, self.TopRightRadius+self.StrokeWidth, self.BottomLeftRadius+self.StrokeWidth, self.BottomRightRadius+self.StrokeWidth, strokeColor)
+
+	sw := self.StrokeWidth
+	outerTl := self.TopLeftRadius
+	if outerTl != 0 {
+		outerTl += sw
+	}
+	outerTr := self.TopRightRadius
+	if outerTr != 0 {
+		outerTr += sw
+	}
+	outerBl := self.BottomLeftRadius
+	if outerBl != 0 {
+		outerBl += sw
+	}
+	outerBr := self.BottomRightRadius
+	if outerBr != 0 {
+		outerBr += sw
+	}
+
+	self.appendRect(self.Width+sw*2, self.Height+sw*2, outerTl, outerTr, outerBl, outerBr, strokeColor)
 }
 
 func (self *RectangleComponent) appendRect(width, height, tl, tr, bl, br float32, color ebiten.Vertex) {
@@ -456,6 +475,7 @@ func (self *RectangleComponent) generateCorner(cx, cy, radius, startAngle, endAn
 		})
 		return
 	}
+
 	// Calculate the number of segments based on the radius to ensure a smooth curve.
 	// We aim for each segment to be approximately 1.0 pixels long.
 	arcLength := float32(radius * math.Pi / 2) // Length of a 90-degree arc
