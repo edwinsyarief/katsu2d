@@ -1,6 +1,7 @@
 package katsu2d
 
 import (
+	"image/color"
 	"sort"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
@@ -209,9 +210,11 @@ type RectangleRenderSystem struct {
 }
 
 // NewRectangleRenderSystem creates a new RectangleRenderSystem.
-func NewRectangleRenderSystem(tm *TextureManager) *RectangleRenderSystem {
+func NewRectangleRenderSystem() *RectangleRenderSystem {
+	img := ebiten.NewImage(1, 1)
+	img.Fill(color.White)
 	return &RectangleRenderSystem{
-		img: tm.Get(0),
+		img: img,
 	}
 }
 
@@ -227,6 +230,7 @@ func (self *RectangleRenderSystem) Update(world *World, dt float64) {
 
 // Draw renders all rectangle components in the world.
 func (self *RectangleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
+	renderer.SetDrawOptions(WithRenderAntiAlias(true))
 	entities := world.Query(CTTransform, CTRectangle)
 	for _, e := range entities {
 		rectAny, _ := world.GetComponent(e, CTRectangle)
@@ -245,8 +249,8 @@ func (self *RectangleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			vx, vy := (&transformMatrix).Apply(float64(v.DstX), float64(v.DstY))
 			v.DstX = float32(vx)
 			v.DstY = float32(vy)
-			v.SrcX = 1
-			v.SrcY = 1
+			v.SrcX = 0
+			v.SrcY = 0
 			worldVertices[i] = v
 		}
 		renderer.AddCustomMeshes(worldVertices, rect.Indices, self.img)

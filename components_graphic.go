@@ -431,14 +431,35 @@ func (self *RectangleComponent) appendRect(width, height, tl, tr, bl, br float32
 	self.generateCorner(width-tr, tr, tr, 270, 360, color, offsetX, offsetY)
 
 	// Create indices
-	for i := uint16(1); i < uint16(len(self.Vertices))-baseIndex; i++ {
+	numPartVertices := uint16(len(self.Vertices)) - baseIndex
+	if numPartVertices <= 2 {
+		self.Vertices = self.Vertices[:baseIndex]
+		return
+	}
+	for i := uint16(1); i < numPartVertices-1; i++ {
 		self.Indices = append(self.Indices, baseIndex, baseIndex+i, baseIndex+i+1)
 	}
-	self.Indices = append(self.Indices, baseIndex, uint16(len(self.Vertices))-1, baseIndex+1)
+	self.Indices = append(self.Indices, baseIndex, baseIndex+numPartVertices-1, baseIndex+1)
 }
 
 func (self *RectangleComponent) generateCorner(cx, cy, radius, startAngle, endAngle float32, color ebiten.Vertex, offsetX, offsetY float32) {
-	const segments = 10
+	if radius <= 0 {
+		self.Vertices = append(self.Vertices, ebiten.Vertex{
+			DstX:   cx + offsetX,
+			DstY:   cy + offsetY,
+			SrcX:   0,
+			SrcY:   0,
+			ColorR: color.ColorR,
+			ColorG: color.ColorG,
+			ColorB: color.ColorB,
+			ColorA: color.ColorA,
+		})
+		return
+	}
+	segments := int(math.Ceil(math.Sqrt(float64(radius)))) * 4
+	if segments < 8 {
+		segments = 8
+	}
 	for i := 0; i <= segments; i++ {
 		angle := float64(startAngle) + float64(i)*(float64(endAngle-startAngle))/float64(segments)
 		rad := angle * math.Pi / 180
