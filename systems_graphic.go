@@ -230,7 +230,6 @@ func (self *RectangleRenderSystem) Update(world *World, dt float64) {
 
 // Draw renders all rectangle components in the world.
 func (self *RectangleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
-	renderer.SetDrawOptions(WithRenderAntiAlias(true))
 	entities := world.Query(CTTransform, CTRectangle)
 	for _, e := range entities {
 		rectAny, _ := world.GetComponent(e, CTRectangle)

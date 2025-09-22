@@ -456,9 +456,12 @@ func (self *RectangleComponent) generateCorner(cx, cy, radius, startAngle, endAn
 		})
 		return
 	}
-	segments := int(math.Ceil(math.Sqrt(float64(radius)))) * 4
-	if segments < 8 {
-		segments = 8
+	// Calculate the number of segments based on the radius to ensure a smooth curve.
+	// We aim for each segment to be approximately 1.0 pixels long.
+	arcLength := float32(radius * math.Pi / 2) // Length of a 90-degree arc
+	segments := int(arcLength)
+	if segments < 4 {
+		segments = 4
 	}
 	for i := 0; i <= segments; i++ {
 		angle := float64(startAngle) + float64(i)*(float64(endAngle-startAngle))/float64(segments)
