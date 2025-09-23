@@ -44,11 +44,7 @@ var (
 	CTOrderable         ComponentID // Orderable component for render sorting
 	CTFoliage           ComponentID // Foliage component for vegetation
 	CTFoliageController ComponentID // Foliage controller for managing foliage physics
-	CTRectangle         ComponentID // Rectangle shape component
-	CTCircle            ComponentID // Circle shape component
-	CTTriangle          ComponentID // Triangle shape component
-	CTPentagon          ComponentID // Pentagon shape component
-	CTHexagon           ComponentID // Hexagon shape component
+	CTShape             ComponentID // Shape component
 )
 
 // RegisterComponent registers a component type and returns its unique ID.
@@ -94,9 +90,5 @@ func init() {
 	CTOrderable = RegisterComponent[*OrderableComponent]()
 	CTFoliage = RegisterComponent[*FoliageComponent]()
 	CTFoliageController = RegisterComponent[*FoliageControllerComponent]()
-	CTRectangle = RegisterComponent[*RectangleComponent]()
-	CTCircle = RegisterComponent[*CircleComponent]()
-	CTTriangle = RegisterComponent[*TriangleComponent]()
-	CTPentagon = RegisterComponent[*PentagonComponent]()
-	CTHexagon = RegisterComponent[*HexagonComponent]()
+	CTShape = RegisterComponent[*ShapeComponent]()
 }
