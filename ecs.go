@@ -404,9 +404,33 @@ func (self *World) QueryExact(componentIDs ...ComponentID) []Entity {
 	return res
 }
 
-// QueryWithExclusion returns entities that have any components from includes
+// QueryAny returns entities that have at least one of the specified components.
+func (self *World) QueryAny(componentIDs ...ComponentID) []Entity {
+	self.mu.RLock()
+	defer self.mu.RUnlock()
+
+	if len(componentIDs) == 0 {
+		return []Entity{}
+	}
+
+	res := make([]Entity, 0)
+	var includeMask uint64
+	for _, id := range componentIDs {
+		includeMask |= 1 << uint64(id)
+	}
+
+	for archMask, arch := range self.archetypes {
+		if archMask&includeMask != 0 {
+			res = append(res, arch.entities...)
+		}
+	}
+
+	return res
+}
+
+// QueryAnyWithExclusion returns entities that have any components from includes
 // but none of the components from excludes.
-func (self *World) QueryWithExclusion(includes []ComponentID, excludes []ComponentID) []Entity {
+func (self *World) QueryAnyWithExclusion(includes []ComponentID, excludes []ComponentID) []Entity {
 	self.mu.RLock()
 	defer self.mu.RUnlock()
 
