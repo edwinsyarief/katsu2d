@@ -54,7 +54,7 @@ func (self *RectangleComponent) SetStrokeColor(topLeft, topRight, bottomRight, b
 	self.dirty = true
 }
 
-func (self *RectangleComponent) SetRadii(topLeft, topRight, bottomLeft, bottomRight float32) {
+func (self *RectangleComponent) SetCornerRadius(topLeft, topRight, bottomLeft, bottomRight float32) {
 	self.TopLeftRadius = topLeft
 	self.TopRightRadius = topRight
 	self.BottomLeftRadius = bottomLeft
@@ -184,11 +184,11 @@ func (self *RectangleComponent) triangulateStroke(outerPath, innerPath []ebiten.
 	numVerts := len(outerPath)
 
 	sw := self.StrokeWidth
-	for _, v := range outerPath {
-		v.DstX -= sw
-		v.DstY -= sw
-		self.Vertices = append(self.Vertices, v)
+	for i := range outerPath {
+		outerPath[i].DstX -= sw
+		outerPath[i].DstY -= sw
 	}
+	self.Vertices = append(self.Vertices, outerPath...)
 	self.Vertices = append(self.Vertices, innerPath...)
 
 	for i := 0; i < numVerts; i++ {
@@ -532,16 +532,33 @@ func (t *TriangleComponent) generateFill() {
 func (t *TriangleComponent) generateStroke() {
 	sw := t.StrokeWidth
 	innerRadius := t.CornerRadius
-	outerRadius := t.CornerRadius
+	outerRadius := innerRadius
 	if innerRadius > 0 {
 		outerRadius += sw
 	}
 
-	segments := t.calculateSegments(outerRadius)
+	seg := t.calculateSegments(outerRadius)
 	var inner_path, outer_path []ebiten.Vertex
+
+	inner_points := []struct{ x, y float32 }{
+		{t.Width / 2, 0},
+		{t.Width, t.Height},
+		{0, t.Height},
+	}
+
 	if t.CornerRadius > 0 {
-		inner_path = t.generatePath(t.Width, t.Height, innerRadius, t.StrokeColors, segments)
-		outer_path = t.generatePath(t.Width, t.Height, outerRadius, t.StrokeColors, segments)
+		inner_path = generateRoundedPathForPolygon(inner_points, innerRadius, t.StrokeColors, t.Width, t.Height, seg, t.calculateSegments)
+
+		inner_sharp_verts := t.generateSharpPath(inner_points, t.StrokeColors)
+		outer_sharp_verts := generateMiterPathForPolygon(inner_sharp_verts, sw)
+
+		outer_points := make([]struct{ x, y float32 }, len(outer_sharp_verts))
+		for i, v := range outer_sharp_verts {
+			outer_points[i].x = v.DstX
+			outer_points[i].y = v.DstY
+		}
+
+		outer_path = generateRoundedPathForPolygon(outer_points, outerRadius, t.StrokeColors, t.Width, t.Height, seg, t.calculateSegments)
 	} else {
 		inner_path = t.generatePath(t.Width, t.Height, 0, t.StrokeColors)
 		outer_path = t.generateMiterPath(inner_path, sw)
@@ -569,15 +586,16 @@ func (t *TriangleComponent) generateStroke() {
 func (t *TriangleComponent) generatePath(width, height, radius float32, colors [4]color.RGBA, segments ...int) []ebiten.Vertex {
 	points := []struct{ x, y float32 }{
 		{width / 2, 0},
-		{0, height},
 		{width, height},
+		{0, height},
 	}
 
 	if radius > 0 {
+		var seg int
 		if len(segments) > 0 {
-			return t.generateRoundedPath(points, radius, colors, segments[0])
+			seg = segments[0]
 		}
-		return t.generateRoundedPath(points, radius, colors, 0)
+		return generateRoundedPathForPolygon(points, radius, colors, width, height, seg, t.calculateSegments)
 	}
 	return t.generateSharpPath(points, colors)
 }
@@ -593,10 +611,6 @@ func (t *TriangleComponent) generateSharpPath(points []struct{ x, y float32 }, c
 		}
 	}
 	return path
-}
-
-func (t *TriangleComponent) generateRoundedPath(points []struct{ x, y float32 }, radius float32, colors [4]color.RGBA, segments int) []ebiten.Vertex {
-	return generateRoundedPathForPolygon(points, radius, colors, t.Width, t.Height, segments, t.calculateSegments)
 }
 
 func (t *TriangleComponent) generateMiterPath(points []ebiten.Vertex, strokeWidth float32) []ebiten.Vertex {
@@ -663,23 +677,43 @@ func (p *PolygonComponent) generateFill() {
 func (p *PolygonComponent) generateStroke() {
 	sw := p.StrokeWidth
 	innerRadius := p.CornerRadius
-	outerRadius := p.CornerRadius
+	outerRadius := innerRadius
 	if innerRadius > 0 {
 		outerRadius += sw
 	}
 
-	segments := p.calculateSegments(outerRadius)
+	seg := p.calculateSegments(outerRadius)
 	var inner_path, outer_path []ebiten.Vertex
+
+	inner_points := make([]struct{ x, y float32 }, p.Sides)
+	angleStep := 2 * math.Pi / float32(p.Sides)
+	for i := 0; i < p.Sides; i++ {
+		angle := float32(i)*angleStep - float32(math.Pi/2)
+		inner_points[i] = struct{ x, y float32 }{
+			x: p.Radius + p.Radius*float32(math.Cos(float64(angle))),
+			y: p.Radius + p.Radius*float32(math.Sin(float64(angle))),
+		}
+	}
+
 	if p.CornerRadius > 0 {
-		inner_path = p.generatePath(p.Radius, innerRadius, p.StrokeColors, segments)
-		outer_path = p.generatePath(p.Radius, outerRadius, p.StrokeColors, segments)
+		inner_path = generateRoundedPathForPolygon(inner_points, innerRadius, p.StrokeColors, p.Radius*2, p.Radius*2, seg, p.calculateSegments)
+
+		inner_sharp_verts := p.generateSharpPath(inner_points, p.StrokeColors, p.Radius)
+		outer_sharp_verts := generateMiterPathForPolygon(inner_sharp_verts, sw)
+
+		outer_points := make([]struct{ x, y float32 }, len(outer_sharp_verts))
+		for i, v := range outer_sharp_verts {
+			outer_points[i].x = v.DstX
+			outer_points[i].y = v.DstY
+		}
+
+		outer_path = generateRoundedPathForPolygon(outer_points, outerRadius, p.StrokeColors, p.Radius*2, p.Radius*2, seg, p.calculateSegments)
 	} else {
 		inner_path = p.generatePath(p.Radius, 0, p.StrokeColors)
 		outer_path = p.generateMiterPath(inner_path, sw)
 	}
 
 	if len(inner_path) != len(outer_path) {
-		// Fallback or error, for safety, though they should be the same now.
 		return
 	}
 
@@ -710,10 +744,11 @@ func (p *PolygonComponent) generatePath(radius, cornerRadius float32, colors [4]
 	}
 
 	if cornerRadius > 0 {
+		var seg int
 		if len(segments) > 0 {
-			return p.generateRoundedPath(points, cornerRadius, colors, radius, segments[0])
+			seg = segments[0]
 		}
-		return p.generateRoundedPath(points, cornerRadius, colors, radius, 0)
+		return generateRoundedPathForPolygon(points, cornerRadius, colors, radius*2, radius*2, seg, p.calculateSegments)
 	}
 	return p.generateSharpPath(points, colors, radius)
 }
@@ -731,12 +766,44 @@ func (p *PolygonComponent) generateSharpPath(points []struct{ x, y float32 }, co
 	return path
 }
 
-func (p *PolygonComponent) generateRoundedPath(points []struct{ x, y float32 }, radius float32, colors [4]color.RGBA, polyRadius float32, segments int) []ebiten.Vertex {
-	return generateRoundedPathForPolygon(points, radius, colors, polyRadius*2, polyRadius*2, segments, p.calculateSegments)
-}
-
 func (p *PolygonComponent) generateMiterPath(points []ebiten.Vertex, strokeWidth float32) []ebiten.Vertex {
 	return generateMiterPathForPolygon(points, strokeWidth)
+}
+
+func (p *PolygonComponent) calculateSegments(radius float32) int {
+	if radius <= 0 {
+		return 1
+	}
+	arcLength := float32(radius * math.Pi / 2)
+	segments := int(arcLength / 1.5)
+	if segments < 4 {
+		segments = 4
+	}
+	if segments > 25 {
+		segments = 25
+	}
+	return segments
+}
+
+func (p *PolygonComponent) triangulateFill(fillPath []ebiten.Vertex, colors [4]color.RGBA) {
+	baseIndex := uint16(len(p.Vertices))
+
+	avgColor := interpolateColor(p.Radius, p.Radius, p.Radius*2, p.Radius*2, colors)
+	cr, cg, cb, ca := avgColor.RGBA()
+
+	center := ebiten.Vertex{
+		DstX: p.Radius, DstY: p.Radius,
+		ColorR: float32(cr) / 0xffff, ColorG: float32(cg) / 0xffff, ColorB: float32(cb) / 0xffff, ColorA: float32(ca) / 0xffff,
+	}
+	p.Vertices = append(p.Vertices, center)
+	p.Vertices = append(p.Vertices, fillPath...)
+
+	numPerimeterVerts := len(fillPath)
+	for i := 0; i < numPerimeterVerts; i++ {
+		p1 := baseIndex + 1 + uint16(i)
+		p2 := baseIndex + 1 + uint16((i+1)%numPerimeterVerts)
+		p.Indices = append(p.Indices, baseIndex, p1, p2)
+	}
 }
 
 func generateRoundedPathForPolygon(points []struct{ x, y float32 }, cornerRadius float32, colors [4]color.RGBA, width, height float32, segments int, calculateSegments func(radius float32) int) []ebiten.Vertex {
@@ -853,42 +920,6 @@ func generateRoundedPathForPolygon(points []struct{ x, y float32 }, cornerRadius
 	return path
 }
 
-func (p *PolygonComponent) calculateSegments(radius float32) int {
-	if radius <= 0 {
-		return 1
-	}
-	arcLength := float32(radius * math.Pi / 2)
-	segments := int(arcLength / 1.5)
-	if segments < 4 {
-		segments = 4
-	}
-	if segments > 25 {
-		segments = 25
-	}
-	return segments
-}
-
-func (p *PolygonComponent) triangulateFill(fillPath []ebiten.Vertex, colors [4]color.RGBA) {
-	baseIndex := uint16(len(p.Vertices))
-
-	avgColor := interpolateColor(p.Radius, p.Radius, p.Radius*2, p.Radius*2, colors)
-	cr, cg, cb, ca := avgColor.RGBA()
-
-	center := ebiten.Vertex{
-		DstX: p.Radius, DstY: p.Radius,
-		ColorR: float32(cr) / 0xffff, ColorG: float32(cg) / 0xffff, ColorB: float32(cb) / 0xffff, ColorA: float32(ca) / 0xffff,
-	}
-	p.Vertices = append(p.Vertices, center)
-	p.Vertices = append(p.Vertices, fillPath...)
-
-	numPerimeterVerts := len(fillPath)
-	for i := 0; i < numPerimeterVerts; i++ {
-		p1 := baseIndex + 1 + uint16(i)
-		p2 := baseIndex + 1 + uint16((i+1)%numPerimeterVerts)
-		p.Indices = append(p.Indices, baseIndex, p1, p2)
-	}
-}
-
 func generateMiterPathForPolygon(points []ebiten.Vertex, strokeWidth float32) []ebiten.Vertex {
 	path := make([]ebiten.Vertex, len(points))
 	numPoints := len(points)
@@ -917,9 +948,9 @@ func generateMiterPathForPolygon(points []ebiten.Vertex, strokeWidth float32) []
 			e2.y /= len2
 		}
 
-		// Assuming CCW winding order for polygons, outward normal is (-dy, dx)
-		normal1 := struct{ x, y float32 }{-e1.y, e1.x}
-		normal2 := struct{ x, y float32 }{-e2.y, e2.x}
+		// Outward normals for CCW polygon: right perpendicular (dy, -dx)
+		normal1 := struct{ x, y float32 }{e1.y, -e1.x}
+		normal2 := struct{ x, y float32 }{e2.y, -e2.x}
 
 		miter_vec := struct{ x, y float32 }{normal1.x + normal2.x, normal1.y + normal2.y}
 		len_miter := float32(math.Sqrt(float64(miter_vec.x*miter_vec.x + miter_vec.y*miter_vec.y)))
