@@ -109,8 +109,8 @@ type ParticleEmitterComponent struct {
 	NoiseFactor float64
 
 	// Internal state
-	lastEmitTime time.Time // Tracks last particle emission time
-	spawnCounter float64   // Accumulates partial particle spawn credit
+	LastEmitTime time.Time // Tracks last particle emission time
+	SpawnCounter float64   // Accumulates partial particle spawn credit
 }
 
 // NewParticleEmitterComponent creates a new particle emitter with default settings
@@ -118,7 +118,7 @@ type ParticleEmitterComponent struct {
 func NewParticleEmitterComponent(textureIDs []int) *ParticleEmitterComponent {
 	return &ParticleEmitterComponent{
 		TextureIDs:   textureIDs,
-		lastEmitTime: time.Now(),
+		LastEmitTime: time.Now(),
 		// Default colors set to white
 		InitialColorMin: color.RGBA{255, 255, 255, 255},
 		InitialColorMax: color.RGBA{255, 255, 255, 255},

@@ -55,7 +55,7 @@ func (self *OrderableSystem) Draw(world *World, renderer *BatchRenderer) {
 			continue
 		}
 
-		if s.dirty {
+		if s.Dirty {
 			s.GenerateMesh()
 		}
 

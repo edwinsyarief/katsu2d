@@ -50,30 +50,30 @@ const (
 // basicCamera implements a 2D camera with smooth tracking, zoom, bump, and shake effects.
 // It follows a target transform, clamps to level bounds, and applies transformations to a scroller.
 type basicCamera struct {
-	target           *ebimath.Transform
-	scroller         *ebimath.Transform
-	targetOffset     ebimath.Vector
-	rawFocus         ebimath.Vector
-	clampedFocus     ebimath.Vector
-	originalViewport ebimath.Vector
-	viewport         ebimath.Vector
-	levelBounds      ebimath.Rectangle
-	baseZoom         float64
-	targetZoom       float64
-	zoomSpeed        float64
-	destZoom         float64
-	bumpZoom         float64
-	trackingSpeed    float64
-	destPoint        ebimath.Vector
-	bumpOffset       ebimath.Vector
-	shakePower       float64
-	clampBounds      bool
-	left             int
-	right            int
-	top              int
-	bottom           int
-	center           ebimath.Vector
-	cd               *managers.CooldownManager
+	Target           *ebimath.Transform
+	Scroller         *ebimath.Transform
+	TargetOffset     ebimath.Vector
+	RawFocus         ebimath.Vector
+	ClampedFocus     ebimath.Vector
+	OriginalViewport ebimath.Vector
+	Viewport         ebimath.Vector
+	LevelBounds      ebimath.Rectangle
+	BaseZoom         float64
+	TargetZoom       float64
+	ZoomSpeed        float64
+	DestZoom         float64
+	BumpZoom         float64
+	TrackingSpeed    float64
+	DestPoint        ebimath.Vector
+	BumpOffset       ebimath.Vector
+	ShakePower       float64
+	ClampBounds      bool
+	Left             int
+	Right            int
+	Top              int
+	Bottom           int
+	Center           ebimath.Vector
+	Cooldown         *managers.CooldownManager
 }
 
 // newBasicCamera creates a new basicCamera with the given viewport and scroller transform.
@@ -82,214 +82,199 @@ func newBasicCamera(viewport ebimath.Vector, scroller *ebimath.Transform) *basic
 		scroller = ebimath.T()
 	}
 	return &basicCamera{
-		scroller:         scroller,
-		targetOffset:     ebimath.V2(0),
-		viewport:         viewport,
-		originalViewport: viewport,
-		baseZoom:         1.0,
-		targetZoom:       1.0,
-		zoomSpeed:        0.0014,
-		trackingSpeed:    DefaultTrackingSpeed,
-		clampBounds:      true,
-		cd:               managers.NewCooldownManager(10),
+		Scroller:         scroller,
+		TargetOffset:     ebimath.V2(0),
+		Viewport:         viewport,
+		OriginalViewport: viewport,
+		BaseZoom:         1.0,
+		TargetZoom:       1.0,
+		ZoomSpeed:        0.0014,
+		TrackingSpeed:    DefaultTrackingSpeed,
+		ClampBounds:      true,
+		Cooldown:         managers.NewCooldownManager(10),
 	}
-}
-
-// GetViewport returns the camera’s viewport size in world coordinates.
-func (self *basicCamera) GetViewport() ebimath.Vector {
-	return self.viewport
-}
-
-// GetZoom returns the current zoom level (base + bump).
-func (self *basicCamera) GetZoom() float64 {
-	return self.baseZoom + self.bumpZoom
 }
 
 // SetZoomSpeed sets the speed of zoom interpolation.
 func (self *basicCamera) SetZoomSpeed(speed float64) {
-	self.zoomSpeed = speed
+	self.ZoomSpeed = speed
 }
 
 // ZoomTo sets a target zoom level with smooth interpolation.
 func (self *basicCamera) ZoomTo(value float64) {
-	self.targetZoom = ebimath.Clamp(value, MinZoom, MaxZoom)
+	self.TargetZoom = ebimath.Clamp(value, MinZoom, MaxZoom)
 }
 
 // ForceZoom sets the zoom level immediately without interpolation.
 func (self *basicCamera) ForceZoom(value float64) {
 	value = ebimath.Clamp(value, MinZoom, MaxZoom)
-	self.baseZoom = value
-	self.targetZoom = value
-	self.destZoom = 0
-}
-
-// BumpZoom applies a temporary zoom offset that decays over time.
-func (self *basicCamera) BumpZoom(value float64) {
-	self.bumpZoom = value
+	self.BaseZoom = value
+	self.TargetZoom = value
+	self.DestZoom = 0
 }
 
 // SetTrackingSpeed sets the speed at which the camera follows its target.
 func (self *basicCamera) SetTrackingSpeed(speed float64) {
-	self.trackingSpeed = speed
+	self.TrackingSpeed = speed
 }
 
 // TrackObject sets a target to follow with optional immediate centering and offset.
 func (self *basicCamera) TrackObject(target *ebimath.Transform, immediateFocus bool, trackingSpeed float64, offset ebimath.Vector) {
-	self.target = target
+	self.Target = target
 	if trackingSpeed > 0 {
-		self.trackingSpeed = trackingSpeed
+		self.TrackingSpeed = trackingSpeed
 	}
-	self.targetOffset = offset
-	if self.target != nil && (immediateFocus || self.rawFocus.IsZero()) {
+	self.TargetOffset = offset
+	if self.Target != nil && (immediateFocus || self.RawFocus.IsZero()) {
 		self.CenterOnTarget()
 	}
 }
 
 // CenterOnTarget instantly moves the camera to the target’s position.
 func (self *basicCamera) CenterOnTarget() {
-	if self.target != nil {
-		self.rawFocus = self.target.Position().Add(self.targetOffset.Scale(self.target.Scale()))
+	if self.Target != nil {
+		self.RawFocus = self.Target.Position().Add(self.TargetOffset.Scale(self.Target.Scale()))
 	}
 }
 
 // StopTrackObject stops tracking the current target.
 func (self *basicCamera) StopTrackObject() {
-	self.target = nil
+	self.Target = nil
 }
 
 // SetLevelBounds defines the level boundaries for clamping.
 func (self *basicCamera) SetLevelBounds(bounds ebimath.Rectangle) {
-	self.levelBounds = bounds
-	self.clampBounds = true
+	self.LevelBounds = bounds
+	self.ClampBounds = true
 }
 
 // SetClampToLevelBounds toggles clamping to level bounds.
 func (self *basicCamera) SetClampToLevelBounds(clamp bool) {
-	self.clampBounds = clamp
+	self.ClampBounds = clamp
 }
 
 // Bump applies a temporary position offset in world coordinates.
 func (self *basicCamera) Bump(v ebimath.Vector) {
-	self.bumpOffset = self.bumpOffset.Add(v)
+	self.BumpOffset = self.BumpOffset.Add(v)
 }
 
 // BumpAngular applies a position offset by angle and distance in world coordinates.
 func (self *basicCamera) BumpAngular(angle, distance float64) {
-	self.bumpOffset = self.bumpOffset.Add(ebimath.V(math.Cos(angle)*distance, math.Sin(angle)*distance))
+	self.BumpOffset = self.BumpOffset.Add(ebimath.V(math.Cos(angle)*distance, math.Sin(angle)*distance))
 }
 
 // Shake applies a shake effect with the given duration and power.
 func (self *basicCamera) Shake(duration, power float64) {
-	self.shakePower = power
+	self.ShakePower = power
 	if power != 0 {
-		self.cd.Set("shaking", duration, nil)
+		self.Cooldown.Set("shaking", duration, nil)
 	}
 }
 
 // IsShaking returns true if the camera is currently shaking.
 func (self *basicCamera) IsShaking() bool {
-	return self.cd.Has("shaking")
+	return self.Cooldown.Has("shaking")
 }
 
 func (self *basicCamera) Update(deltaTime float64) {
 	frameCount = (frameCount % math.MaxInt) + 1
-	zoom := self.GetZoom()
-	self.viewport = ebimath.V(self.originalViewport.X/zoom, self.originalViewport.Y/zoom)
-	self.cd.Update(deltaTime)
-	if zoomDiff := self.targetZoom - self.baseZoom; zoomDiff != 0 {
-		zoomStep := self.zoomSpeed * deltaTime
-		self.destZoom = ebimath.Clamp(self.destZoom+ebimath.Sign(zoomDiff)*zoomStep, math.Min(zoomDiff, 0), math.Max(zoomDiff, 0))
-		self.baseZoom += self.destZoom
-		self.destZoom *= math.Pow(ZoomFriction, deltaTime)
+	zoom := self.BaseZoom + self.BumpZoom
+	self.Viewport = ebimath.V(self.OriginalViewport.X/zoom, self.OriginalViewport.Y/zoom)
+	self.Cooldown.Update(deltaTime)
+	if zoomDiff := self.TargetZoom - self.BaseZoom; zoomDiff != 0 {
+		zoomStep := self.ZoomSpeed * deltaTime
+		self.DestZoom = ebimath.Clamp(self.DestZoom+ebimath.Sign(zoomDiff)*zoomStep, math.Min(zoomDiff, 0), math.Max(zoomDiff, 0))
+		self.BaseZoom += self.DestZoom
+		self.DestZoom *= math.Pow(ZoomFriction, deltaTime)
 	}
-	self.bumpZoom *= math.Pow(ZoomFriction, deltaTime)
-	if self.target != nil {
-		targetPos := self.target.Position().Add(self.targetOffset.Scale(self.target.Scale()))
-		angle := float64(self.rawFocus.AngleToPoint(targetPos))
-		distX := math.Abs(targetPos.X - self.rawFocus.X)
-		distY := math.Abs(targetPos.Y - self.rawFocus.Y)
-		spdX := TrackingSpeedFactorX * self.trackingSpeed * zoom
-		spdY := TrackingSpeedFactorY * self.trackingSpeed * zoom
-		if distX >= DeadZonePercentX*self.viewport.X {
-			deltaX := 0.8*distX - DeadZonePercentX*self.viewport.X
-			self.destPoint.X += math.Cos(angle) * deltaX * spdX * deltaTime
+	self.BumpZoom *= math.Pow(ZoomFriction, deltaTime)
+	if self.Target != nil {
+		targetPos := self.Target.Position().Add(self.TargetOffset.Scale(self.Target.Scale()))
+		angle := float64(self.RawFocus.AngleToPoint(targetPos))
+		distX := math.Abs(targetPos.X - self.RawFocus.X)
+		distY := math.Abs(targetPos.Y - self.RawFocus.Y)
+		spdX := TrackingSpeedFactorX * self.TrackingSpeed * zoom
+		spdY := TrackingSpeedFactorY * self.TrackingSpeed * zoom
+		if distX >= DeadZonePercentX*self.Viewport.X {
+			deltaX := 0.8*distX - DeadZonePercentX*self.Viewport.X
+			self.DestPoint.X += math.Cos(angle) * deltaX * spdX * deltaTime
 		}
-		if distY >= DeadZonePercentY*self.viewport.Y {
-			deltaY := 0.8*distY - DeadZonePercentY*self.viewport.Y
-			self.destPoint.Y += math.Sin(angle) * deltaY * spdY * deltaTime
+		if distY >= DeadZonePercentY*self.Viewport.Y {
+			deltaY := 0.8*distY - DeadZonePercentY*self.Viewport.Y
+			self.DestPoint.Y += math.Sin(angle) * deltaY * spdY * deltaTime
 		}
 	}
-	frict := BaseFriction - self.trackingSpeed*zoom*FrictionTrackingMod*BaseFriction
-	if self.clampBounds {
+	frict := BaseFriction - self.TrackingSpeed*zoom*FrictionTrackingMod*BaseFriction
+	if self.ClampBounds {
 		self.applyBreaking(&frict, deltaTime)
 	}
-	self.rawFocus = self.rawFocus.Add(self.destPoint.ScaleF(deltaTime))
-	self.destPoint = self.destPoint.ScaleF(math.Pow(frict, deltaTime))
-	self.bumpOffset = self.bumpOffset.ScaleF(math.Pow(BumpFriction, deltaTime))
-	if self.clampBounds {
-		self.clampedFocus.X = ebimath.Clamp(self.rawFocus.X, self.viewport.X*0.5, math.Max(self.levelBounds.Width()-self.viewport.X*0.5, self.viewport.X*0.5))
-		self.clampedFocus.Y = ebimath.Clamp(self.rawFocus.Y, self.viewport.Y*0.5, math.Max(self.levelBounds.Height()-self.viewport.Y*0.5, self.viewport.Y*0.5))
+	self.RawFocus = self.RawFocus.Add(self.DestPoint.ScaleF(deltaTime))
+	self.DestPoint = self.DestPoint.ScaleF(math.Pow(frict, deltaTime))
+	self.BumpOffset = self.BumpOffset.ScaleF(math.Pow(BumpFriction, deltaTime))
+	if self.ClampBounds {
+		self.ClampedFocus.X = ebimath.Clamp(self.RawFocus.X, self.Viewport.X*0.5, math.Max(self.LevelBounds.Width()-self.Viewport.X*0.5, self.Viewport.X*0.5))
+		self.ClampedFocus.Y = ebimath.Clamp(self.RawFocus.Y, self.Viewport.Y*0.5, math.Max(self.LevelBounds.Height()-self.Viewport.Y*0.5, self.Viewport.Y*0.5))
 	} else {
-		self.clampedFocus = self.rawFocus
+		self.ClampedFocus = self.RawFocus
 	}
 	self.apply()
 }
 
 func (self *basicCamera) applyBreaking(frict *float64, deltaTime float64) {
-	brakeDistX := BreakDistance * self.viewport.X
-	if self.destPoint.X != 0 {
+	brakeDistX := BreakDistance * self.Viewport.X
+	if self.DestPoint.X != 0 {
 		var brakeRatio float64
-		if self.destPoint.X < 0 {
-			brakeRatio = 1 - ebimath.Clamp((self.rawFocus.X-self.viewport.X*0.5)/brakeDistX, 0, 1)
+		if self.DestPoint.X < 0 {
+			brakeRatio = 1 - ebimath.Clamp((self.RawFocus.X-self.Viewport.X*0.5)/brakeDistX, 0, 1)
 		} else {
-			brakeRatio = 1 - ebimath.Clamp((self.levelBounds.Width()-self.viewport.X*0.5-self.rawFocus.X)/brakeDistX, 0, 1)
+			brakeRatio = 1 - ebimath.Clamp((self.LevelBounds.Width()-self.Viewport.X*0.5-self.RawFocus.X)/brakeDistX, 0, 1)
 		}
 		*frict *= 1 - 0.9*brakeRatio*deltaTime
 	}
-	brakeDistY := BreakDistance * self.viewport.Y
-	if self.destPoint.Y != 0 {
+	brakeDistY := BreakDistance * self.Viewport.Y
+	if self.DestPoint.Y != 0 {
 		var brakeRatio float64
-		if self.destPoint.Y < 0 {
-			brakeRatio = 1 - ebimath.Clamp((self.rawFocus.Y-self.viewport.Y*0.5)/brakeDistY, 0, 1)
+		if self.DestPoint.Y < 0 {
+			brakeRatio = 1 - ebimath.Clamp((self.RawFocus.Y-self.Viewport.Y*0.5)/brakeDistY, 0, 1)
 		} else {
-			brakeRatio = 1 - ebimath.Clamp((self.levelBounds.Height()-self.viewport.Y*0.5-self.rawFocus.Y)/brakeDistY, 0, 1)
+			brakeRatio = 1 - ebimath.Clamp((self.LevelBounds.Height()-self.Viewport.Y*0.5-self.RawFocus.Y)/brakeDistY, 0, 1)
 		}
 		*frict *= 1 - 0.9*brakeRatio*deltaTime
 	}
 }
 
 func (self *basicCamera) apply() {
-	zoom := self.GetZoom()
-	screenCenter := ebimath.V(self.originalViewport.X/2, self.originalViewport.Y/2)
-	t := screenCenter.Sub(self.clampedFocus.ScaleF(zoom))
-	t = t.Sub(self.bumpOffset.ScaleF(zoom))
-	if self.cd.Has("shaking") {
+	zoom := self.BaseZoom + self.BumpZoom
+	screenCenter := ebimath.V(self.OriginalViewport.X/2, self.OriginalViewport.Y/2)
+	t := screenCenter.Sub(self.ClampedFocus.ScaleF(zoom))
+	t = t.Sub(self.BumpOffset.ScaleF(zoom))
+	if self.Cooldown.Has("shaking") {
 		ftime := float64(frameCount)
-		shakeAmount := self.shakePower * self.cd.GetRatio("shaking")
+		shakeAmount := self.ShakePower * self.Cooldown.GetRatio("shaking")
 		shakeOffset := ebimath.V(
 			math.Cos(ftime*ShakeFreqX)*ShakeAmp*shakeAmount,
 			math.Sin(0.3+ftime*ShakeFreqY)*ShakeAmp*shakeAmount,
 		)
 		t = t.Add(shakeOffset.ScaleF(zoom))
-		if self.cd.GetRatio("shaking") == 0 {
-			self.shakePower = 0
+		if self.Cooldown.GetRatio("shaking") == 0 {
+			self.ShakePower = 0
 		}
 	}
-	self.scroller.SetPosition(t.Round())
-	self.scroller.SetScale(ebimath.V2(zoom))
-	self.left = int(self.clampedFocus.X - self.viewport.X*0.5)
-	self.right = self.left + int(self.viewport.X-1)
-	self.top = int(self.clampedFocus.Y - self.viewport.Y*0.5)
-	self.bottom = self.top + int(self.viewport.Y-1)
-	self.center = ebimath.V(float64(self.left+self.right)*0.5, float64(self.top+self.bottom)*0.5)
+	self.Scroller.SetPosition(t.Round())
+	self.Scroller.SetScale(ebimath.V2(zoom))
+	self.Left = int(self.ClampedFocus.X - self.Viewport.X*0.5)
+	self.Right = self.Left + int(self.Viewport.X-1)
+	self.Top = int(self.ClampedFocus.Y - self.Viewport.Y*0.5)
+	self.Bottom = self.Top + int(self.Viewport.Y-1)
+	self.Center = ebimath.V(float64(self.Left+self.Right)*0.5, float64(self.Top+self.Bottom)*0.5)
 }
 
 func (self *basicCamera) Area() ebimath.Rectangle {
 	return ebimath.NewRectangle(
-		float64(self.left),
-		float64(self.top),
-		float64(self.right-self.left+1),
-		float64(self.bottom-self.top+1),
+		float64(self.Left),
+		float64(self.Top),
+		float64(self.Right-self.Left+1),
+		float64(self.Bottom-self.Top+1),
 	)
 }
 
@@ -303,7 +288,7 @@ type camera struct {
 	Rotation       Interpolator
 	ViewportWidth  int
 	ViewportHeight int
-	followTarget   *ebimath.Vector
+	FollowTarget   *ebimath.Vector
 }
 
 // newCamera creates a new camera with default values and initialized interpolators.
@@ -316,16 +301,16 @@ func newCamera(viewportWidth, viewportHeight int) *camera {
 		ViewportWidth:  viewportWidth,
 		ViewportHeight: viewportHeight,
 	}
-	self.PositionX = Interpolator{current: pos.X, target: pos.X, mode: Instant}
-	self.PositionY = Interpolator{current: pos.Y, target: pos.Y, mode: Instant}
-	self.Zoom = Interpolator{current: 1.0, target: 1.0, mode: Instant}
-	self.Rotation = Interpolator{current: t.Rotation(), target: t.Rotation(), mode: Instant}
+	self.PositionX = Interpolator{Current: pos.X, Target: pos.X, Mode: Instant}
+	self.PositionY = Interpolator{Current: pos.Y, Target: pos.Y, Mode: Instant}
+	self.Zoom = Interpolator{Current: 1.0, Target: 1.0, Mode: Instant}
+	self.Rotation = Interpolator{Current: t.Rotation(), Target: t.Rotation(), Mode: Instant}
 	return self
 }
 
 // Follow sets the camera to smoothly follow a target position using Spring interpolation.
 func (self *camera) Follow(target *ebimath.Vector) {
-	self.followTarget = target
+	self.FollowTarget = target
 	if target != nil {
 		self.PositionX.SetTarget(target.X, Spring, 0)
 		self.PositionY.SetTarget(target.Y, Spring, 0)
@@ -334,26 +319,26 @@ func (self *camera) Follow(target *ebimath.Vector) {
 
 // StopFollowing stops following any target and sets position interpolators to Instant.
 func (self *camera) StopFollowing() {
-	self.followTarget = nil
-	self.PositionX.mode = Instant
-	self.PositionY.mode = Instant
-	self.PositionX.current = self.PositionX.target
-	self.PositionY.current = self.PositionY.target
+	self.FollowTarget = nil
+	self.PositionX.Mode = Instant
+	self.PositionY.Mode = Instant
+	self.PositionX.Current = self.PositionX.Target
+	self.PositionY.Current = self.PositionY.Target
 }
 
 // Update advances the camera’s interpolators and applies the results to the transform.
 func (self *camera) Update(deltaTime float64) {
-	if self.followTarget != nil {
-		self.PositionX.target = self.followTarget.X
-		self.PositionY.target = self.followTarget.Y
+	if self.FollowTarget != nil {
+		self.PositionX.Target = self.FollowTarget.X
+		self.PositionY.Target = self.FollowTarget.Y
 	}
 	self.PositionX.Update(deltaTime)
 	self.PositionY.Update(deltaTime)
 	self.Zoom.Update(deltaTime)
 	self.Rotation.Update(deltaTime)
-	self.CurrentZoom = ebimath.Clamp(self.Zoom.current, MinZoom, MaxZoom)
-	self.SetPosition(ebimath.V(self.PositionX.current, self.PositionY.current))
-	self.SetRotation(self.Rotation.current)
+	self.CurrentZoom = ebimath.Clamp(self.Zoom.Current, MinZoom, MaxZoom)
+	self.SetPosition(ebimath.V(self.PositionX.Current, self.PositionY.Current))
+	self.SetRotation(self.Rotation.Current)
 }
 
 // WorldToScreen converts a world position to screen coordinates.
@@ -377,7 +362,7 @@ func (self *camera) ScreenToWorld(screenPos ebimath.Vector) ebimath.Vector {
 // SetTargetPosition sets a new target position with interpolation.
 // This will stop any direct movement or following.
 func (self *camera) SetTargetPosition(position ebimath.Vector, mode InterpolationMode, duration float64) {
-	self.followTarget = nil
+	self.FollowTarget = nil
 	self.PositionX.SetTarget(position.X, mode, duration)
 	self.PositionY.SetTarget(position.Y, mode, duration)
 }
@@ -405,7 +390,7 @@ func (self *camera) Move(delta ebimath.Vector, mode InterpolationMode, duration 
 // This is suitable for continuous, player-controlled movement.
 // It will stop any active position interpolation or following.
 func (self *camera) AddPosition(delta ebimath.Vector) {
-	self.followTarget = nil
+	self.FollowTarget = nil
 	newPos := self.Position().Add(delta)
 	self.PositionX.SetTarget(newPos.X, Instant, 0)
 	self.PositionY.SetTarget(newPos.Y, Instant, 0)
@@ -414,7 +399,7 @@ func (self *camera) AddPosition(delta ebimath.Vector) {
 
 // SetPositionInstant instantly sets the camera’s position and stops following.
 func (self *camera) SetPositionInstant(position ebimath.Vector) {
-	self.followTarget = nil
+	self.FollowTarget = nil
 	self.PositionX.SetTarget(position.X, Instant, 0)
 	self.PositionY.SetTarget(position.Y, Instant, 0)
 	self.SetPosition(position)
@@ -565,68 +550,68 @@ func easingFunc(mode InterpolationMode, t float64) float64 {
 
 // Interpolator manages smooth transitions for a single scalar value (e.g., position, zoom).
 type Interpolator struct {
-	current   float64
-	target    float64
-	mode      InterpolationMode
-	duration  float64
-	elapsed   float64
-	velocity  float64
-	start     float64
-	stiffness float64
-	damping   float64
+	Current   float64
+	Target    float64
+	Mode      InterpolationMode
+	Duration  float64
+	Elapsed   float64
+	Velocity  float64
+	Start     float64
+	Stiffness float64
+	Damping   float64
 }
 
 // SetTarget sets a new target value with the specified mode and duration.
 func (self *Interpolator) SetTarget(newTarget float64, mode InterpolationMode, duration float64) {
-	self.target = newTarget
-	self.mode = mode
-	switch self.mode {
+	self.Target = newTarget
+	self.Mode = mode
+	switch self.Mode {
 	case Instant:
-		self.current = newTarget
-		self.velocity = 0
+		self.Current = newTarget
+		self.Velocity = 0
 	case Spring:
-		if self.stiffness == 0 {
-			self.stiffness = 100.0
+		if self.Stiffness == 0 {
+			self.Stiffness = 100.0
 		}
-		if self.damping == 0 {
-			self.damping = 10.0
+		if self.Damping == 0 {
+			self.Damping = 10.0
 		}
 	default:
 		if duration <= 0 {
 			duration = 0.001
 		}
-		self.start = self.current
-		self.duration = duration
-		self.elapsed = 0
-		self.velocity = 0
+		self.Start = self.Current
+		self.Duration = duration
+		self.Elapsed = 0
+		self.Velocity = 0
 	}
 }
 
 // Update advances the interpolation based on elapsed time (deltaTime in seconds).
 func (self *Interpolator) Update(deltaTime float64) {
-	switch self.mode {
+	switch self.Mode {
 	case Instant:
 		return
 	case Spring:
-		displacement := self.target - self.current
-		if math.Abs(displacement) < 0.001 && math.Abs(self.velocity) < 0.001 {
-			self.current = self.target
-			self.velocity = 0
+		displacement := self.Target - self.Current
+		if math.Abs(displacement) < 0.001 && math.Abs(self.Velocity) < 0.001 {
+			self.Current = self.Target
+			self.Velocity = 0
 			return
 		}
-		acceleration := self.stiffness*displacement - self.damping*self.velocity
-		self.velocity += acceleration * deltaTime
-		self.current += self.velocity * deltaTime
+		acceleration := self.Stiffness*displacement - self.Damping*self.Velocity
+		self.Velocity += acceleration * deltaTime
+		self.Current += self.Velocity * deltaTime
 	default:
-		self.elapsed += deltaTime
-		if self.elapsed >= self.duration {
-			self.current = self.target
-			self.mode = Instant
+		self.Elapsed += deltaTime
+		if self.Elapsed >= self.Duration {
+			self.Current = self.Target
+			self.Mode = Instant
 			return
 		}
-		t := self.elapsed / self.duration
-		easing := easingFunc(self.mode, t)
-		self.current = self.start + (self.target-self.start)*easing
+		t := self.Elapsed / self.Duration
+		easing := easingFunc(self.Mode, t)
+		self.Current = self.Start + (self.Target-self.Start)*easing
 	}
 }
 

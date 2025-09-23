@@ -38,23 +38,23 @@ type KeyConfig struct {
 
 // InputComponent stores all input bindings and their current state.
 type InputComponent struct {
-	bindings     map[Action][]Binding
-	justPressed  map[Action]bool
-	pressed      map[Action]bool
-	justReleased map[Action]bool
+	Bindings     map[Action][]Binding
+	JustPressed  map[Action]bool
+	Pressed      map[Action]bool
+	JustReleased map[Action]bool
 
 	// Mouse wheel state, stored separately as it's not a binary button state
-	mouseWheelX float64
-	mouseWheelY float64
+	MouseWheelX float64
+	MouseWheelY float64
 }
 
 // NewInputComponent creates and initializes a new InputComponent.
 func NewInputComponent(bindinds map[Action][]KeyConfig) *InputComponent {
 	res := &InputComponent{
-		bindings:     make(map[Action][]Binding),
-		justPressed:  make(map[Action]bool),
-		pressed:      make(map[Action]bool),
-		justReleased: make(map[Action]bool),
+		Bindings:     make(map[Action][]Binding),
+		JustPressed:  make(map[Action]bool),
+		Pressed:      make(map[Action]bool),
+		JustReleased: make(map[Action]bool),
 	}
 
 	if len(bindinds) > 0 {
@@ -95,13 +95,13 @@ func (self *InputComponent) Bind(action Action, primary any, modifiers ...any) {
 		Primary:   primaryCode,
 		Modifiers: mods,
 	}
-	self.bindings[action] = append(self.bindings[action], binding)
+	self.Bindings[action] = append(self.Bindings[action], binding)
 }
 
 // BatchBind replaces all existing bindings with a new set.
 // This is useful for loading a saved or preset control scheme.
 func (self *InputComponent) BatchBind(bindings map[Action][]KeyConfig) {
-	self.bindings = make(map[Action][]Binding) // Clear all existing bindings
+	self.Bindings = make(map[Action][]Binding) // Clear all existing bindings
 	for a, b := range bindings {
 		for _, k := range b {
 			self.Bind(a, k.Primary, k.Modifiers...)
@@ -111,27 +111,27 @@ func (self *InputComponent) BatchBind(bindings map[Action][]KeyConfig) {
 
 // IsPressed returns true if the action is currently being pressed.
 func (self *InputComponent) IsPressed(action Action) bool {
-	return self.pressed[action]
+	return self.Pressed[action]
 }
 
 // IsJustPressed returns true if the action was just pressed in the current frame.
 func (self *InputComponent) IsJustPressed(action Action) bool {
-	return self.justPressed[action]
+	return self.JustPressed[action]
 }
 
 // IsJustReleased returns true if the action was just released in the current frame.
 func (self *InputComponent) IsJustReleased(action Action) bool {
-	return self.justReleased[action]
+	return self.JustReleased[action]
 }
 
 // GetPressDuration returns the duration (in seconds) the action has been held down.
 func (self *InputComponent) GetPressDuration(action Action) float64 {
 	var duration float64
-	if !self.pressed[action] {
+	if !self.Pressed[action] {
 		return 0.0
 	}
 	// An action can have multiple bindings. We want the longest duration.
-	for _, binding := range self.bindings[action] {
+	for _, binding := range self.Bindings[action] {
 		var currentDuration float64
 		switch binding.Primary.Type {
 		case InputTypeKeyboard:
@@ -184,16 +184,6 @@ func (self *InputComponent) IsCustomGamepadButtonJustPressed(id ebiten.GamepadID
 func (self *InputComponent) IsCustomGamepadButtonJustReleased(id ebiten.GamepadID, code any) bool {
 	return inpututil.IsGamepadButtonJustReleased(id, ebiten.GamepadButton(code.(int))) ||
 		inpututil.IsStandardGamepadButtonJustReleased(id, ebiten.StandardGamepadButton(code.(int)))
-}
-
-// MouseWheelX returns the horizontal delta of the mouse wheel for the current frame.
-func (self *InputComponent) MouseWheelX() float64 {
-	return self.mouseWheelX
-}
-
-// MouseWheelY returns the vertical delta of the mouse wheel for the current frame.
-func (self *InputComponent) MouseWheelY() float64 {
-	return self.mouseWheelY
 }
 
 // isPressed checks if the given InputCode is currently pressed.

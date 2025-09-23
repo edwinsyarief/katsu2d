@@ -25,7 +25,7 @@ func (self *ShapeRenderSystem) Update(world *World, dt float64) {
 	entities := world.Query(CTShape)
 	for _, e := range entities {
 		shapeAny, _ := world.GetComponent(e, CTShape)
-		shape := shapeAny.(*ShapeComponent).shape
+		shape := shapeAny.(*ShapeComponent).Shape
 		shape.Rebuild()
 	}
 }
@@ -35,7 +35,7 @@ func (self *ShapeRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 	entities := world.Query(CTTransform, CTShape)
 	for _, e := range entities {
 		shapeAny, _ := world.GetComponent(e, CTShape)
-		shape := shapeAny.(*ShapeComponent).shape
+		shape := shapeAny.(*ShapeComponent).Shape
 
 		tAny, _ := world.GetComponent(e, CTTransform)
 		t := tAny.(*TransformComponent)

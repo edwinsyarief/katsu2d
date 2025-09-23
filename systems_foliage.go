@@ -29,7 +29,7 @@ func (self *FoliageSystem) Update(world *World, dt float64) {
 	}
 	controller := controllerComp.(*FoliageControllerComponent)
 	// Increment the wind timer to progress the wind simulation.
-	controller.windTime += dt
+	controller.WindTime += dt
 
 	// Iterate over all entities that have foliage, sprite, and transform components.
 	for _, entity := range world.Query(CTFoliage, CTSprite, CTTransform) {
@@ -39,12 +39,12 @@ func (self *FoliageSystem) Update(world *World, dt float64) {
 		sprite := spriteAny.(*SpriteComponent)
 
 		// Skip if the sprite has no base vertices to manipulate.
-		if len(sprite.baseVertices) == 0 {
+		if len(sprite.BaseVertices) == 0 {
 			continue
 		}
 
 		// Calculate the vertical bounds (minY and maxY) of the sprite's vertices.
-		minY, maxY := getVertexBounds(sprite.baseVertices)
+		minY, maxY := getVertexBounds(sprite.BaseVertices)
 		height := float64(maxY - minY)
 		if height == 0 {
 			continue
@@ -54,7 +54,7 @@ func (self *FoliageSystem) Update(world *World, dt float64) {
 		pivot := getDefaultPivot(foliage.Pivot)
 
 		// Reset the sprite's current vertices to their original, base positions.
-		copy(sprite.Vertices, sprite.baseVertices)
+		copy(sprite.Vertices, sprite.BaseVertices)
 
 		// Apply the wind effect to each vertex based on the controller's state.
 		applyWindEffect(sprite, controller, foliage, minY, height, pivot)
@@ -86,9 +86,9 @@ func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerCompo
 	foliage *FoliageComponent, minY float32, height float64, pivot ebimath.Vector) {
 
 	// Add a small amount of variation to the sway frequency for each foliage instance.
-	swayFreq := 1.0 + controller.noise.Eval3(foliage.SwaySeed, 0, 0)*0.2
+	swayFreq := 1.0 + controller.Noise.Eval3(foliage.SwaySeed, 0, 0)*0.2
 
-	for i, baseVertex := range sprite.baseVertices {
+	for i, baseVertex := range sprite.BaseVertices {
 		// Calculate a normalized Y-coordinate (0.0 at the top, 1.0 at the bottom).
 		normalizedY := (baseVertex.DstY - minY) / float32(height)
 		// The sway factor is based on how far the vertex is from the pivot point.
@@ -96,29 +96,29 @@ func applyWindEffect(sprite *SpriteComponent, controller *FoliageControllerCompo
 		swayFactor := math.Pow(math.Abs(float64(normalizedY)-pivot.Y), 1.5)
 
 		// Sample Perlin noise to add randomness to the sway.
-		swayNoise := controller.noise.Eval3(controller.windTime*controller.windSpeed*0.1*swayFreq+foliage.SwaySeed, 0, 0)
+		swayNoise := controller.Noise.Eval3(controller.WindTime*controller.WindSpeed*0.1*swayFreq+foliage.SwaySeed, 0, 0)
 
 		// Primary ripple: a smooth wave traveling with the wind direction.
 		// The dot product projects the vertex position onto the wind direction vector.
-		dotProduct := controller.windDirection.X*float64(baseVertex.DstX) + controller.windDirection.Y*float64(baseVertex.DstY)
-		ripplePhase := controller.windTime*controller.windSpeed*2.0 - dotProduct*0.05
+		dotProduct := controller.WindDirection.X*float64(baseVertex.DstX) + controller.WindDirection.Y*float64(baseVertex.DstY)
+		ripplePhase := controller.WindTime*controller.WindSpeed*2.0 - dotProduct*0.05
 		primaryRipple := math.Sin(ripplePhase)
 
 		// Secondary ripple: slower, more subtle Perlin noise to add randomness to the overall ripple.
-		secondaryRipple := controller.noise.Eval3(controller.windTime*controller.windSpeed*0.5, float64(baseVertex.DstX)*0.02, float64(baseVertex.DstY)*0.02)
+		secondaryRipple := controller.Noise.Eval3(controller.WindTime*controller.WindSpeed*0.5, float64(baseVertex.DstX)*0.02, float64(baseVertex.DstY)*0.02)
 
 		// Combine the two ripple noise sources with different weights.
 		rippleNoise := primaryRipple*0.7 + secondaryRipple*0.3
 
 		// Calculate the final sway value, combining a sine wave and Perlin noise.
-		swayValue := math.Sin(controller.windTime*controller.windSpeed*0.1*swayFreq + foliage.SwaySeed + swayNoise*10)
+		swayValue := math.Sin(controller.WindTime*controller.WindSpeed*0.1*swayFreq + foliage.SwaySeed + swayNoise*10)
 
 		// Total displacement is a combination of the overall wind force and the ripple effects.
-		displacement := (swayValue*0.25+0.75)*controller.windForce + rippleNoise*controller.rippleStrength
+		displacement := (swayValue*0.25+0.75)*controller.WindForce + rippleNoise*controller.RippleStrength
 
 		// Calculate the final displacement in X and Y directions, taking wind direction and sway factor into account.
-		dispX := calculateDisplacement(displacement, swayFactor, controller.windDirection.X)
-		dispY := calculateDisplacement(displacement, swayFactor, controller.windDirection.Y)
+		dispX := calculateDisplacement(displacement, swayFactor, controller.WindDirection.X)
+		dispY := calculateDisplacement(displacement, swayFactor, controller.WindDirection.Y)
 
 		// Apply the calculated displacement to the sprite's vertices.
 		sprite.Vertices[i].DstX = baseVertex.DstX + float32(dispX)

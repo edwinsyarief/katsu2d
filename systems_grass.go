@@ -38,22 +38,22 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		cameraComp, ok := world.GetComponent(cameraEntity, CTCamera)
 		if ok {
 			camera := cameraComp.(*CameraComponent)
-			controller.renderArea = camera.Area()
+			controller.RenderArea = camera.Area()
 		}
 	}
 
 	// Advance the global wind timer and scroll values, used for procedural wind patterns.
-	controller.windTime += dt
-	controller.windScroll = controller.windScroll.Add(ebimath.Vector{X: 0.6 * dt * 60, Y: 0.4 * dt * 60})
+	controller.WindTime += dt
+	controller.WindScroll = controller.WindScroll.Add(ebimath.Vector{X: 0.6 * dt * 60, Y: 0.4 * dt * 60})
 
 	// Make a shallow copy of external force sources for this frame to ensure a consistent state during calculations.
-	currentFrameForceSources := make([]ForceSource, len(controller.externalForceSources))
-	copy(currentFrameForceSources, controller.externalForceSources)
+	currentFrameForceSources := make([]ForceSource, len(controller.ExternalForceSources))
+	copy(currentFrameForceSources, controller.ExternalForceSources)
 
 	// Process active strong wind gusts.
 	activeGustsForFrame := []activeGustFrameData{}
 	newGusts := []*StrongWindGust{} // A new slice to hold gusts that are still active.
-	for _, gust := range controller.strongWindGusts {
+	for _, gust := range controller.StrongWindGusts {
 		if !gust.Active {
 			continue
 		}
@@ -87,7 +87,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		})
 		newGusts = append(newGusts, gust) // Keep the gust for the next frame.
 	}
-	controller.strongWindGusts = newGusts // Replace the old slice with the filtered one.
+	controller.StrongWindGusts = newGusts // Replace the old slice with the filtered one.
 
 	// Before applying new forces, reset the accumulated force for all grass entities.
 	// This ensures that forces from the previous frame don't carry over.
@@ -101,7 +101,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 	// --- APPLY FORCES FROM EXTERNAL SOURCES (e.g., player movement) ---
 	for _, fs := range currentFrameForceSources {
 		// Use the quadtree to efficiently find grass entities within the force source's radius.
-		affectedObjects := controller.quadtree.QueryCircle(fs.Position, fs.Radius)
+		affectedObjects := controller.Quadtree.QueryCircle(fs.Position, fs.Radius)
 		for _, entity := range affectedObjects {
 			grassAny, ok := world.GetComponent(entity, CTGrass)
 			if !ok {
@@ -136,7 +136,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 				}
 
 				// Calculate and apply the force, scaled by strength, falloff, and a base acceleration.
-				forceAccel := direction * fs.Strength * falloff * controller.forceBaseAcceleration * 2.5
+				forceAccel := direction * fs.Strength * falloff * controller.ForceBaseAcceleration * 2.5
 				grass.AccumulatedForce += forceAccel
 			}
 		}
@@ -166,7 +166,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		}
 
 		// Use the quadtree to efficiently find grass entities within the gust's bounding box.
-		affectedObjects := controller.quadtree.Query(gustRect)
+		affectedObjects := controller.Quadtree.Query(gustRect)
 		for _, entity := range affectedObjects {
 			grassAny, ok := world.GetComponent(entity, CTGrass)
 			if !ok {
@@ -206,7 +206,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 			combinedFalloff := widthFalloff * lengthFalloff
 			if combinedFalloff > 0 {
 				forceDirectionX := gust.Direction.X
-				forceAccel := forceDirectionX * gust.Strength * currentStrengthMultiplier * combinedFalloff * controller.forceBaseAcceleration * 2.5
+				forceAccel := forceDirectionX * gust.Strength * currentStrengthMultiplier * combinedFalloff * controller.ForceBaseAcceleration * 2.5
 				grass.AccumulatedForce += forceAccel
 			}
 		}
@@ -218,12 +218,12 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		grass := grassComp.(*GrassComponent)
 
 		// A spring force constantly tries to pull the grass back to its upright position (0 sway).
-		springForce := (0 - grass.InteractionSway) * controller.swaySpringStrength
+		springForce := (0 - grass.InteractionSway) * controller.SwaySpringStrength
 		totalForce := grass.AccumulatedForce + springForce
 
 		// Apply the total force to the grass's velocity, then apply damping to slow it down over time.
 		grass.SwayVelocity += totalForce * dt
-		grass.SwayVelocity *= controller.swayDamping
+		grass.SwayVelocity *= controller.SwayDamping
 		grass.InteractionSway += grass.SwayVelocity * dt
 
 		// A positional decay is re-introduced to ensure grass always returns to its upright state.
@@ -256,10 +256,10 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		// This makes the grass react to interactions rather than being blown by the wind.
 		if !forcePresent {
 			// A constant directional push from the wind.
-			directionalSwayBias = controller.windDirection.X * controller.windForce * localWindForceMagnitude
+			directionalSwayBias = controller.WindDirection.X * controller.WindForce * localWindForceMagnitude
 			// A gentle, oscillating sway to simulate rustling.
-			oscillationAmplitude = controller.windForce * localWindForceMagnitude * 0.5
-			oscillationSway = math.Sin(controller.windTime*controller.windSpeed+grass.SwaySeed) * oscillationAmplitude
+			oscillationAmplitude = controller.WindForce * localWindForceMagnitude * 0.5
+			oscillationSway = math.Sin(controller.WindTime*controller.WindSpeed+grass.SwaySeed) * oscillationAmplitude
 		}
 
 		// Combine the wind effects (if any) with the sway from interactions.

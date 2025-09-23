@@ -15,15 +15,11 @@ type Shape interface {
 }
 
 type ShapeComponent struct {
-	shape Shape
+	Shape Shape
 }
 
 func NewShapeComponent(shape Shape) *ShapeComponent {
-	return &ShapeComponent{shape: shape}
-}
-
-func (self *ShapeComponent) Shape() Shape {
-	return self.shape
+	return &ShapeComponent{Shape: shape}
 }
 
 type RectangleShape struct {
@@ -37,7 +33,7 @@ type RectangleShape struct {
 	StrokeColors      [4]color.RGBA // 0:TL, 1:TR, 2:BR, 3:BL
 	Vertices          []ebiten.Vertex
 	Indices           []uint16
-	dirty             bool
+	Dirty             bool
 }
 
 func NewRectangleShape(width, height float32, col color.RGBA) *RectangleShape {
@@ -46,7 +42,7 @@ func NewRectangleShape(width, height float32, col color.RGBA) *RectangleShape {
 		Height:       height,
 		FillColors:   [4]color.RGBA{col, col, col, col},
 		StrokeColors: [4]color.RGBA{col, col, col, col},
-		dirty:        true,
+		Dirty:        true,
 	}
 }
 
@@ -55,7 +51,7 @@ func (self *RectangleShape) SetColor(topLeft, topRight, bottomRight, bottomLeft 
 	self.FillColors[1] = topRight
 	self.FillColors[2] = bottomRight
 	self.FillColors[3] = bottomLeft
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *RectangleShape) SetStrokeColor(topLeft, topRight, bottomRight, bottomLeft color.RGBA) {
@@ -63,7 +59,7 @@ func (self *RectangleShape) SetStrokeColor(topLeft, topRight, bottomRight, botto
 	self.StrokeColors[1] = topRight
 	self.StrokeColors[2] = bottomRight
 	self.StrokeColors[3] = bottomLeft
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *RectangleShape) SetCornerRadius(topLeft, topRight, bottomLeft, bottomRight float32) {
@@ -71,20 +67,20 @@ func (self *RectangleShape) SetCornerRadius(topLeft, topRight, bottomLeft, botto
 	self.TopRightRadius = topRight
 	self.BottomLeftRadius = bottomLeft
 	self.BottomRightRadius = bottomRight
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *RectangleShape) SetStroke(width float32, col color.RGBA) {
 	self.StrokeWidth = width
 	self.StrokeColors = [4]color.RGBA{col, col, col, col}
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *RectangleShape) Rebuild() {
-	if !self.dirty {
+	if !self.Dirty {
 		return
 	}
-	self.dirty = false
+	self.Dirty = false
 
 	self.Vertices = nil
 	self.Indices = nil
@@ -249,7 +245,7 @@ type CircleShape struct {
 	StrokeColors [4]color.RGBA
 	Vertices     []ebiten.Vertex
 	Indices      []uint16
-	dirty        bool
+	Dirty        bool
 }
 
 func NewCircleShape(radius float32, col color.RGBA) *CircleShape {
@@ -257,7 +253,7 @@ func NewCircleShape(radius float32, col color.RGBA) *CircleShape {
 		Radius:       radius,
 		FillColors:   [4]color.RGBA{col, col, col, col},
 		StrokeColors: [4]color.RGBA{col, col, col, col},
-		dirty:        true,
+		Dirty:        true,
 	}
 }
 
@@ -266,7 +262,7 @@ func (self *CircleShape) SetColor(topLeft, topRight, bottomRight, bottomLeft col
 	self.FillColors[1] = topRight
 	self.FillColors[2] = bottomRight
 	self.FillColors[3] = bottomLeft
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *CircleShape) SetStrokeColor(topLeft, topRight, bottomRight, bottomLeft color.RGBA) {
@@ -274,13 +270,13 @@ func (self *CircleShape) SetStrokeColor(topLeft, topRight, bottomRight, bottomLe
 	self.StrokeColors[1] = topRight
 	self.StrokeColors[2] = bottomRight
 	self.StrokeColors[3] = bottomLeft
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *CircleShape) SetStroke(width float32, col color.RGBA) {
 	self.StrokeWidth = width
 	self.StrokeColors = [4]color.RGBA{col, col, col, col}
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *CircleShape) GetVertices() []ebiten.Vertex {
@@ -292,10 +288,10 @@ func (self *CircleShape) GetIndices() []uint16 {
 }
 
 func (self *CircleShape) Rebuild() {
-	if !self.dirty {
+	if !self.Dirty {
 		return
 	}
-	self.dirty = false
+	self.Dirty = false
 
 	self.Vertices = nil
 	self.Indices = nil
@@ -407,7 +403,7 @@ type TriangleShape struct {
 	CornerRadius  float32
 	Vertices      []ebiten.Vertex
 	Indices       []uint16
-	dirty         bool
+	Dirty         bool
 }
 
 func NewTriangleShape(width, height float32, col color.RGBA) *TriangleShape {
@@ -416,7 +412,7 @@ func NewTriangleShape(width, height float32, col color.RGBA) *TriangleShape {
 		Height:       height,
 		FillColors:   [4]color.RGBA{col, col, col, col},
 		StrokeColors: [4]color.RGBA{col, col, col, col},
-		dirty:        true,
+		Dirty:        true,
 	}
 }
 
@@ -424,25 +420,25 @@ func (self *TriangleShape) SetColor(top, right, left color.RGBA) {
 	self.FillColors[0] = top
 	self.FillColors[1] = right
 	self.FillColors[2] = left
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *TriangleShape) SetStrokeColor(top, right, left color.RGBA) {
 	self.StrokeColors[0] = top
 	self.StrokeColors[1] = right
 	self.StrokeColors[2] = left
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *TriangleShape) SetStroke(width float32, col color.RGBA) {
 	self.StrokeWidth = width
 	self.StrokeColors = [4]color.RGBA{col, col, col, col}
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *TriangleShape) SetCornerRadius(radius float32) {
 	self.CornerRadius = radius
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *TriangleShape) GetVertices() []ebiten.Vertex {
@@ -454,10 +450,10 @@ func (self *TriangleShape) GetIndices() []uint16 {
 }
 
 func (self *TriangleShape) Rebuild() {
-	if !self.dirty {
+	if !self.Dirty {
 		return
 	}
-	self.dirty = false
+	self.Dirty = false
 
 	self.Vertices = nil
 	self.Indices = nil
@@ -607,7 +603,7 @@ type PolygonShape struct {
 	CornerRadius float32
 	Vertices     []ebiten.Vertex
 	Indices      []uint16
-	dirty        bool
+	Dirty        bool
 }
 
 func NewPolygonShape(sides int, radius float32, col color.RGBA) *PolygonShape {
@@ -616,7 +612,7 @@ func NewPolygonShape(sides int, radius float32, col color.RGBA) *PolygonShape {
 		Radius:       radius,
 		FillColors:   [4]color.RGBA{col, col, col, col},
 		StrokeColors: [4]color.RGBA{col, col, col, col},
-		dirty:        true,
+		Dirty:        true,
 	}
 }
 
@@ -625,7 +621,7 @@ func (self *PolygonShape) SetColor(topLeft, topRight, bottomRight, bottomLeft co
 	self.FillColors[1] = topRight
 	self.FillColors[2] = bottomRight
 	self.FillColors[3] = bottomLeft
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *PolygonShape) SetStrokeColor(topLeft, topRight, bottomRight, bottomLeft color.RGBA) {
@@ -633,18 +629,18 @@ func (self *PolygonShape) SetStrokeColor(topLeft, topRight, bottomRight, bottomL
 	self.StrokeColors[1] = topRight
 	self.StrokeColors[2] = bottomRight
 	self.StrokeColors[3] = bottomLeft
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *PolygonShape) SetStroke(width float32, col color.RGBA) {
 	self.StrokeWidth = width
 	self.StrokeColors = [4]color.RGBA{col, col, col, col}
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *PolygonShape) SetCornerRadius(radius float32) {
 	self.CornerRadius = radius
-	self.dirty = true
+	self.Dirty = true
 }
 
 func (self *PolygonShape) GetVertices() []ebiten.Vertex {
@@ -674,10 +670,10 @@ func NewHexagonShape(radius float32, col color.RGBA) *HexagonShape {
 }
 
 func (self *PolygonShape) Rebuild() {
-	if !self.dirty {
+	if !self.Dirty {
 		return
 	}
-	self.dirty = false
+	self.Dirty = false
 
 	self.Vertices = nil
 	self.Indices = nil

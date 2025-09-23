@@ -28,7 +28,7 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		renderer.Flush()
 		textComp.UpdateCache()
 		op := &text.DrawOptions{}
-		op.LineSpacing = textComp.LineSpacing()
+		op.LineSpacing = textComp.LineSpacing
 
 		switch textComp.Alignment {
 		case TextAlignmentTopRight, TextAlignmentMiddleRight, TextAlignmentBottomRight:
@@ -43,7 +43,7 @@ func (self *TextRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 		t.SetOffset(ebimath.V(offsetX, offsetY))
 		op.GeoM = t.Transform.Matrix()
 		op.ColorScale = utils.RGBAToColorScale(textComp.Color)
-		text.Draw(renderer.screen, textComp.Caption, textComp.fontFace, op)
+		text.Draw(renderer.screen, textComp.Caption, textComp.FontFace, op)
 	}
 }
 
@@ -183,7 +183,7 @@ func (self *SpriteRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			continue
 		}
 
-		if s.dirty {
+		if s.Dirty {
 			s.GenerateMesh()
 		}
 

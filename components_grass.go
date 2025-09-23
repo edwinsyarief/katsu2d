@@ -69,28 +69,28 @@ type GrassOption func(*GrassControllerComponent)
 // WithGrassTileSize sets the size of the grid cells for grass placement.
 func WithGrassTileSize(size int) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.tileSize = size
+		self.TileSize = size
 	}
 }
 
 // WithGrassDensity sets the number of grass blades to generate per tile.
 func WithGrassDensity(density int) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.grassDensity = density
+		self.GrassDensity = density
 	}
 }
 
 // WithGrassWindForce sets the maximum amplitude of wind-induced sway.
 func WithGrassWindForce(force float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.windForce = force
+		self.WindForce = force
 	}
 }
 
 // WithGrassWindSpeed sets how fast the grass sways due to the wind effect.
 func WithGrassWindSpeed(speed float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.windSpeed = speed
+		self.WindSpeed = speed
 	}
 }
 
@@ -98,14 +98,14 @@ func WithGrassWindSpeed(speed float64) GrassOption {
 // The provided vector will be normalized to a unit vector.
 func WithGrassWindDirection(x, y float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.windDirection = ebimath.Vector{X: x, Y: y}.Normalize()
+		self.WindDirection = ebimath.Vector{X: x, Y: y}.Normalize()
 	}
 }
 
 // WithGrassNoiseMapSize sets the dimension of the generated Perlin noise map used for wind.
 func WithGrassNoiseMapSize(size int) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.noiseMapSize = size
+		self.NoiseMapSize = size
 	}
 }
 
@@ -113,7 +113,7 @@ func WithGrassNoiseMapSize(size int) GrassOption {
 // the size of the wind patterns. A lower frequency means larger, smoother patterns.
 func WithGrassNoiseFrequency(freq float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.noiseFrequency = freq
+		self.NoiseFrequency = freq
 	}
 }
 
@@ -121,7 +121,7 @@ func WithGrassNoiseFrequency(freq float64) GrassOption {
 // A higher value makes the grass react more quickly and stiffly.
 func WithGrassForceBaseAcceleration(accel float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.forceBaseAcceleration = accel
+		self.ForceBaseAcceleration = accel
 	}
 }
 
@@ -129,7 +129,7 @@ func WithGrassForceBaseAcceleration(accel float64) GrassOption {
 // This acts like a spring constant, pulling the grass back to its base state.
 func WithGrassSwaySpringStrength(strength float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.swaySpringStrength = strength
+		self.SwaySpringStrength = strength
 	}
 }
 
@@ -137,7 +137,7 @@ func WithGrassSwaySpringStrength(strength float64) GrassOption {
 // This controls how quickly the sway oscillations decay.
 func WithGrassSwayDamping(damping float64) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.swayDamping = damping
+		self.SwayDamping = damping
 	}
 }
 
@@ -145,7 +145,7 @@ func WithGrassSwayDamping(damping float64) GrassOption {
 // If no areas are provided, grass will be generated across the entire world.
 func WithGrassAreas(areas []Area) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.grassAreas = areas
+		self.GrassAreas = areas
 	}
 }
 
@@ -153,44 +153,44 @@ func WithGrassAreas(areas []Area) GrassOption {
 // in front of or behind other sprites based on their Y-position.
 func WithGrassOrderable(orderable bool) GrassOption {
 	return func(self *GrassControllerComponent) {
-		self.orderable = orderable
+		self.Orderable = orderable
 	}
 }
 
 // GrassControllerComponent holds the configuration and overall state for the grass simulation system.
 type GrassControllerComponent struct {
-	worldWidth   int
-	worldHeight  int
-	tileSize     int
-	grassDensity int
-	quadtree     *Quadtree
-	tm           *TextureManager
-	// externalForceSources are points of force (e.g., player's position) that affect nearby grass.
-	externalForceSources []ForceSource
-	// strongWindGusts are temporary, moving wind effects.
-	strongWindGusts []*StrongWindGust
-	// windScroll represents the current offset for sampling the Perlin noise map,
+	WorldWidth   int
+	WorldHeight  int
+	TileSize     int
+	GrassDensity int
+	Quadtree     *Quadtree
+	Tm           *TextureManager
+	// ExternalForceSources are points of force (e.g., player's position) that affect nearby grass.
+	ExternalForceSources []ForceSource
+	// StrongWindGusts are temporary, moving wind effects.
+	StrongWindGusts []*StrongWindGust
+	// WindScroll represents the current offset for sampling the Perlin noise map,
 	// creating a scrolling wind effect.
-	windScroll ebimath.Vector
-	// windTime is the elapsed time used to update the windScroll.
-	windTime              float64
-	noiseImage            *ebiten.Image
-	noiseMapSize          int
-	noiseFrequency        float64
-	swaySpringStrength    float64
-	swayDamping           float64
-	forceBaseAcceleration float64
-	// grassAreas specifies the regions for grass generation.
-	grassAreas []Area
-	// renderArea defines the current visible area of the world.
-	renderArea    ebimath.Rectangle
-	windDirection ebimath.Vector
-	windForce     float64
-	windSpeed     float64
+	WindScroll ebimath.Vector
+	// WindTime is the elapsed time used to update the windScroll.
+	WindTime              float64
+	NoiseImage            *ebiten.Image
+	NoiseMapSize          int
+	NoiseFrequency        float64
+	SwaySpringStrength    float64
+	SwayDamping           float64
+	ForceBaseAcceleration float64
+	// GrassAreas specifies the regions for grass generation.
+	GrassAreas []Area
+	// RenderArea defines the current visible area of the world.
+	RenderArea    ebimath.Rectangle
+	WindDirection ebimath.Vector
+	WindForce     float64
+	WindSpeed     float64
 	// TextureID is the default texture to use for grass blades.
 	TextureID int
-	// orderable indicates whether the grass sprites should be Z-sorted for rendering.
-	orderable bool
+	// Orderable indicates whether the grass sprites should be Z-sorted for rendering.
+	Orderable bool
 	// Z is the Z-depth for rendering the grass.
 	Z float64
 }
@@ -199,19 +199,19 @@ type GrassControllerComponent struct {
 // It sets up default values and applies any provided options.
 func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, worldHeight int, textureID int, z float64, opts ...GrassOption) *GrassControllerComponent {
 	self := &GrassControllerComponent{
-		worldWidth:            worldWidth,
-		worldHeight:           worldHeight,
-		tileSize:              32,
-		grassDensity:          20,
-		tm:                    tm,
-		noiseMapSize:          512,
-		noiseFrequency:        100.0,
-		swaySpringStrength:    0.5,
-		swayDamping:           0.5,
-		forceBaseAcceleration: 800.0,
-		windDirection:         ebimath.Vector{X: 1.0, Y: 0.0},
-		windForce:             0.3,
-		windSpeed:             0.5,
+		WorldWidth:            worldWidth,
+		WorldHeight:           worldHeight,
+		TileSize:              32,
+		GrassDensity:          20,
+		Tm:                    tm,
+		NoiseMapSize:          512,
+		NoiseFrequency:        100.0,
+		SwaySpringStrength:    0.5,
+		SwayDamping:           0.5,
+		ForceBaseAcceleration: 800.0,
+		WindDirection:         ebimath.Vector{X: 1.0, Y: 0.0},
+		WindForce:             0.3,
+		WindSpeed:             0.5,
 		TextureID:             textureID,
 		Z:                     z,
 	}
@@ -224,9 +224,9 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 		Min: ebimath.Vector{X: 0, Y: 0},
 		Max: ebimath.Vector{X: float64(worldWidth), Y: float64(worldHeight)},
 	}
-	self.quadtree = NewQuadtree(world, bounds)
+	self.Quadtree = NewQuadtree(world, bounds)
 	// Generate a Perlin noise image to simulate complex wind patterns.
-	self.noiseImage = utils.GeneratePerlinNoiseImage(self.noiseMapSize, self.noiseMapSize, self.noiseFrequency)
+	self.NoiseImage = utils.GeneratePerlinNoiseImage(self.NoiseMapSize, self.NoiseMapSize, self.NoiseFrequency)
 	self.initGrass(world)
 
 	return self
@@ -234,27 +234,27 @@ func NewGrassControllerComponent(world *World, tm *TextureManager, worldWidth, w
 
 // initGrass generates and places all grass blades within the specified areas.
 func (self *GrassControllerComponent) initGrass(world *World) {
-	areasToGenerate := self.grassAreas
+	areasToGenerate := self.GrassAreas
 	// If no specific areas are defined, generate grass across the entire world.
 	if len(areasToGenerate) == 0 {
 		areasToGenerate = []Area{
-			{X1: 0, Y1: 0, X2: self.worldWidth / self.tileSize, Y2: self.worldHeight / self.tileSize},
+			{X1: 0, Y1: 0, X2: self.WorldWidth / self.TileSize, Y2: self.WorldHeight / self.TileSize},
 		}
 	}
 
 	for _, area := range areasToGenerate {
 		startX := int(math.Max(0, float64(area.X1)))
 		startY := int(math.Max(0, float64(area.Y1)))
-		endX := int(math.Min(float64(self.worldWidth/self.tileSize), float64(area.X2)))
-		endY := int(math.Min(float64(self.worldHeight/self.tileSize), float64(area.Y2)))
+		endX := int(math.Min(float64(self.WorldWidth/self.TileSize), float64(area.X2)))
+		endY := int(math.Min(float64(self.WorldHeight/self.TileSize), float64(area.Y2)))
 
 		for yTile := startY; yTile < endY; yTile++ {
 			for xTile := startX; xTile < endX; xTile++ {
 				// Generate grass blades for each tile based on the density setting.
-				for i := 0; i < self.grassDensity; i++ {
+				for i := 0; i < self.GrassDensity; i++ {
 					// Calculate a random position within the current tile.
-					posX := float64(xTile*self.tileSize) + rand.Float64()*float64(self.tileSize)
-					posY := float64(yTile*self.tileSize) + rand.Float64()*float64(self.tileSize)
+					posX := float64(xTile*self.TileSize) + rand.Float64()*float64(self.TileSize)
+					posY := float64(yTile*self.TileSize) + rand.Float64()*float64(self.TileSize)
 
 					grassComp := &GrassComponent{
 						// Set a random seed for unique, natural wind sway.
@@ -269,7 +269,7 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					transform.Z = self.Z
 
 					// If orderable, create and add an orderable component for rendering.
-					if self.orderable {
+					if self.Orderable {
 						orderable := NewOrderableComponent(nil)
 						orderable.SetIndex(transform.Position().Y)
 						world.AddComponent(entity, orderable)
@@ -281,7 +281,7 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 						textureID = area.TexturesIDs[rand.Intn(len(area.TexturesIDs))]
 					}
 
-					img := self.tm.Get(textureID)
+					img := self.Tm.Get(textureID)
 					sprite := NewSpriteComponent(textureID, img.Bounds())
 
 					// Manually adjust the vertices to set the anchor to the bottom-center.
@@ -300,7 +300,7 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 					world.AddComponent(entity, sprite)
 
 					// Insert the new grass entity into the quadtree for efficient spatial queries.
-					self.quadtree.Insert(entity)
+					self.Quadtree.Insert(entity)
 				}
 			}
 		}
@@ -310,15 +310,15 @@ func (self *GrassControllerComponent) initGrass(world *World) {
 // getWindForceAt samples the wind force at a given world position from the noise map.
 // The noise map is treated as a seamless, repeating texture.
 func (self *GrassControllerComponent) getWindForceAt(x, y float64) float64 {
-	sampleX := int(math.Mod(x+self.windScroll.X, float64(self.noiseMapSize)))
-	sampleY := int(math.Mod(y+self.windScroll.Y, float64(self.noiseMapSize)))
+	sampleX := int(math.Mod(x+self.WindScroll.X, float64(self.NoiseMapSize)))
+	sampleY := int(math.Mod(y+self.WindScroll.Y, float64(self.NoiseMapSize)))
 	if sampleX < 0 {
-		sampleX += self.noiseMapSize
+		sampleX += self.NoiseMapSize
 	}
 	if sampleY < 0 {
-		sampleY += self.noiseMapSize
+		sampleY += self.NoiseMapSize
 	}
-	noiseColor := self.noiseImage.At(sampleX, sampleY)
+	noiseColor := self.NoiseImage.At(sampleX, sampleY)
 	// The color value (red channel) represents the wind force.
 	r, _, _, _ := noiseColor.RGBA()
 	// Normalize the value to a float between 0.0 and 1.0.
@@ -327,7 +327,7 @@ func (self *GrassControllerComponent) getWindForceAt(x, y float64) float64 {
 
 // SetForcePositions updates the list of external force sources affecting the grass.
 func (self *GrassControllerComponent) SetForcePositions(sources ...ForceSource) {
-	self.externalForceSources = sources
+	self.ExternalForceSources = sources
 }
 
 // AddStrongWindGust adds a new strong wind gust to the simulation.
@@ -335,5 +335,5 @@ func (self *GrassControllerComponent) AddStrongWindGust(gust StrongWindGust) {
 	// Normalize the direction vector and set the gust as active.
 	gust.Direction = gust.EndPos.Sub(gust.StartPos).Normalize()
 	gust.Active = true
-	self.strongWindGusts = append(self.strongWindGusts, &gust)
+	self.StrongWindGusts = append(self.StrongWindGusts, &gust)
 }

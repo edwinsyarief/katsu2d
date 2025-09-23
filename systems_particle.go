@@ -33,9 +33,9 @@ func (self *ParticleEmitterSystem) Update(world *World, dt float64) {
 
 		particlesToSpawn := 0
 		if em.Active {
-			em.spawnCounter += em.EmitRate * dt
-			particlesToSpawn = int(em.spawnCounter)
-			em.spawnCounter -= float64(particlesToSpawn)
+			em.SpawnCounter += em.EmitRate * dt
+			particlesToSpawn = int(em.SpawnCounter)
+			em.SpawnCounter -= float64(particlesToSpawn)
 		} else if em.BurstCount > 0 {
 			particlesToSpawn = em.BurstCount
 			em.BurstCount = 0
@@ -257,8 +257,7 @@ func (self *ParticleRenderSystem) Draw(world *World, renderer *BatchRenderer) {
 			continue
 		}
 
-		//imgW, imgH := img.Bounds().Dx(), img.Bounds().Dy()
-		srcRect := s.GetSourceRect()
+		srcRect := s.SrcRect
 		effColor := s.Color
 		effColor.A = uint8(float32(s.Color.A) * s.Opacity)
 		realPos := ebimath.V2(0).Apply(t.Matrix())

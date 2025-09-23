@@ -27,24 +27,24 @@ func (s *InputSystem) Update(world *World, delta float64) {
 		}
 
 		// Reset states for the current frame
-		for action := range comp.bindings {
-			comp.justPressed[action] = false
-			comp.justReleased[action] = false
+		for action := range comp.Bindings {
+			comp.JustPressed[action] = false
+			comp.JustReleased[action] = false
 		}
 
 		// set the mouse wheel deltas
-		comp.mouseWheelX = wx
-		comp.mouseWheelY = wy
+		comp.MouseWheelX = wx
+		comp.MouseWheelY = wy
 
 		// Now, check for the current state for all bindings.
-		for action := range comp.bindings {
+		for action := range comp.Bindings {
 			// A single action can be triggered by multiple bindings (e.g., keyboard and gamepad)
 			// We use a logical OR to ensure that if any binding is met, the action is triggered.
 			isAnyJustPressed := false
 			isAnyPressed := false
 			isAnyJustReleased := false
 
-			for _, binding := range comp.bindings[action] {
+			for _, binding := range comp.Bindings[action] {
 				modsDown := true
 				for _, mod := range binding.Modifiers {
 					if !isPressed(mod) {
@@ -67,9 +67,9 @@ func (s *InputSystem) Update(world *World, delta float64) {
 			}
 
 			// Update the component's state based on the calculated values
-			comp.justPressed[action] = isAnyJustPressed
-			comp.justReleased[action] = isAnyJustReleased
-			comp.pressed[action] = isAnyPressed
+			comp.JustPressed[action] = isAnyJustPressed
+			comp.JustReleased[action] = isAnyJustReleased
+			comp.Pressed[action] = isAnyPressed
 		}
 	}
 }

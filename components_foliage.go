@@ -23,18 +23,18 @@ type FoliageComponent struct {
 // FoliageControllerComponent manages the overall state and logic for the foliage simulation.
 // It handles wind effects and other global parameters that affect all foliage.
 type FoliageControllerComponent struct {
-	// windTime is a continuously increasing value used to drive the time-based wind simulation.
-	windTime float64
-	// windDirection is the dominant vector for the ambient wind, normalized to a unit vector.
-	windDirection ebimath.Vector
-	// windForce controls the maximum amplitude of the wind-induced sway.
-	windForce float64
-	// windSpeed determines how quickly the wind effect progresses over time.
-	windSpeed float64
-	// rippleStrength sets the intensity of the rippling effect that travels through the foliage.
-	rippleStrength float64
-	// noise is the Perlin noise generator used to create complex, natural-looking wind patterns.
-	noise opensimplex.Noise
+	// WindTime is a continuously increasing value used to drive the time-based wind simulation.
+	WindTime float64
+	// WindDirection is the dominant vector for the ambient wind, normalized to a unit vector.
+	WindDirection ebimath.Vector
+	// WindForce controls the maximum amplitude of the wind-induced sway.
+	WindForce float64
+	// WindSpeed determines how quickly the wind effect progresses over time.
+	WindSpeed float64
+	// RippleStrength sets the intensity of the rippling effect that travels through the foliage.
+	RippleStrength float64
+	// Noise is the Perlin noise generator used to create complex, natural-looking wind patterns.
+	Noise opensimplex.Noise
 }
 
 // FoliageOption is a functional option type for configuring a FoliageControllerComponent.
@@ -44,28 +44,28 @@ type FoliageOption func(*FoliageControllerComponent)
 // WithFoliageWindForce sets the maximum amplitude of the foliage's sway due to wind.
 func WithFoliageWindForce(force float64) FoliageOption {
 	return func(c *FoliageControllerComponent) {
-		c.windForce = force
+		c.WindForce = force
 	}
 }
 
 // WithFoliageWindSpeed sets how fast the foliage sways due to the wind effect.
 func WithFoliageWindSpeed(speed float64) FoliageOption {
 	return func(c *FoliageControllerComponent) {
-		c.windSpeed = speed
+		c.WindSpeed = speed
 	}
 }
 
 // WithFoliageWindDirection sets the dominant direction of the ambient wind. The vector will be normalized.
 func WithFoliageWindDirection(x, y float64) FoliageOption {
 	return func(c *FoliageControllerComponent) {
-		c.windDirection = ebimath.Vector{X: x, Y: y}.Normalize()
+		c.WindDirection = ebimath.Vector{X: x, Y: y}.Normalize()
 	}
 }
 
 // WithFoliageRippleStrength sets the strength of the rippling effect that travels through the foliage.
 func WithFoliageRippleStrength(strength float64) FoliageOption {
 	return func(c *FoliageControllerComponent) {
-		c.rippleStrength = strength
+		c.RippleStrength = strength
 	}
 }
 
@@ -78,12 +78,12 @@ func NewFoliageControllerComponent(opts ...FoliageOption) *FoliageControllerComp
 	noiseGenerator := opensimplex.New(time.Now().UnixNano())
 
 	c := &FoliageControllerComponent{
-		windDirection:  ebimath.Vector{X: 1.0, Y: 0.0},
-		windForce:      10.0, // Default pixels of sway
-		windSpeed:      1.0,
-		rippleStrength: 1.0,
-		windTime:       0,
-		noise:          noiseGenerator, // Assign the newly created noise generator
+		WindDirection:  ebimath.Vector{X: 1.0, Y: 0.0},
+		WindForce:      10.0, // Default pixels of sway
+		WindSpeed:      1.0,
+		RippleStrength: 1.0,
+		WindTime:       0,
+		Noise:          noiseGenerator, // Assign the newly created noise generator
 	}
 	// Apply all functional options to customize the component.
 	for _, opt := range opts {
