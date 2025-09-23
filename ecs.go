@@ -461,8 +461,8 @@ func (self *World) QueryTag(tags ...string) []Entity {
 	return res
 }
 
-// QueryExclude queries all entities that has one of component, but without tag or tag is not in the list
-func (self *World) QueryWithTagExclusion(componentIDs []ComponentID, excludedTags ...string) []Entity {
+// QueryAnyWithTagExclusion queries all entities that has one of component, but without tag or tag is not in the list
+func (self *World) QueryAnyWithTagExclusion(componentIDs []ComponentID, excludedTags ...string) []Entity {
 	self.mu.RLock()
 	defer self.mu.RUnlock()
 
