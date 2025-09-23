@@ -222,6 +222,14 @@ func (self *RectangleComponent) triangulateFill(fillPath []ebiten.Vertex, colors
 	}
 }
 
+func (self *RectangleComponent) GetVertices() []ebiten.Vertex {
+	return self.Vertices
+}
+
+func (self *RectangleComponent) GetIndices() []uint16 {
+	return self.Indices
+}
+
 type CircleComponent struct {
 	Radius       float32
 	FillColors   [4]color.RGBA

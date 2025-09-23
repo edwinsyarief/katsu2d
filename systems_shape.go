@@ -22,15 +22,7 @@ func NewShapeRenderSystem() *ShapeRenderSystem {
 
 // Update rebuilds the mesh for any dirty shapes.
 func (self *ShapeRenderSystem) Update(world *World, dt float64) {
-	// Handle RectangleComponent separately
-	rectEntities := world.Query(CTRectangle)
-	for _, e := range rectEntities {
-		rectAny, _ := world.GetComponent(e, CTRectangle)
-		rect := rectAny.(*RectangleComponent)
-		rect.Rebuild()
-	}
-
-	// Handle other shapes
+	self.updateShapes(world, CTRectangle)
 	self.updateShapes(world, CTCircle)
 	self.updateShapes(world, CTTriangle)
 	self.updateShapes(world, CTPentagon)
