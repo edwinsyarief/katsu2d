@@ -22,6 +22,10 @@ func NewShapeComponent(shape Shape) *ShapeComponent {
 	return &ShapeComponent{shape: shape}
 }
 
+func (self *ShapeComponent) Shape() Shape {
+	return self.shape
+}
+
 type RectangleShape struct {
 	Width, Height     float32
 	FillColors        [4]color.RGBA // 0:TL, 1:TR, 2:BR, 3:BL
