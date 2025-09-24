@@ -4,6 +4,7 @@ import (
 	"math"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/edwinsyarief/lazyecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -16,48 +17,52 @@ func NewFoliageSystem() *FoliageSystem {
 }
 
 // Update processes all foliage entities each frame, applying wind effects.
-func (self *FoliageSystem) Update(world *World, dt float64) {
+func (self *FoliageSystem) Update(world *lazyecs.World, dt float64) {
 	// Retrieve the main foliage controller from the world.
-	controllers := world.Query(CTFoliageController)
-	if len(controllers) == 0 {
+	query1 := world.Query(CTFoliageController)
+	var controller *FoliageControllerComponent
+	for query1.Next() {
+		ctrlEntities := query1.Entities()
+		for _, entity := range ctrlEntities {
+			controller, _ = lazyecs.GetComponent[FoliageControllerComponent](world, entity)
+			// Increment the wind timer to progress the wind simulation.
+			controller.WindTime += dt
+		}
+	}
+
+	if controller == nil {
 		return
 	}
 
-	controllerComp, ok := world.GetComponent(controllers[0], CTFoliageController)
-	if !ok {
-		return
-	}
-	controller := controllerComp.(*FoliageControllerComponent)
-	// Increment the wind timer to progress the wind simulation.
-	controller.WindTime += dt
+	// Retrieve foliage
+	query2 := world.Query(CTFoliage, CTSprite, CTTransform)
+	for query2.Next() {
+		for _, entity := range query2.Entities() {
+			foliage, _ := lazyecs.GetComponent[FoliageComponent](world, entity)
+			sprite, _ := lazyecs.GetComponent[SpriteComponent](world, entity)
+			sprite.GenerateMesh()
 
-	// Iterate over all entities that have foliage, sprite, and transform components.
-	for _, entity := range world.Query(CTFoliage, CTSprite, CTTransform) {
-		foliageAny, _ := world.GetComponent(entity, CTFoliage)
-		spriteAny, _ := world.GetComponent(entity, CTSprite)
-		foliage := foliageAny.(*FoliageComponent)
-		sprite := spriteAny.(*SpriteComponent)
+			// Skip if the sprite has no base vertices to manipulate.
+			if len(sprite.BaseVertices) == 0 {
+				continue
+			}
 
-		// Skip if the sprite has no base vertices to manipulate.
-		if len(sprite.BaseVertices) == 0 {
-			continue
+			// Calculate the vertical bounds (minY and maxY) of the sprite's vertices.
+			minY, maxY := getVertexBounds(sprite.BaseVertices)
+			height := float64(maxY - minY)
+			if height == 0 {
+				continue
+			}
+
+			// Determine the pivot point for rotation, using a default if none is specified.
+			pivot := getDefaultPivot(foliage.Pivot)
+
+			// Reset the sprite's current vertices to their original, base positions.
+			copy(sprite.Vertices, sprite.BaseVertices)
+
+			// Apply the wind effect to each vertex based on the controller's state.
+			applyWindEffect(sprite, controller, foliage, minY, height, pivot)
 		}
-
-		// Calculate the vertical bounds (minY and maxY) of the sprite's vertices.
-		minY, maxY := getVertexBounds(sprite.BaseVertices)
-		height := float64(maxY - minY)
-		if height == 0 {
-			continue
-		}
-
-		// Determine the pivot point for rotation, using a default if none is specified.
-		pivot := getDefaultPivot(foliage.Pivot)
-
-		// Reset the sprite's current vertices to their original, base positions.
-		copy(sprite.Vertices, sprite.BaseVertices)
-
-		// Apply the wind effect to each vertex based on the controller's state.
-		applyWindEffect(sprite, controller, foliage, minY, height, pivot)
 	}
 }
 

@@ -10,7 +10,7 @@ This project is currently under active development. While core functionalities a
 
 ## Features
 
-- **Fast & Unique ECS Architecture:** A robust Entity Component System that promotes modularity, reusability, and high performance by separating data (components) from logic (systems).
+- **Fast & Unique ECS Architecture:** Lazy ECS. [https://github.com/edwinsyarief/lazyecs](https://github.com/edwinsyarief/lazyecs)
 - **Optimized Batching Renderer:** Efficiently draws multiple sprites in a single draw call, significantly reducing overhead. Supports advanced transformations like rotation and scaling for batched entities.
 - **Powerful Audio Manager:** Feature-rich audio system supporting music and sound effects with:
   - Fade in/out transitions for smooth audio blending

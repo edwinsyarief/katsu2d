@@ -51,22 +51,18 @@ type SpriteComponent struct {
 	Dirty        bool
 }
 
-// NewSpriteComponent creates a new sprite component for a simple quad.
-func NewSpriteComponent(textureID int, bounds image.Rectangle) *SpriteComponent {
-	s := &SpriteComponent{
-		TextureID: textureID,
-		DstW:      float32(bounds.Dx()),
-		DstH:      float32(bounds.Dy()),
-		SrcRect:   &bounds,
-		Color:     color.RGBA{255, 255, 255, 255},
-		Opacity:   1.0,
-		Rows:      1,
-		Cols:      1,
-		MeshType:  SpriteMeshTypeQuad,
-		TexMode:   SpriteTextureModeStretch,
-		Dirty:     true,
-	}
-	return s
+func (self *SpriteComponent) Init(textureID int, bounds image.Rectangle) {
+	self.TextureID = textureID
+	self.DstW = float32(bounds.Dx())
+	self.DstH = float32(bounds.Dy())
+	self.SrcRect = &bounds
+	self.Color = color.RGBA{255, 255, 255, 255}
+	self.Opacity = 1.0
+	self.Rows = 1
+	self.Cols = 1
+	self.MeshType = SpriteMeshTypeQuad
+	self.TexMode = SpriteTextureModeStretch
+	self.Dirty = true
 }
 
 // SetGrid sets the number of rows and columns for the mesh.

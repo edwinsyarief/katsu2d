@@ -69,25 +69,16 @@ func WithFoliageRippleStrength(strength float64) FoliageOption {
 	}
 }
 
-// NewFoliageControllerComponent creates and initializes a new foliage controller.
-// It sets default values and applies any provided options.
-func NewFoliageControllerComponent(opts ...FoliageOption) *FoliageControllerComponent {
-	// Initialize a new Perlin noise generator with a random seed based on the current time.
-	// Alpha, Beta, and N control the frequency, amplitude, and number of octaves,
-	// which define the complexity and texture of the wind patterns.
-	noiseGenerator := opensimplex.New(time.Now().UnixNano())
+func (self *FoliageControllerComponent) Init(opts ...FoliageOption) {
+	self.Noise = opensimplex.New(time.Now().UnixNano())
+	self.WindDirection = ebimath.V(1, 0)
+	self.WindForce = 10
+	self.WindSpeed = 1
+	self.RippleStrength = 1
+	self.WindTime = 0
 
-	c := &FoliageControllerComponent{
-		WindDirection:  ebimath.Vector{X: 1.0, Y: 0.0},
-		WindForce:      10.0, // Default pixels of sway
-		WindSpeed:      1.0,
-		RippleStrength: 1.0,
-		WindTime:       0,
-		Noise:          noiseGenerator, // Assign the newly created noise generator
-	}
 	// Apply all functional options to customize the component.
 	for _, opt := range opts {
-		opt(c)
+		opt(self)
 	}
-	return c
 }

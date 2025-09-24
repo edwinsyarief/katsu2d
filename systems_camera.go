@@ -1,29 +1,29 @@
 package katsu2d
 
+import "github.com/edwinsyarief/lazyecs"
+
 type BasicCameraSystem struct{}
 
-func (self *BasicCameraSystem) Update(world *World, dt float64) {
-	entities := world.Query(CTBasicCamera)
-	for _, entity := range entities {
-		comp, ok := world.GetComponent(entity, CTBasicCamera)
-		if !ok {
-			continue
+func (self *BasicCameraSystem) Update(world *lazyecs.World, dt float64) {
+	query := world.Query(CTBasicCamera)
+	for query.Next() {
+		if cameras, ok := lazyecs.GetComponentSlice[BasicCameraComponent](query); ok {
+			for _, c := range cameras {
+				c.Update(dt)
+			}
 		}
-		camera := comp.(*BasicCameraComponent)
-		camera.Update(dt)
 	}
 }
 
 type CameraSystem struct{}
 
-func (self *CameraSystem) Update(world *World, dt float64) {
-	entities := world.Query(CTCamera)
-	for _, entity := range entities {
-		comp, ok := world.GetComponent(entity, CTCamera)
-		if !ok {
-			continue
+func (self *CameraSystem) Update(world *lazyecs.World, dt float64) {
+	query := world.Query(CTCamera)
+	for query.Next() {
+		if cameras, ok := lazyecs.GetComponentSlice[CameraComponent](query); ok {
+			for _, c := range cameras {
+				c.Update(dt)
+			}
 		}
-		camera := comp.(*CameraComponent)
-		camera.Update(dt)
 	}
 }

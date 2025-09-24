@@ -1,5 +1,5 @@
-github.com/ebitengine/gomobile v0.0.0-20250329061421-6d0a8e981e4c h1:Ccgks2VROTr6bIm1FFxG2jT6P1DaCBMj8g/O9xbOQ08=
-github.com/ebitengine/gomobile v0.0.0-20250329061421-6d0a8e981e4c/go.mod h1:M6DDA2RbegvWBVv4Dq482lwyFTtMczT1A7UNm1qOYzY=
+github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 h1:+kz5iTT3L7uU+VhlMfTb8hHcxLO3TlaELlX8wa4XjA0=
+github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1/go.mod h1:lKJoeixeJwnFmYsBny4vvCJGVFc3aYDalhuDsfZzWHI=
 github.com/ebitengine/hideconsole v1.0.0 h1:5J4U0kXF+pv/DhiXt5/lTz0eO5ogJ1iXb8Yj1yReDqE=
 github.com/ebitengine/hideconsole v1.0.0/go.mod h1:hTTBTvVYWKBuxPr7peweneWdkUwEuHuB3C1R/ielR1A=
 github.com/ebitengine/oto/v3 v3.3.3 h1:m6RV69OqoXYSWCDsHXN9rc07aDuDstGHtait7HXSM7g=
@@ -10,6 +10,10 @@ github.com/edwinsyarief/assetpacker v1.0.0 h1:V4z0MZRfDQGRafo4jvXyGsYKfUw61B7bRC
 github.com/edwinsyarief/assetpacker v1.0.0/go.mod h1:Cv5V5pP0S33109CQJkip4fHCVDJVi44o4kVsHEGzeEw=
 github.com/edwinsyarief/ebi-math v1.2.4 h1:A09R2gzQw4KI9NylcJxKo/PqY/m5Ic/14YuB8Dn4fTA=
 github.com/edwinsyarief/ebi-math v1.2.4/go.mod h1:lbp0G39FFDw6Ip24UtFpykJtRnUFuyC3HelaoYZkuOU=
+github.com/edwinsyarief/lazyecs v1.0.0 h1:DnGoV+TJ7Kc3NoRWnnj8u9fYUOt72ICSHbocPNi0Q/4=
+github.com/edwinsyarief/lazyecs v1.0.0/go.mod h1:nrNMXHwURxJpECwRJSUBpv1U+TseNXJhVl3xzBPglUc=
+github.com/edwinsyarief/lazyecs v1.1.0 h1:C4cuVwZYe3o6StcWgqqr9YX6sW9t09AY9+iF9vTxn5Q=
+github.com/edwinsyarief/lazyecs v1.1.0/go.mod h1:nrNMXHwURxJpECwRJSUBpv1U+TseNXJhVl3xzBPglUc=
 github.com/go-text/typesetting v0.3.0 h1:OWCgYpp8njoxSRpwrdd1bQOxdjOXDj9Rqart9ML4iF4=
 github.com/go-text/typesetting v0.3.0/go.mod h1:qjZLkhRgOEYMhU9eHBr3AR4sfnGJvOXNLt8yRAySFuY=
 github.com/go-text/typesetting-utils v0.0.0-20241103174707-87a29e9e6066 h1:qCuYC+94v2xrb1PoS4NIDe7DGYtLnU2wWiQe9a1B1c0=

@@ -7,12 +7,8 @@ type OrderableComponent struct {
 	IsStatic    bool
 }
 
-// NewOrderableComponent creates a new OrderableComponent with a dynamic index function.
-func NewOrderableComponent(indexFunc func() float64) *OrderableComponent {
-	return &OrderableComponent{
-		IndexFunc: indexFunc,
-		IsStatic:  false,
-	}
+func (self *OrderableComponent) Init(indexFunc func() float64) {
+	self.IndexFunc = indexFunc
 }
 
 // SetIndex sets a static sorting index for the entity.

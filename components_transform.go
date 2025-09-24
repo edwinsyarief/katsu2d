@@ -9,15 +9,6 @@ type TransformComponent struct {
 	Z                  float64 // Z-coordinate for depth sorting
 }
 
-// Position returns the current 2D position vector of the transform
-func (self *TransformComponent) Position() ebimath.Vector {
-	return self.Transform.Position()
-}
-
-// NewTransformComponent creates a new transform component with default values
-// Initializes with a new ebimath Transform and Z=0
-func NewTransformComponent() *TransformComponent {
-	return &TransformComponent{
-		Transform: ebimath.T(),
-	}
+func (self *TransformComponent) Init() {
+	self.Transform = ebimath.T()
 }

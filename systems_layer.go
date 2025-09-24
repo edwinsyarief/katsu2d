@@ -2,7 +2,9 @@ package katsu2d
 
 import (
 	"image/color"
+	"sync"
 
+	"github.com/edwinsyarief/lazyecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -44,11 +46,13 @@ type LayerSytem struct {
 	drawSystems             []DrawSystem   // Collection of drawing systems to be executed
 	updateSystems           []UpdateSystem // Collection of update systems to be executed
 	stretched, pixelPerfect bool
+
+	once sync.Once
 }
 
 // NewLayerSystem creates a new layer renderer with specified dimensions
 // and optional configuration through LayerRendererOptions
-func NewLayerSystem(world *World, width, height int, opts ...LayerOption) *LayerSytem {
+func NewLayerSystem(width, height int, opts ...LayerOption) *LayerSytem {
 	buffer := ebiten.NewImage(width, height)
 	ls := &LayerSytem{
 		batchRenderer: NewBatchRenderer(),
@@ -63,9 +67,6 @@ func NewLayerSystem(world *World, width, height int, opts ...LayerOption) *Layer
 
 	ls.canvas = newCanvas(width, height, ls.stretched, ls.pixelPerfect)
 
-	eb := world.GetEventBus()
-	eb.Subscribe(EngineLayoutChangedEvent{}, ls.onEngineLayoutChanged)
-
 	return ls
 }
 
@@ -74,7 +75,12 @@ func (self *LayerSytem) onEngineLayoutChanged(obj interface{}) {
 	self.canvas.Resize(data.Width, data.Height)
 }
 
-func (self *LayerSytem) Update(world *World, dt float64) {
+func (self *LayerSytem) Update(world *lazyecs.World, dt float64) {
+	self.once.Do(func() {
+		eb := GetEventBus(world)
+		eb.Subscribe(EngineLayoutChangedEvent{}, self.onEngineLayoutChanged)
+	})
+
 	for _, us := range self.updateSystems {
 		us.Update(world, dt)
 	}
@@ -82,7 +88,7 @@ func (self *LayerSytem) Update(world *World, dt float64) {
 
 // Draw executes all registered render systems and handles scaling of the final output.
 // It maintains aspect ratio while scaling and centers the result on the screen.
-func (self *LayerSytem) Draw(world *World, renderer *BatchRenderer) {
+func (self *LayerSytem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
 	// Clear the buffer with transparency
 	self.buffer.Fill(color.Transparent)
 
