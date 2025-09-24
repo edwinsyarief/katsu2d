@@ -8,124 +8,114 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// FirePreset returns a configured emitter for a fire effect.
-func FirePreset(textureID int) *ParticleEmitterComponent {
-	emitter := NewParticleEmitterComponent([]int{textureID})
-	emitter.Active = true
-	emitter.EmitRate = 200
-	emitter.MaxParticles = 500
-	emitter.ParticleLifetime = 1.0
-	emitter.InitialParticleSpeedMin = 3
-	emitter.InitialParticleSpeedMax = 5
-	emitter.ParticleSpawnOffset = ebimath.V(8, 8)
-	emitter.InitialColorMin = color.RGBA{255, 255, 0, 255} // Yellow
-	emitter.InitialColorMax = color.RGBA{255, 128, 0, 255} // Orange
-	emitter.TargetColorMin = color.RGBA{255, 0, 0, 0}      // Red, transparent
-	emitter.TargetColorMax = color.RGBA{255, 0, 0, 0}      // Red, transparent
-	emitter.FadeMode = ParticleFadeModeFadeOut
-	emitter.BlendMode = ebiten.BlendLighter // Additive blending for a glowing effect
-	emitter.MinScale = 1
-	emitter.MaxScale = 1.5
-	emitter.MinRotation = 0
-	emitter.MaxRotation = 1.5 * math.Pi
-	emitter.Gravity = ebimath.V(0, -100)
-	return emitter
+func (self *ParticleEmitterComponent) FirePreset(textureID int) {
+	self.Init([]int{textureID})
+	self.Active = true
+	self.EmitRate = 200
+	self.MaxParticles = 500
+	self.ParticleLifetime = 1.0
+	self.InitialParticleSpeedMin = 3
+	self.InitialParticleSpeedMax = 5
+	self.ParticleSpawnOffset = ebimath.V(8, 8)
+	self.InitialColorMin = color.RGBA{255, 255, 0, 255} // Yellow
+	self.InitialColorMax = color.RGBA{255, 128, 0, 255} // Orange
+	self.TargetColorMin = color.RGBA{255, 0, 0, 0}      // Red, transparent
+	self.TargetColorMax = color.RGBA{255, 0, 0, 0}      // Red, transparent
+	self.FadeMode = ParticleFadeModeFadeOut
+	self.BlendMode = ebiten.BlendLighter // Additive blending for a glowing effect
+	self.MinScale = 1
+	self.MaxScale = 1.5
+	self.MinRotation = 0
+	self.MaxRotation = 1.5 * math.Pi
+	self.Gravity = ebimath.V(0, -100)
 }
 
-// RainPreset returns a configured emitter for a rain effect.
-func RainPreset(textureID int) *ParticleEmitterComponent {
-	emitter := NewParticleEmitterComponent([]int{textureID})
-	emitter.Active = true
-	emitter.EmitRate = 200
-	emitter.MaxParticles = 1000
-	emitter.ParticleLifetime = 1.0
-	emitter.InitialParticleSpeedMin = 200
-	emitter.InitialParticleSpeedMax = 300
-	emitter.ParticleSpawnOffset = ebimath.V(100, 0) // Wide spawn area
-	emitter.InitialColorMin = color.RGBA{100, 150, 255, 200}
-	emitter.InitialColorMax = color.RGBA{100, 150, 255, 200}
-	emitter.TargetColorMin = color.RGBA{100, 150, 255, 0}
-	emitter.TargetColorMax = color.RGBA{100, 150, 255, 0}
-	emitter.FadeMode = ParticleFadeModeFadeOut
-	emitter.Gravity = ebimath.V(0, 150) // Gravity pulls particles down
-	emitter.BlendMode = ebiten.BlendSourceOver
-	emitter.MinScale = 0.2
-	emitter.MaxScale = 0.5
-	emitter.ScaleMode = ParticleScaleModeNone
-	emitter.MinRotation = 0
-	emitter.MaxRotation = 0
-	return emitter
+func (self *ParticleEmitterComponent) RainPreset(textureID int) {
+	self.Init([]int{textureID})
+	self.Active = true
+	self.EmitRate = 200
+	self.MaxParticles = 1000
+	self.ParticleLifetime = 1.0
+	self.InitialParticleSpeedMin = 200
+	self.InitialParticleSpeedMax = 300
+	self.ParticleSpawnOffset = ebimath.V(100, 0) // Wide spawn area
+	self.InitialColorMin = color.RGBA{100, 150, 255, 200}
+	self.InitialColorMax = color.RGBA{100, 150, 255, 200}
+	self.TargetColorMin = color.RGBA{100, 150, 255, 0}
+	self.TargetColorMax = color.RGBA{100, 150, 255, 0}
+	self.FadeMode = ParticleFadeModeFadeOut
+	self.Gravity = ebimath.V(0, 150) // Gravity pulls particles down
+	self.BlendMode = ebiten.BlendSourceOver
+	self.MinScale = 0.2
+	self.MaxScale = 0.5
+	self.ScaleMode = ParticleScaleModeNone
+	self.MinRotation = 0
+	self.MaxRotation = 0
 }
 
-// SmokePreset returns a configured emitter for a smoke effect.
-func SmokePreset(textureID int) *ParticleEmitterComponent {
-	emitter := NewParticleEmitterComponent([]int{textureID})
-	emitter.Active = true
-	emitter.EmitRate = 10
-	emitter.MaxParticles = 100
-	emitter.ParticleLifetime = 5.0
-	emitter.InitialParticleSpeedMin = 10
-	emitter.InitialParticleSpeedMax = 20
-	emitter.ParticleSpawnOffset = ebimath.V(5, 5)
-	emitter.InitialColorMin = color.RGBA{150, 150, 150, 100}
-	emitter.InitialColorMax = color.RGBA{200, 200, 200, 100}
-	emitter.TargetColorMin = color.RGBA{50, 50, 50, 0}
-	emitter.TargetColorMax = color.RGBA{50, 50, 50, 0}
-	emitter.FadeMode = ParticleFadeModeFadeOut
-	emitter.BlendMode = ebiten.BlendSourceOver
-	emitter.MinScale = 0.5
-	emitter.MaxScale = 2.0
-	emitter.MinRotation = 0
-	emitter.MaxRotation = 2 * math.Pi
-	return emitter
+func (self *ParticleEmitterComponent) SmokePreset(textureIDs []int) {
+	self.Init(textureIDs)
+	self.Active = true
+	self.EmitRate = 10
+	self.MaxParticles = 100
+	self.ParticleLifetime = 5.0
+	self.InitialParticleSpeedMin = 10
+	self.InitialParticleSpeedMax = 20
+	self.ParticleSpawnOffset = ebimath.V(5, 5)
+	self.InitialColorMin = color.RGBA{150, 150, 150, 100}
+	self.InitialColorMax = color.RGBA{200, 200, 200, 100}
+	self.TargetColorMin = color.RGBA{50, 50, 50, 0}
+	self.TargetColorMax = color.RGBA{50, 50, 50, 0}
+	self.FadeMode = ParticleFadeModeFadeOut
+	self.BlendMode = ebiten.BlendSourceOver
+	self.MinScale = 0.5
+	self.MaxScale = 2.0
+	self.MinRotation = 0
+	self.MaxRotation = 2 * math.Pi
 }
 
-// ExplosionPreset returns a configured emitter for a one-time explosion effect.
-func ExplosionPreset(textureID int) *ParticleEmitterComponent {
-	emitter := NewParticleEmitterComponent([]int{textureID})
-	emitter.Active = false
-	emitter.BurstCount = 100
-	emitter.MaxParticles = 100
-	emitter.ParticleLifetime = 0.8
-	emitter.InitialParticleSpeedMin = 50
-	emitter.InitialParticleSpeedMax = 100
-	emitter.InitialColorMin = color.RGBA{255, 150, 0, 255}
-	emitter.InitialColorMax = color.RGBA{255, 255, 0, 255}
-	emitter.TargetColorMin = color.RGBA{255, 0, 0, 0}
-	emitter.TargetColorMax = color.RGBA{255, 0, 0, 0}
-	emitter.FadeMode = ParticleFadeModeFadeOut
-	emitter.BlendMode = ebiten.BlendLighter
-	emitter.MinScale = 0.5
-	emitter.MaxScale = 1.5
-	emitter.MinRotation = 0
-	emitter.MaxRotation = 2 * math.Pi
-	return emitter
+func (self *ParticleEmitterComponent) ExplosionPreset(textureIDs []int) {
+	self.Init(textureIDs)
+	self.Active = false
+	self.BurstCount = 100
+	self.MaxParticles = 100
+	self.ParticleLifetime = 0.8
+	self.InitialParticleSpeedMin = 50
+	self.InitialParticleSpeedMax = 100
+	self.InitialColorMin = color.RGBA{255, 150, 0, 255}
+	self.InitialColorMax = color.RGBA{255, 255, 0, 255}
+	self.TargetColorMin = color.RGBA{255, 0, 0, 0}
+	self.TargetColorMax = color.RGBA{255, 0, 0, 0}
+	self.FadeMode = ParticleFadeModeFadeOut
+	self.BlendMode = ebiten.BlendLighter
+	self.MinScale = 0.5
+	self.MaxScale = 1.5
+	self.MinRotation = 0
+	self.MaxRotation = 2 * math.Pi
 }
 
-// WhimsicalPreset returns a configured emitter for a whimsical effect.
-func WhimsicalPreset(textureID int) *ParticleEmitterComponent {
-	emitter := NewParticleEmitterComponent([]int{textureID})
-	emitter.Active = true
-	emitter.EmitRate = 50
-	emitter.MaxParticles = 200
-	emitter.ParticleLifetime = 3.0
-	emitter.InitialParticleSpeedMin = 20
-	emitter.InitialParticleSpeedMax = 40
-	emitter.ParticleSpawnOffset = ebimath.V(10, 10)
-	emitter.InitialColorMin = color.RGBA{255, 0, 255, 255} // Magenta
-	emitter.InitialColorMax = color.RGBA{0, 255, 255, 255} // Cyan
-	emitter.TargetColorMin = color.RGBA{255, 255, 0, 0}    // Yellow, transparent
-	emitter.TargetColorMax = color.RGBA{0, 255, 0, 0}      // Green, transparent
-	emitter.FadeMode = ParticleFadeModeFadeInOut
-	emitter.ScaleMode = ParticleScaleModeScaleInOut
-	emitter.MinScale = 0.2
-	emitter.MaxScale = 0.8
-	emitter.TargetScaleMin = 0.1
-	emitter.TargetScaleMax = 0.4
-	emitter.DirectionMode = ParticleDirectionModeNoise
-	emitter.NoiseFactor = 0.1
-	emitter.RotationSpeedMin = -math.Pi
-	emitter.RotationSpeedMax = math.Pi
-	emitter.BlendMode = ebiten.BlendLighter
-	return emitter
+func (self *ParticleEmitterComponent) WhimsicalPreset(textureID int) {
+	self.Init([]int{textureID})
+	self.Active = true
+	self.EmitRate = 50
+	self.MaxParticles = 200
+	self.ParticleLifetime = 3.0
+	self.InitialParticleSpeedMin = 20
+	self.InitialParticleSpeedMax = 40
+	self.ParticleSpawnOffset = ebimath.V(10, 10)
+	self.InitialColorMin = color.RGBA{255, 0, 255, 255} // Magenta
+	self.InitialColorMax = color.RGBA{0, 255, 255, 255} // Cyan
+	self.TargetColorMin = color.RGBA{255, 255, 0, 0}    // Yellow, transparent
+	self.TargetColorMax = color.RGBA{0, 255, 0, 0}      // Green, transparent
+	self.FadeMode = ParticleFadeModeFadeInOut
+	self.ScaleMode = ParticleScaleModeScaleInOut
+	self.MinScale = 0.2
+	self.MaxScale = 0.8
+	self.TargetScaleMin = 0.1
+	self.TargetScaleMax = 0.4
+	self.DirectionMode = ParticleDirectionModeNoise
+	self.NoiseFactor = 0.1
+	self.RotationSpeedMin = -math.Pi
+	self.RotationSpeedMax = math.Pi
+	self.BlendMode = ebiten.BlendLighter
 }

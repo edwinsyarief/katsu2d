@@ -3,34 +3,56 @@ package katsu2d
 import (
 	"sort"
 
+	"github.com/edwinsyarief/lazyecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // OrderableSystem renders sprite components sorted by their orderable index.
 type OrderableSystem struct {
-	world            *World
 	tm               *TextureManager
-	drawableEntities []Entity
+	drawableEntities []lazyecs.Entity
+	transforms       map[lazyecs.Entity]TransformComponent
+	sprites          map[lazyecs.Entity]SpriteComponent
+	orderables       map[lazyecs.Entity]OrderableComponent
 }
 
 // NewOrderableSystem creates a new RenderOrderSystem.
-func NewOrderableSystem(world *World, tm *TextureManager) *OrderableSystem {
+func NewOrderableSystem(tm *TextureManager) *OrderableSystem {
 	return &OrderableSystem{
-		world: world,
-		tm:    tm,
+		tm: tm,
 	}
 }
 
 // Update queries for all renderable entities and sorts them.
-func (self *OrderableSystem) Update(world *World, dt float64) {
-	self.drawableEntities = world.Query(CTOrderable, CTSprite, CTTransform)
+func (self *OrderableSystem) Update(world *lazyecs.World, dt float64) {
+	self.transforms = make(map[lazyecs.Entity]TransformComponent)
+	self.sprites = make(map[lazyecs.Entity]SpriteComponent)
+	self.orderables = make(map[lazyecs.Entity]OrderableComponent)
+
+	query := world.Query(CTTransform, CTSprite, CTOrderable)
+	currentEntities := make([]lazyecs.Entity, 0)
+	lastEntities := make(map[lazyecs.Entity]struct{})
+	for query.Next() {
+		transforms, _ := lazyecs.GetComponentSlice[TransformComponent](query)
+		sprites, _ := lazyecs.GetComponentSlice[SpriteComponent](query)
+		orderable, _ := lazyecs.GetComponentSlice[OrderableComponent](query)
+
+		for i, entity := range query.Entities() {
+			if _, ok := lastEntities[entity]; !ok {
+				currentEntities = append(currentEntities, entity)
+			}
+
+			self.transforms[entity] = transforms[i]
+			self.sprites[entity] = sprites[i]
+			self.orderables[entity] = orderable[i]
+		}
+	}
+
+	self.drawableEntities = currentEntities
 
 	sort.SliceStable(self.drawableEntities, func(i, j int) bool {
-		orderable1, _ := world.GetComponent(self.drawableEntities[i], CTOrderable)
-		o1 := orderable1.(*OrderableComponent)
-
-		orderable2, _ := world.GetComponent(self.drawableEntities[j], CTOrderable)
-		o2 := orderable2.(*OrderableComponent)
+		o1 := self.orderables[self.drawableEntities[i]]
+		o2 := self.orderables[self.drawableEntities[j]]
 
 		index1 := o1.Index()
 		index2 := o2.Index()
@@ -43,12 +65,10 @@ func (self *OrderableSystem) Update(world *World, dt float64) {
 }
 
 // Draw renders all sprites in the world, using the pre-sorted list.
-func (self *OrderableSystem) Draw(world *World, renderer *BatchRenderer) {
+func (self *OrderableSystem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
 	for _, entity := range self.drawableEntities {
-		tx, _ := world.GetComponent(entity, CTTransform)
-		t := tx.(*TransformComponent)
-		sprite, _ := world.GetComponent(entity, CTSprite)
-		s := sprite.(*SpriteComponent)
+		t := self.transforms[entity]
+		s := self.sprites[entity]
 
 		img := self.tm.Get(s.TextureID)
 		if img == nil {

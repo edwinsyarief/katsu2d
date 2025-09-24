@@ -6,7 +6,6 @@ type TagComponent struct {
 	Tag string // The identifying string for this entity
 }
 
-// NewTagComponent creates a new tag component with the specified string identifier
-func NewTagComponent(tag string) *TagComponent {
-	return &TagComponent{Tag: tag}
+func (self *TagComponent) Init(tag string) {
+	self.Tag = tag
 }

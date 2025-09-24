@@ -6,13 +6,16 @@ import (
 
 	ebimath "github.com/edwinsyarief/ebi-math"
 	"github.com/edwinsyarief/katsu2d/utils"
+	"github.com/edwinsyarief/lazyecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // FadeOverlaySystem manages fade overlays.
 type FadeOverlaySystem struct {
-	indices  []uint16
-	vertices []ebiten.Vertex
+	indices         []uint16
+	vertices        []ebiten.Vertex
+	overlayEntities []lazyecs.Entity
+	overlays        map[lazyecs.Entity]*FadeOverlayComponent
 }
 
 // NewFadeOverlaySystem creates a new FadeOverlaySystem.
@@ -24,33 +27,40 @@ func NewFadeOverlaySystem() *FadeOverlaySystem {
 }
 
 // Update updates all fade overlays in the world.
-func (self *FadeOverlaySystem) Update(world *World, dt float64) {
-	toRemove := []Entity{}
-	entities := world.Query(CTFadeOverlay)
-	for _, e := range entities {
-		fadeAny, _ := world.GetComponent(e, CTFadeOverlay)
-		fade := fadeAny.(*FadeOverlayComponent)
-		if fade.Finished {
-			if fade.FadeType == FadeTypeIn {
-				toRemove = append(toRemove, e)
+func (self *FadeOverlaySystem) Update(world *lazyecs.World, dt float64) {
+	toRemove := []lazyecs.Entity{}
+	query := world.Query(CTFadeOverlay)
+	for query.Next() {
+		for _, entity := range query.Entities() {
+			fade, _ := lazyecs.GetComponent[FadeOverlayComponent](world, entity)
+			self.overlays[entity] = fade
+
+			if fade.Finished {
+				if fade.FadeType == FadeTypeIn {
+					toRemove = append(toRemove, entity)
+				}
+				continue
 			}
-			continue
-		}
 
-		fade.CurrentFade, fade.Finished = fade.Tween.Update(float32(dt))
+			fade.CurrentFade, fade.Finished = fade.Tween.Update(float32(dt))
 
-		if fade.Finished && fade.Callback != nil {
-			fade.Callback()
+			if fade.Finished && fade.Callback != nil {
+				fade.Callback()
+			}
+
+			self.overlayEntities = append(self.overlayEntities, entity)
 		}
 	}
-	world.BatchRemoveEntities(toRemove...)
+
+	for _, entity := range toRemove {
+		delete(self.overlays, entity)
+		world.RemoveEntity(entity)
+	}
 }
 
-func (self *FadeOverlaySystem) Draw(world *World, renderer *BatchRenderer) {
-	entities := world.Query(CTFadeOverlay)
-	for _, e := range entities {
-		fadeAny, _ := world.GetComponent(e, CTFadeOverlay)
-		fade := fadeAny.(*FadeOverlayComponent)
+func (self *FadeOverlaySystem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
+	for _, entity := range self.overlayEntities {
+		fade := self.overlays[entity]
 
 		if fade.FadeType == FadeTypeIn && fade.Finished {
 			continue
@@ -80,12 +90,14 @@ func (self *FadeOverlaySystem) updateOverlayVertices(width, height int) {
 // CinematicOverlaySystem manages cinematic overlays.
 type CinematicOverlaySystem struct {
 	// Pre-allocated buffers for performance
-	indices      []uint16
-	vertices     []ebiten.Vertex
-	spotlightV   []ebiten.Vertex
-	spotlightI   []uint16
-	spotlightSeg int
-	toRemove     []Entity
+	indices         []uint16
+	vertices        []ebiten.Vertex
+	spotlightV      []ebiten.Vertex
+	spotlightI      []uint16
+	spotlightSeg    int
+	toRemove        []lazyecs.Entity
+	overlayEntities []lazyecs.Entity
+	overlays        map[lazyecs.Entity]*CinematicOverlayComponent
 }
 
 // NewCinematicOverlaySystem creates a new CinematicOverlaySystem.
@@ -106,80 +118,86 @@ func NewCinematicOverlaySystem() *CinematicOverlaySystem {
 }
 
 // Update updates all cinematic overlays in the world.
-func (self *CinematicOverlaySystem) Update(world *World, dt float64) {
+func (self *CinematicOverlaySystem) Update(world *lazyecs.World, dt float64) {
 	self.toRemove = self.toRemove[:0]
-	entities := world.Query(CTCinematicOverlay)
-	for _, e := range entities {
-		cinematicAny, _ := world.GetComponent(e, CTCinematicOverlay)
-		cinematic := cinematicAny.(*CinematicOverlayComponent)
-		if cinematic.Finished {
-			if cinematic.EndType == CinematicTransitionIn {
-				self.toRemove = append(self.toRemove, e)
+	query := world.Query(CTCinematicOverlay)
+	for query.Next() {
+		for _, entity := range query.Entities() {
+			cinematic, _ := lazyecs.GetComponent[CinematicOverlayComponent](world, entity)
+			self.overlays[entity] = cinematic
+
+			if cinematic.Finished {
+				if cinematic.EndType == CinematicTransitionIn {
+					self.toRemove = append(self.toRemove, entity)
+				}
+				continue
 			}
-			continue
-		}
 
-		// Update timing
-		cinematic.Delayer.Update(dt)
+			self.overlayEntities = append(self.overlayEntities, entity)
 
-		// Trigger delay if cinematic is finished and auto-finish is enabled
-		if cinematic.CinematicFinished && cinematic.AutoFinish && !cinematic.DelayFinished {
-			cinematic.Delayer.Activate("cinematic_delay")
-		}
+			// Update timing
+			cinematic.Delayer.Update(dt)
 
-		// Handle start phase
-		if !cinematic.CinematicFinished {
-			value, finished := cinematic.Tween.Update(float32(dt))
-			cinematic.CinematicFinished = finished
-			cinematic.TransitionValue = float64(value)
-		} else if cinematic.DelayFinished {
-			// Transition to end phase once
-			cinematic.lastStepOnce.Do(cinematic.setupLastStep)
-			value, finished := cinematic.Tween.Update(float32(dt))
-			cinematic.TransitionValue = float64(value)
-			cinematic.Finished = finished
-			if cinematic.Finished && cinematic.Callback != nil {
-				cinematic.Callback()
+			// Trigger delay if cinematic is finished and auto-finish is enabled
+			if cinematic.CinematicFinished && cinematic.AutoFinish && !cinematic.DelayFinished {
+				cinematic.Delayer.Activate("cinematic_delay")
 			}
-		} else {
-			continue
-		}
 
-		// Update alpha during start phase
-		if !cinematic.CinematicFinished && cinematic.StartFade {
-			if cinematic.CinematicType == CinematicMovie {
-				cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(0.0, 1.0, cinematic.TransitionValue)
-			} else {
-				cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(0.0, 1.0, cinematic.TransitionValue/cinematic.SpotlightMaxValue)
-			}
-		}
-
-		// Update alpha during end phase
-		if cinematic.DelayFinished && cinematic.EndFade {
-			if !cinematic.StartFade {
-				if cinematic.CinematicType == CinematicMovie {
-					cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(cinematic.Radius/float64(cinematic.Height), 1.0, cinematic.TransitionValue)
-				} else {
-					cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(cinematic.Radius/cinematic.SpotlightMaxValue, 1.0, cinematic.TransitionValue/cinematic.SpotlightMaxValue)
+			// Handle start phase
+			if !cinematic.CinematicFinished {
+				value, finished := cinematic.Tween.Update(float32(dt))
+				cinematic.CinematicFinished = finished
+				cinematic.TransitionValue = float64(value)
+			} else if cinematic.DelayFinished {
+				// Transition to end phase once
+				cinematic.lastStepOnce.Do(cinematic.setupLastStep)
+				value, finished := cinematic.Tween.Update(float32(dt))
+				cinematic.TransitionValue = float64(value)
+				cinematic.Finished = finished
+				if cinematic.Finished && cinematic.Callback != nil {
+					cinematic.Callback()
 				}
 			} else {
+				continue
+			}
+
+			// Update alpha during start phase
+			if !cinematic.CinematicFinished && cinematic.StartFade {
 				if cinematic.CinematicType == CinematicMovie {
 					cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(0.0, 1.0, cinematic.TransitionValue)
 				} else {
 					cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(0.0, 1.0, cinematic.TransitionValue/cinematic.SpotlightMaxValue)
 				}
 			}
+
+			// Update alpha during end phase
+			if cinematic.DelayFinished && cinematic.EndFade {
+				if !cinematic.StartFade {
+					if cinematic.CinematicType == CinematicMovie {
+						cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(cinematic.Radius/float64(cinematic.Height), 1.0, cinematic.TransitionValue)
+					} else {
+						cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(cinematic.Radius/cinematic.SpotlightMaxValue, 1.0, cinematic.TransitionValue/cinematic.SpotlightMaxValue)
+					}
+				} else {
+					if cinematic.CinematicType == CinematicMovie {
+						cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(0.0, 1.0, cinematic.TransitionValue)
+					} else {
+						cinematic.CinematicAlphaValue = utils.CalculateProgressRatio(0.0, 1.0, cinematic.TransitionValue/cinematic.SpotlightMaxValue)
+					}
+				}
+			}
 		}
 	}
-	world.BatchRemoveEntities(self.toRemove...)
+	for _, entity := range self.toRemove {
+		delete(self.overlays, entity)
+		world.RemoveEntity(entity)
+	}
 }
 
 // Draw renders all cinematic overlays to the screen.
-func (self *CinematicOverlaySystem) Draw(world *World, renderer *BatchRenderer) {
-	entities := world.Query(CTCinematicOverlay)
-	for _, e := range entities {
-		cinematicAny, _ := world.GetComponent(e, CTCinematicOverlay)
-		cinematic := cinematicAny.(*CinematicOverlayComponent)
+func (self *CinematicOverlaySystem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
+	for _, entity := range self.overlayEntities {
+		cinematic := self.overlays[entity]
 
 		if cinematic.EndType == CinematicTransitionIn && cinematic.Finished {
 			continue

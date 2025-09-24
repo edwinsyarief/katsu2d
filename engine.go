@@ -5,13 +5,14 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/edwinsyarief/lazyecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // Engine manages the game loop, global state, and scene transitions.
 type Engine struct {
 	// Managers
-	world    *World
+	world    *lazyecs.World
 	tm       *TextureManager
 	fm       *FontManager
 	am       *AudioManager
@@ -147,7 +148,7 @@ func WithUpdateSystem(sys UpdateSystem) Option {
 // NewEngine creates a new engine with options.
 func NewEngine(opts ...Option) *Engine {
 	e := &Engine{
-		world:    NewWorld(),
+		world:    lazyecs.NewWorld(),
 		fm:       NewFontManager(),
 		am:       NewAudioManager(44100),
 		sm:       NewSceneManager(),
@@ -165,7 +166,8 @@ func NewEngine(opts ...Option) *Engine {
 		atlasHeight:           2048,
 		// ... default settings
 	}
-	e.World().initEventBus()
+
+	_ = GetEventBus(e.world)
 
 	// Apply all the functional options. This might override the defaults.
 	for _, opt := range opts {
@@ -194,7 +196,7 @@ func (self *Engine) InitAssetReader(path string, key []byte) {
 }
 
 // World returns the engine's global ECS world.
-func (self *Engine) World() *World {
+func (self *Engine) World() *lazyecs.World {
 	return self.world
 }
 
@@ -262,11 +264,8 @@ func (self *Engine) SetTimeScale(ts float64) {
 func (self *Engine) Update() error {
 	dt := (1.0 / 60.0) * self.timeScale
 
-	// Process deferred removals for the engine's world.
-	self.World().processRemovals()
-
 	if self.layoutHasChanged {
-		eb := self.World().GetEventBus()
+		eb := GetEventBus(self.world)
 		eb.Publish(EngineLayoutChangedEvent{
 			Width:  self.hiResWidth,
 			Height: self.hiResHeight,
@@ -279,7 +278,10 @@ func (self *Engine) Update() error {
 	}
 
 	// Process event bus
-	self.World().ProcessEventBus()
+	ProcessEventBus(self.world)
+
+	// Process deferred removals for the engine's world.
+	self.World().ProcessRemovals()
 
 	// Then, update the active scene's systems.
 	if self.sm.current != nil {

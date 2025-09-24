@@ -4,6 +4,7 @@ import (
 	"math"
 
 	ebimath "github.com/edwinsyarief/ebi-math"
+	"github.com/edwinsyarief/lazyecs"
 )
 
 // GrassControllerSystem is responsible for simulating the physics of all grass entities in the world.
@@ -17,85 +18,98 @@ func NewGrassControllerSystem() *GrassControllerSystem {
 
 // Update is the main simulation loop for the grass system. It is called once per frame.
 // It calculates and applies all forces to the grass, updating their sway and rotation.
-func (self *GrassControllerSystem) Update(world *World, dt float64) {
+func (self *GrassControllerSystem) Update(world *lazyecs.World, dt float64) {
+	var cameraExist = false
+	var cameraArea ebimath.Rectangle
+
+	query1 := world.Query(CTCamera)
+	for query1.Next() {
+		cameraExist = true
+		cameras, _ := lazyecs.GetComponentSlice[CameraComponent](query1)
+		cameraArea = cameras[0].Area()
+	}
+
 	// Retrieve the single GrassController component, which holds global settings for the simulation.
-	grassControllerEntities := world.Query(CTGrassController)
-	if len(grassControllerEntities) == 0 {
+	query2 := world.Query(CTGrassController)
+	var controller *GrassControllerComponent = nil
+	var currentFrameForceSources = make([]ForceSource, 0)
+	var activeGustsForFrame = []activeGustFrameData{}
+	for query2.Next() {
+		for _, entity := range query2.Entities() {
+			controller, _ = lazyecs.GetComponent[GrassControllerComponent](world, entity)
+			if cameraExist {
+				controller.RenderArea = cameraArea
+			}
+
+			// Advance the global wind timer and scroll values, used for procedural wind patterns.
+			controller.WindTime += dt
+			controller.WindScroll = controller.WindScroll.Add(ebimath.Vector{X: 0.6 * dt * 60, Y: 0.4 * dt * 60})
+
+			// Make a shallow copy of external force sources for this frame to ensure a consistent state during calculations.
+			currentFrameForceSources = make([]ForceSource, len(controller.ExternalForceSources))
+			copy(currentFrameForceSources, controller.ExternalForceSources)
+
+			// Process active strong wind gusts.
+			newGusts := []*StrongWindGust{} // A new slice to hold gusts that are still active.
+			for _, gust := range controller.StrongWindGusts {
+				if !gust.Active {
+					continue
+				}
+
+				// Update the gust's lifetime and deactivate it if it has expired.
+				gust.ElapsedTime += dt
+				if gust.ElapsedTime >= gust.Duration {
+					gust.Active = false
+					continue
+				}
+
+				// Calculate the gust's current strength, applying fade-in and fade-out effects.
+				currentStrengthMultiplier := 1.0
+				if gust.ElapsedTime < gust.FadeInDuration {
+					// Fading in at the beginning of the gust's life.
+					currentStrengthMultiplier = gust.ElapsedTime / gust.FadeInDuration
+				} else if gust.ElapsedTime > gust.Duration-gust.FadeOutDuration {
+					// Fading out at the end.
+					currentStrengthMultiplier = (gust.Duration - gust.ElapsedTime) / gust.FadeOutDuration
+				}
+				currentStrengthMultiplier = math.Max(0, math.Min(1, currentStrengthMultiplier)) // Clamp between 0 and 1.
+
+				// Determine the gust's current position as it travels from its start to end point.
+				progress := gust.ElapsedTime / gust.Duration
+				currentGustPos := gust.StartPos.Add(gust.EndPos.Sub(gust.StartPos).ScaleF(progress))
+
+				activeGustsForFrame = append(activeGustsForFrame, activeGustFrameData{
+					gust:               gust,
+					pos:                currentGustPos,
+					strengthMultiplier: currentStrengthMultiplier,
+				})
+				newGusts = append(newGusts, gust) // Keep the gust for the next frame.
+			}
+			controller.StrongWindGusts = newGusts // Replace the old slice with the filtered one.
+		}
+	}
+
+	if controller == nil {
 		return
 	}
-	grassControllerEntity := grassControllerEntities[0]
-	grassControllerComp, ok := world.GetComponent(grassControllerEntity, CTGrassController)
-	if !ok {
-		return
-	}
-	controller := grassControllerComp.(*GrassControllerComponent)
-
-	// Update the controller's render area based on the main camera's view.
-	// This could be used for optimizations, like only simulating visible grass.
-	cameraEntities := world.Query(CTCamera)
-	if len(cameraEntities) > 0 {
-		cameraEntity := cameraEntities[0]
-		cameraComp, ok := world.GetComponent(cameraEntity, CTCamera)
-		if ok {
-			camera := cameraComp.(*CameraComponent)
-			controller.RenderArea = camera.Area()
-		}
-	}
-
-	// Advance the global wind timer and scroll values, used for procedural wind patterns.
-	controller.WindTime += dt
-	controller.WindScroll = controller.WindScroll.Add(ebimath.Vector{X: 0.6 * dt * 60, Y: 0.4 * dt * 60})
-
-	// Make a shallow copy of external force sources for this frame to ensure a consistent state during calculations.
-	currentFrameForceSources := make([]ForceSource, len(controller.ExternalForceSources))
-	copy(currentFrameForceSources, controller.ExternalForceSources)
-
-	// Process active strong wind gusts.
-	activeGustsForFrame := []activeGustFrameData{}
-	newGusts := []*StrongWindGust{} // A new slice to hold gusts that are still active.
-	for _, gust := range controller.StrongWindGusts {
-		if !gust.Active {
-			continue
-		}
-
-		// Update the gust's lifetime and deactivate it if it has expired.
-		gust.ElapsedTime += dt
-		if gust.ElapsedTime >= gust.Duration {
-			gust.Active = false
-			continue
-		}
-
-		// Calculate the gust's current strength, applying fade-in and fade-out effects.
-		currentStrengthMultiplier := 1.0
-		if gust.ElapsedTime < gust.FadeInDuration {
-			// Fading in at the beginning of the gust's life.
-			currentStrengthMultiplier = gust.ElapsedTime / gust.FadeInDuration
-		} else if gust.ElapsedTime > gust.Duration-gust.FadeOutDuration {
-			// Fading out at the end.
-			currentStrengthMultiplier = (gust.Duration - gust.ElapsedTime) / gust.FadeOutDuration
-		}
-		currentStrengthMultiplier = math.Max(0, math.Min(1, currentStrengthMultiplier)) // Clamp between 0 and 1.
-
-		// Determine the gust's current position as it travels from its start to end point.
-		progress := gust.ElapsedTime / gust.Duration
-		currentGustPos := gust.StartPos.Add(gust.EndPos.Sub(gust.StartPos).ScaleF(progress))
-
-		activeGustsForFrame = append(activeGustsForFrame, activeGustFrameData{
-			gust:               gust,
-			pos:                currentGustPos,
-			strengthMultiplier: currentStrengthMultiplier,
-		})
-		newGusts = append(newGusts, gust) // Keep the gust for the next frame.
-	}
-	controller.StrongWindGusts = newGusts // Replace the old slice with the filtered one.
 
 	// Before applying new forces, reset the accumulated force for all grass entities.
 	// This ensures that forces from the previous frame don't carry over.
-	grassEntities := world.Query(CTGrass, CTTransform)
-	for _, entity := range grassEntities {
-		grassComp, _ := world.GetComponent(entity, CTGrass)
-		grass := grassComp.(*GrassComponent)
-		grass.AccumulatedForce = 0.0
+	query3 := world.Query(CTGrass, CTTransform)
+	grasses := make(map[lazyecs.Entity]*GrassComponent)
+	transforms := make(map[lazyecs.Entity]*TransformComponent)
+	grassEntities := make([]lazyecs.Entity, 0)
+	for query3.Next() {
+		for _, entity := range query3.Entities() {
+			grassEntities = append(grassEntities, entity)
+
+			grass, _ := lazyecs.GetComponent[GrassComponent](world, entity)
+			grass.AccumulatedForce = 0.0
+			grasses[entity] = grass
+
+			transform, _ := lazyecs.GetComponent[TransformComponent](world, entity)
+			transforms[entity] = transform
+		}
 	}
 
 	// --- APPLY FORCES FROM EXTERNAL SOURCES (e.g., player movement) ---
@@ -103,16 +117,8 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		// Use the quadtree to efficiently find grass entities within the force source's radius.
 		affectedObjects := controller.Quadtree.QueryCircle(fs.Position, fs.Radius)
 		for _, entity := range affectedObjects {
-			grassAny, ok := world.GetComponent(entity, CTGrass)
-			if !ok {
-				continue
-			}
-			grass := grassAny.(*GrassComponent)
-			transformAny, ok := world.GetComponent(entity, CTTransform)
-			if !ok {
-				continue
-			}
-			transform := transformAny.(*TransformComponent)
+			grass := grasses[entity]
+			transform := transforms[entity]
 
 			pos := transform.Position()
 			dx := pos.X - fs.Position.X
@@ -168,16 +174,8 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 		// Use the quadtree to efficiently find grass entities within the gust's bounding box.
 		affectedObjects := controller.Quadtree.Query(gustRect)
 		for _, entity := range affectedObjects {
-			grassAny, ok := world.GetComponent(entity, CTGrass)
-			if !ok {
-				continue
-			}
-			grass := grassAny.(*GrassComponent)
-			transformAny, ok := world.GetComponent(entity, CTTransform)
-			if !ok {
-				continue
-			}
-			transform := transformAny.(*TransformComponent)
+			grass := grasses[entity]
+			transform := transforms[entity]
 
 			// Determine the grass blade's position relative to the gust's center and direction.
 			grassToGust := transform.Position().Sub(currentGustPos)
@@ -214,8 +212,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 
 	// --- UPDATE GRASS PHYSICS (SPRING-DAMPER MODEL) ---
 	for _, entity := range grassEntities {
-		grassComp, _ := world.GetComponent(entity, CTGrass)
-		grass := grassComp.(*GrassComponent)
+		grass := grasses[entity]
 
 		// A spring force constantly tries to pull the grass back to its upright position (0 sway).
 		springForce := (0 - grass.InteractionSway) * controller.SwaySpringStrength
@@ -238,8 +235,7 @@ func (self *GrassControllerSystem) Update(world *World, dt float64) {
 			grass.SwayVelocity = 0.0
 		}
 
-		transformComp, _ := world.GetComponent(entity, CTTransform)
-		transform := transformComp.(*TransformComponent)
+		transform := transforms[entity]
 		pos := transform.Position()
 
 		// --- BLEND WIND AND INTERACTION SWAY ---
