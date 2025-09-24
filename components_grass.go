@@ -254,20 +254,28 @@ func (self *GrassControllerComponent) initGrass(world *lazyecs.World) {
 
 					entity := world.CreateEntity()
 
-					grass, _ := lazyecs.AddComponent[GrassComponent](world, entity)
+					lazyecs.AddComponent[GrassComponent](world, entity)
+					lazyecs.AddComponent[TransformComponent](world, entity)
+					lazyecs.AddComponent[SpriteComponent](world, entity)
+
+					if self.Orderable {
+						lazyecs.AddComponent[OrderableComponent](world, entity)
+					}
+
+					grass, _ := lazyecs.GetComponent[GrassComponent](world, entity)
 					grass.SwaySeed = rand.Float64() * 2 * math.Pi
 					grass.InteractionSway = 0
 					grass.SwayVelocity = 0
 					grass.CurrentSway = 0
 
-					transform, _ := lazyecs.AddComponent[TransformComponent](world, entity)
+					transform, _ := lazyecs.GetComponent[TransformComponent](world, entity)
 					transform.Init()
 					transform.SetPosition(ebimath.V(posX, posY))
 					transform.Z = self.Z
 
 					// If orderable, create and add an orderable component for rendering.
 					if self.Orderable {
-						orderable, _ := lazyecs.AddComponent[OrderableComponent](world, entity)
+						orderable, _ := lazyecs.GetComponent[OrderableComponent](world, entity)
 						orderable.Init(nil)
 						orderable.SetIndex(transform.Position().Y)
 					}
@@ -279,7 +287,7 @@ func (self *GrassControllerComponent) initGrass(world *lazyecs.World) {
 					}
 
 					img := self.Tm.Get(textureID)
-					sprite, _ := lazyecs.AddComponent[SpriteComponent](world, entity)
+					sprite, _ := lazyecs.GetComponent[SpriteComponent](world, entity)
 					sprite.Init(textureID, img.Bounds())
 
 					// Manually adjust the vertices to set the anchor to the bottom-center.

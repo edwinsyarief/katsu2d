@@ -70,18 +70,25 @@ func (self *ParticleEmitterSystem) spawnParticle(world *lazyecs.World, emitterEn
 	}
 
 	newParticleEntity := world.CreateEntity()
-	particleTransform, _ := lazyecs.AddComponent[TransformComponent](world, newParticleEntity)
+
+	// Add all components first
+	lazyecs.AddComponent[TransformComponent](world, newParticleEntity)
+	lazyecs.AddComponent[SpriteComponent](world, newParticleEntity)
+	lazyecs.AddComponent[ParticleComponent](world, newParticleEntity)
+	lazyecs.AddComponent[ParentComponent](world, newParticleEntity)
+	lazyecs.AddComponent[OrderableComponent](world, newParticleEntity)
+
+	// Now get pointers to the actual components in storage
+	parentComponent, _ := lazyecs.GetComponent[ParentComponent](world, newParticleEntity)
+	parentComponent.Init(emitterEntity)
+	particleTransform, _ := lazyecs.GetComponent[TransformComponent](world, newParticleEntity)
 	particleTransform.Init()
-	particleSprite, _ := lazyecs.AddComponent[SpriteComponent](world, newParticleEntity)
+	particleSprite, _ := lazyecs.GetComponent[SpriteComponent](world, newParticleEntity)
 	tex := self.tm.Get(texID)
 	particleSprite.Init(texID, tex.Bounds())
-	particleSprite.GenerateMesh()
+	particleData, _ := lazyecs.GetComponent[ParticleComponent](world, newParticleEntity)
 
-	particleData, _ := lazyecs.AddComponent[ParticleComponent](world, newParticleEntity)
-	parentComponent, _ := lazyecs.AddComponent[ParentComponent](world, newParticleEntity)
-	parentComponent.Init(emitterEntity)
-
-	particleOrderable, _ := lazyecs.AddComponent[OrderableComponent](world, newParticleEntity)
+	particleOrderable, _ := lazyecs.GetComponent[OrderableComponent](world, newParticleEntity)
 	if parentOrderable, ok := lazyecs.GetComponent[OrderableComponent](world, emitterEntity); ok {
 		particleOrderable.SetIndex(parentOrderable.Index())
 	}
