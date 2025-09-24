@@ -69,11 +69,14 @@ func (self *ParticleEmitterSystem) spawnParticle(world *lazyecs.World, emitterEn
 		texID = emitter.TextureIDs[0]
 	}
 
-	tex := self.tm.Get(texID)
 	newParticleEntity := world.CreateEntity()
 	particleTransform, _ := lazyecs.AddComponent[TransformComponent](world, newParticleEntity)
 	particleTransform.Init()
 	particleSprite, _ := lazyecs.AddComponent[SpriteComponent](world, newParticleEntity)
+	tex := self.tm.Get(texID)
+	particleSprite.Init(texID, tex.Bounds())
+	particleSprite.GenerateMesh()
+
 	particleData, _ := lazyecs.AddComponent[ParticleComponent](world, newParticleEntity)
 	parentComponent, _ := lazyecs.AddComponent[ParentComponent](world, newParticleEntity)
 	parentComponent.Init(emitterEntity)
@@ -111,10 +114,7 @@ func (self *ParticleEmitterSystem) spawnParticle(world *lazyecs.World, emitterEn
 	particleData.NoiseOffsetX = self.r.Float64() * 1000
 	particleData.NoiseOffsetY = self.r.Float64() * 1000
 
-	bounds := tex.Bounds()
-	particleSprite.Init(texID, bounds)
 	particleSprite.Color = particleData.InitialColor
-	particleSprite.GenerateMesh()
 }
 
 // ParticleUpdateSystem is an UpdateSystem that handles the movement and lifecycle of particles.
