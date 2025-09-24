@@ -113,7 +113,7 @@ type ParticleEmitterComponent struct {
 	SpawnCounter float64   // Accumulates partial particle spawn credit
 }
 
-func (self *ParticleEmitterComponent) Init(textureIDs []int) {
+func (self *ParticleEmitterComponent) Init(textureIDs []int) *ParticleEmitterComponent {
 	self.TextureIDs = textureIDs
 	self.LastEmitTime = time.Now()
 	// Default colors set to whit
@@ -135,4 +135,6 @@ func (self *ParticleEmitterComponent) Init(textureIDs []int) {
 	self.FadeMode = ParticleFadeModeNone
 	self.ScaleMode = ParticleScaleModeNone
 	self.DirectionMode = ParticleDirectionModeLinear
+
+	return self
 }

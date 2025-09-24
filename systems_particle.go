@@ -140,7 +140,6 @@ func NewParticleUpdateSystem() *ParticleUpdateSystem {
 // Update implements the UpdateSystem interface.
 func (self *ParticleUpdateSystem) Update(world *lazyecs.World, dt float64) {
 	self.time += dt
-	var toRemove []lazyecs.Entity
 	query := world.Query(CTTransform, CTParticle, CTSprite, CTParent)
 	for query.Next() {
 		for _, entity := range query.Entities() {
@@ -215,13 +214,9 @@ func (self *ParticleUpdateSystem) Update(world *lazyecs.World, dt float64) {
 			}
 
 			if particle.Lifetime <= 0 {
-				toRemove = append(toRemove, entity)
+				world.RemoveEntity(entity)
 			}
 		}
-	}
-
-	for _, entity := range toRemove {
-		world.RemoveEntity(entity)
 	}
 }
 

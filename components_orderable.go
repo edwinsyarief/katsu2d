@@ -7,16 +7,18 @@ type OrderableComponent struct {
 	IsStatic    bool
 }
 
-func (self *OrderableComponent) Init(indexFunc func() float64) {
+func (self *OrderableComponent) Init(indexFunc func() float64) *OrderableComponent {
 	self.IndexFunc = indexFunc
+	return self
 }
 
 // SetIndex sets a static sorting index for the entity.
 // This will override the index function.
-func (self *OrderableComponent) SetIndex(index float64) {
+func (self *OrderableComponent) SetIndex(index float64) *OrderableComponent {
 	self.StaticIndex = index
 	self.IsStatic = true
 	self.IndexFunc = nil // Clear the function to save memory
+	return self
 }
 
 // Index returns the sorting index for the entity.

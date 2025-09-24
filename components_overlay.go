@@ -32,7 +32,8 @@ type FadeOverlayComponent struct {
 	Callback    func()
 }
 
-func (self *FadeOverlayComponent) Init(fadeType FadeType, fadeColor color.RGBA, duration float64, callback func()) {
+func (self *FadeOverlayComponent) Init(
+	fadeType FadeType, fadeColor color.RGBA, duration float64, callback func()) *FadeOverlayComponent {
 	begin, end := float32(0.0), float32(1.0)
 	easing := ease.CubicInOut
 	if fadeType == FadeTypeIn {
@@ -47,10 +48,13 @@ func (self *FadeOverlayComponent) Init(fadeType FadeType, fadeColor color.RGBA, 
 	self.Overlay = overlay
 	self.Tween = tween.New(begin, end, float32(duration), easing)
 	self.Callback = callback
+
+	return self
 }
 
-func (self *FadeOverlayComponent) SetDelay(delay float64) {
+func (self *FadeOverlayComponent) SetDelay(delay float64) *FadeOverlayComponent {
 	self.Tween.SetDelay(float32(delay))
+	return self
 }
 
 type CinematicType int
@@ -90,7 +94,7 @@ type CinematicOverlayComponent struct {
 
 func (self *CinematicOverlayComponent) Init(width, height int, col color.RGBA, opacity float64, cinematicType CinematicType,
 	startType, endType CinematicOverlayType, startFade, endFade, autoFinish bool,
-	cinematicDelay, radius, startSpeed, endSpeed float64, offset ebimath.Vector, callback func()) {
+	cinematicDelay, radius, startSpeed, endSpeed float64, offset ebimath.Vector, callback func()) *CinematicOverlayComponent {
 	self.OverlayColor = col
 	self.OverlayOpacity = opacity
 	self.Width = width
@@ -122,6 +126,8 @@ func (self *CinematicOverlayComponent) Init(width, height int, col color.RGBA, o
 		self.SpotlightMaxValue = float64(height) * (1 + SpotlightOvershootFactor)
 	}
 	self.Tween = self.createStartTween()
+
+	return self
 }
 
 func (self *CinematicOverlayComponent) createStartTween() *tween.Sequence {

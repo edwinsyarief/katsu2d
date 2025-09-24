@@ -9,6 +9,7 @@ type TransformComponent struct {
 	Z                  float64 // Z-coordinate for depth sorting
 }
 
-func (self *TransformComponent) Init() {
+func (self *TransformComponent) Init() *TransformComponent {
 	self.Transform = ebimath.T()
+	return self
 }

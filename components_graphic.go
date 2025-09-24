@@ -51,7 +51,7 @@ type SpriteComponent struct {
 	Dirty        bool
 }
 
-func (self *SpriteComponent) Init(textureID int, bounds image.Rectangle) {
+func (self *SpriteComponent) Init(textureID int, bounds image.Rectangle) *SpriteComponent {
 	self.TextureID = textureID
 	self.DstW = float32(bounds.Dx())
 	self.DstH = float32(bounds.Dy())
@@ -63,6 +63,7 @@ func (self *SpriteComponent) Init(textureID int, bounds image.Rectangle) {
 	self.MeshType = SpriteMeshTypeQuad
 	self.TexMode = SpriteTextureModeStretch
 	self.Dirty = true
+	return self
 }
 
 // SetGrid sets the number of rows and columns for the mesh.

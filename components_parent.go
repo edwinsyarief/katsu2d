@@ -7,6 +7,7 @@ type ParentComponent struct {
 	Parent lazyecs.Entity
 }
 
-func (self *ParentComponent) Init(parent lazyecs.Entity) {
+func (self *ParentComponent) Init(parent lazyecs.Entity) *ParentComponent {
 	self.Parent = parent
+	return self
 }

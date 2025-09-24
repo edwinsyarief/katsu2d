@@ -15,7 +15,6 @@ type FadeOverlaySystem struct {
 	indices         []uint16
 	vertices        []ebiten.Vertex
 	overlayEntities []lazyecs.Entity
-	overlays        map[lazyecs.Entity]*FadeOverlayComponent
 }
 
 // NewFadeOverlaySystem creates a new FadeOverlaySystem.
@@ -28,16 +27,17 @@ func NewFadeOverlaySystem() *FadeOverlaySystem {
 
 // Update updates all fade overlays in the world.
 func (self *FadeOverlaySystem) Update(world *lazyecs.World, dt float64) {
+	self.overlayEntities = make([]lazyecs.Entity, 0)
+
 	toRemove := []lazyecs.Entity{}
 	query := world.Query(CTFadeOverlay)
 	for query.Next() {
 		for _, entity := range query.Entities() {
 			fade, _ := lazyecs.GetComponent[FadeOverlayComponent](world, entity)
-			self.overlays[entity] = fade
 
 			if fade.Finished {
 				if fade.FadeType == FadeTypeIn {
-					toRemove = append(toRemove, entity)
+					world.RemoveEntity(entity)
 				}
 				continue
 			}
@@ -53,14 +53,13 @@ func (self *FadeOverlaySystem) Update(world *lazyecs.World, dt float64) {
 	}
 
 	for _, entity := range toRemove {
-		delete(self.overlays, entity)
 		world.RemoveEntity(entity)
 	}
 }
 
 func (self *FadeOverlaySystem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
 	for _, entity := range self.overlayEntities {
-		fade := self.overlays[entity]
+		fade, _ := lazyecs.GetComponent[FadeOverlayComponent](world, entity)
 
 		if fade.FadeType == FadeTypeIn && fade.Finished {
 			continue
@@ -95,9 +94,7 @@ type CinematicOverlaySystem struct {
 	spotlightV      []ebiten.Vertex
 	spotlightI      []uint16
 	spotlightSeg    int
-	toRemove        []lazyecs.Entity
 	overlayEntities []lazyecs.Entity
-	overlays        map[lazyecs.Entity]*CinematicOverlayComponent
 }
 
 // NewCinematicOverlaySystem creates a new CinematicOverlaySystem.
@@ -119,16 +116,17 @@ func NewCinematicOverlaySystem() *CinematicOverlaySystem {
 
 // Update updates all cinematic overlays in the world.
 func (self *CinematicOverlaySystem) Update(world *lazyecs.World, dt float64) {
-	self.toRemove = self.toRemove[:0]
+	self.overlayEntities = make([]lazyecs.Entity, 0)
+
+	toRemove := []lazyecs.Entity{}
 	query := world.Query(CTCinematicOverlay)
 	for query.Next() {
 		for _, entity := range query.Entities() {
 			cinematic, _ := lazyecs.GetComponent[CinematicOverlayComponent](world, entity)
-			self.overlays[entity] = cinematic
 
 			if cinematic.Finished {
 				if cinematic.EndType == CinematicTransitionIn {
-					self.toRemove = append(self.toRemove, entity)
+					toRemove = append(toRemove, entity)
 				}
 				continue
 			}
@@ -188,8 +186,7 @@ func (self *CinematicOverlaySystem) Update(world *lazyecs.World, dt float64) {
 			}
 		}
 	}
-	for _, entity := range self.toRemove {
-		delete(self.overlays, entity)
+	for _, entity := range toRemove {
 		world.RemoveEntity(entity)
 	}
 }
@@ -197,7 +194,7 @@ func (self *CinematicOverlaySystem) Update(world *lazyecs.World, dt float64) {
 // Draw renders all cinematic overlays to the screen.
 func (self *CinematicOverlaySystem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
 	for _, entity := range self.overlayEntities {
-		cinematic := self.overlays[entity]
+		cinematic, _ := lazyecs.GetComponent[CinematicOverlayComponent](world, entity)
 
 		if cinematic.EndType == CinematicTransitionIn && cinematic.Finished {
 			continue

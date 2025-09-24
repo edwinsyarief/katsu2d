@@ -196,7 +196,10 @@ type GrassControllerComponent struct {
 	Z float64
 }
 
-func (self *GrassControllerComponent) Init(world *lazyecs.World, tm *TextureManager, worldWidth, worldHeight int, textureID int, z float64, opts ...GrassOption) {
+func (self *GrassControllerComponent) Init(
+	world *lazyecs.World, tm *TextureManager,
+	worldWidth, worldHeight int, textureID int, z float64,
+	opts ...GrassOption) *GrassControllerComponent {
 	self.WorldWidth = worldWidth
 	self.WorldHeight = worldHeight
 	self.TileSize = 32
@@ -226,6 +229,8 @@ func (self *GrassControllerComponent) Init(world *lazyecs.World, tm *TextureMana
 	// Generate a Perlin noise image to simulate complex wind patterns.
 	self.NoiseImage = utils.GeneratePerlinNoiseImage(self.NoiseMapSize, self.NoiseMapSize, self.NoiseFrequency)
 	self.initGrass(world)
+
+	return self
 }
 
 // initGrass generates and places all grass blades within the specified areas.

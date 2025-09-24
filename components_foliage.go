@@ -69,7 +69,7 @@ func WithFoliageRippleStrength(strength float64) FoliageOption {
 	}
 }
 
-func (self *FoliageControllerComponent) Init(opts ...FoliageOption) {
+func (self *FoliageControllerComponent) Init(opts ...FoliageOption) *FoliageControllerComponent {
 	self.Noise = opensimplex.New(time.Now().UnixNano())
 	self.WindDirection = ebimath.V(1, 0)
 	self.WindForce = 10
@@ -81,4 +81,6 @@ func (self *FoliageControllerComponent) Init(opts ...FoliageOption) {
 	for _, opt := range opts {
 		opt(self)
 	}
+
+	return self
 }

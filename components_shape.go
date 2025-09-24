@@ -18,8 +18,9 @@ type ShapeComponent struct {
 	Shape Shape
 }
 
-func (self *ShapeComponent) Init(shape Shape) {
+func (self *ShapeComponent) Init(shape Shape) *ShapeComponent {
 	self.Shape = shape
+	return self
 }
 
 type RectangleShape struct {

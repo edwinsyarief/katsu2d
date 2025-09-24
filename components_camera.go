@@ -620,8 +620,9 @@ type BasicCameraComponent struct {
 	*basicCamera
 }
 
-func (self *BasicCameraComponent) Init(viewport ebimath.Vector, scroller *ebimath.Transform) {
+func (self *BasicCameraComponent) Init(viewport ebimath.Vector, scroller *ebimath.Transform) *BasicCameraComponent {
 	self.basicCamera = newBasicCamera(viewport, scroller)
+	return self
 }
 
 // CameraComponent is a component that wraps a camera.
@@ -629,6 +630,7 @@ type CameraComponent struct {
 	*camera
 }
 
-func (self *CameraComponent) Init(viewportWidth, viewportHeight int) {
+func (self *CameraComponent) Init(viewportWidth, viewportHeight int) *CameraComponent {
 	self.camera = newCamera(viewportWidth, viewportHeight)
+	return self
 }
