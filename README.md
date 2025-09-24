@@ -97,39 +97,37 @@ The ECS (Entity Component System) is the core of Katsu2D. It allows you to organ
 An entity is just a unique ID. You can create one using the `world.CreateEntity()` method:
 
 ```go
-// Assuming 'world' is your *katsu2d.World instance
+// Assuming 'world' is your *lazyecs.World instance
 entity := world.CreateEntity()
 ```
 
 #### Adding a Component
 
-Once you have an entity, you can add components to it using constructor functions.
+Once you have an entity, you can add components to it.
 
 **TransformComponent:**
 The `TransformComponent` manages an entity's position, scale, and rotation.
 
 ```go
-// Create a new transform component
-t := katsu2d.NewTransformComponent()
-// Set its position in the world
+// Create and initialize the transform component
+t := katsu2d.TransformComponent{}
+t.Init()
 t.SetPosition(ebimath.V(consts.WindowWidth/2, consts.WindowHeight/2))
+
 // Add the component to the entity
-world.AddComponent(entity, t)
+lazyecs.SetComponent(world, entity, t)
 ```
 
 **SpriteComponent:**
 The `SpriteComponent` allows an entity to be rendered as a sprite. It requires a `textureID` that you get from the `TextureManager` when you load your assets.
 
 ```go
-// Get the texture info from the manager
-// (Assuming EbitengineLogoTextureID was loaded as shown in the "Managing Assets" section)
-textureInfo := e.TextureManager().Get(EbitengineLogoTextureID)
-
-// Create the sprite component using the texture ID and the texture's bounds
-s := katsu2d.NewSpriteComponent(EbitengineLogoTextureID, textureInfo.Bounds())
+// Create and initialize the sprite component
+s := katsu2d.SpriteComponent{}
+s.Init(assets.EbitengineLogoTextureID, image.Rect(0, 0, 256, 256))
 
 // Add the component to the entity
-world.AddComponent(entity, s)
+lazyecs.SetComponent(world, entity, s)
 ```
 
 #### Component IDs
@@ -152,7 +150,7 @@ You can remove a component from an entity using its `ComponentID`.
 
 ```go
 // Remove the TransformComponent from the entity
-world.RemoveComponent(entity, katsu2d.CTTransform)
+success := lazyecs.RemoveComponent[katsu2d.TransformComponent](world,entity)
 ```
 
 #### Filtering Entities (Querying)
@@ -161,17 +159,16 @@ Systems use queries to find entities that have a specific set of components. The
 
 ```go
 // Find all entities that have both a TransformComponent and a SpriteComponent
-entities := world.Query(katsu2d.CTTransform, katsu2d.CTSprite)
+query := world.Query(katsu2d.CTTransform, katsu2d.CTSprite)
 
-// You can now loop through the returned entities
-for _, entity := range entities {
-    // Get a specific component from the entity
-    transform, _ := world.GetComponent(entity, katsu2d.CTTransform)
-    
-    // Cast it to the correct type to use it
-    t := transform.(*katsu2d.TransformComponent)
-    
-    // ... do something with the transform ...
+for query.Next() {
+    // You can now loop through the returned entities
+    for _, entity := range query.Entities() {
+        // Get a specific component from the entity
+        transform, _ := lazecs.GetComponent[katsu2d.TransformComponent](world, entity)
+        
+        // ... do something with the transform ...
+    }
 }
 ```
 
@@ -213,13 +210,13 @@ import (
 
 var (
     // CTPlayer will hold the ComponentID for our custom component.
-    CTPlayer katsu2d.ComponentID
+    CTPlayer lazyecs.ComponentID
 )
 
 func init() {
     // Register the component and store its ID.
     // The component type is passed as a type parameter.
-    CTPlayer = katsu2d.RegisterComponent[*PlayerComponent]()
+    CTPlayer = lazyecs.RegisterComponent[PlayerComponent]()
 }
 ```
 
