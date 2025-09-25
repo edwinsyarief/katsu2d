@@ -113,28 +113,30 @@ type ParticleEmitterComponent struct {
 	SpawnCounter float64   // Accumulates partial particle spawn credit
 }
 
-func (self *ParticleEmitterComponent) Init(textureIDs []int) *ParticleEmitterComponent {
-	self.TextureIDs = textureIDs
-	self.LastEmitTime = time.Now()
-	// Default colors set to whit
-	self.InitialColorMin = color.RGBA{255, 255, 255, 255}
-	self.InitialColorMax = color.RGBA{255, 255, 255, 255}
-	self.TargetColorMin = color.RGBA{255, 255, 255, 255}
-	self.TargetColorMax = color.RGBA{255, 255, 255, 255}
-	// Default blend mode and transformation
-	self.BlendMode = ebiten.BlendSourceOver
-	self.MinScale = 1.0
-	self.MaxScale = 1.0
-	self.TargetScaleMin = 1.0
-	self.TargetScaleMax = 1.0
-	self.MinRotation = 0
-	self.MaxRotation = 0
-	self.EndRotationMin = 0
-	self.EndRotationMax = 0
-	// Default mode
-	self.FadeMode = ParticleFadeModeNone
-	self.ScaleMode = ParticleScaleModeNone
-	self.DirectionMode = ParticleDirectionModeLinear
+func NewParticleEmitterComponent(textureIDs []int) *ParticleEmitterComponent {
+	res := &ParticleEmitterComponent{}
 
-	return self
+	res.TextureIDs = textureIDs
+	res.LastEmitTime = time.Now()
+	// Default colors set to whit
+	res.InitialColorMin = color.RGBA{255, 255, 255, 255}
+	res.InitialColorMax = color.RGBA{255, 255, 255, 255}
+	res.TargetColorMin = color.RGBA{255, 255, 255, 255}
+	res.TargetColorMax = color.RGBA{255, 255, 255, 255}
+	// Default blend mode and transformation
+	res.BlendMode = ebiten.BlendSourceOver
+	res.MinScale = 1.0
+	res.MaxScale = 1.0
+	res.TargetScaleMin = 1.0
+	res.TargetScaleMax = 1.0
+	res.MinRotation = 0
+	res.MaxRotation = 0
+	res.EndRotationMin = 0
+	res.EndRotationMax = 0
+	// Default mode
+	res.FadeMode = ParticleFadeModeNone
+	res.ScaleMode = ParticleScaleModeNone
+	res.DirectionMode = ParticleDirectionModeLinear
+
+	return res
 }

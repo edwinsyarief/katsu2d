@@ -8,114 +8,119 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-func (self *ParticleEmitterComponent) FirePreset(textureID int) {
-	self.Init([]int{textureID})
-	self.Active = true
-	self.EmitRate = 200
-	self.MaxParticles = 500
-	self.ParticleLifetime = 1.0
-	self.InitialParticleSpeedMin = 3
-	self.InitialParticleSpeedMax = 5
-	self.ParticleSpawnOffset = ebimath.V(8, 8)
-	self.InitialColorMin = color.RGBA{255, 255, 0, 255} // Yellow
-	self.InitialColorMax = color.RGBA{255, 128, 0, 255} // Orange
-	self.TargetColorMin = color.RGBA{255, 0, 0, 0}      // Red, transparent
-	self.TargetColorMax = color.RGBA{255, 0, 0, 0}      // Red, transparent
-	self.FadeMode = ParticleFadeModeFadeOut
-	self.BlendMode = ebiten.BlendLighter // Additive blending for a glowing effect
-	self.MinScale = 1
-	self.MaxScale = 1.5
-	self.MinRotation = 0
-	self.MaxRotation = 1.5 * math.Pi
-	self.Gravity = ebimath.V(0, -100)
+func FirePreset(textureID int) *ParticleEmitterComponent {
+	res := NewParticleEmitterComponent([]int{textureID})
+	res.Active = true
+	res.EmitRate = 200
+	res.MaxParticles = 500
+	res.ParticleLifetime = 1.0
+	res.InitialParticleSpeedMin = 3
+	res.InitialParticleSpeedMax = 5
+	res.ParticleSpawnOffset = ebimath.V(8, 8)
+	res.InitialColorMin = color.RGBA{255, 255, 0, 255} // Yellow
+	res.InitialColorMax = color.RGBA{255, 128, 0, 255} // Orange
+	res.TargetColorMin = color.RGBA{255, 0, 0, 0}      // Red, transparent
+	res.TargetColorMax = color.RGBA{255, 0, 0, 0}      // Red, transparent
+	res.FadeMode = ParticleFadeModeFadeOut
+	res.BlendMode = ebiten.BlendLighter // Additive blending for a glowing effect
+	res.MinScale = 1
+	res.MaxScale = 1.5
+	res.MinRotation = 0
+	res.MaxRotation = 1.5 * math.Pi
+	res.Gravity = ebimath.V(0, -100)
+	return res
 }
 
-func (self *ParticleEmitterComponent) RainPreset(textureID int) {
-	self.Init([]int{textureID})
-	self.Active = true
-	self.EmitRate = 200
-	self.MaxParticles = 1000
-	self.ParticleLifetime = 1.0
-	self.InitialParticleSpeedMin = 200
-	self.InitialParticleSpeedMax = 300
-	self.ParticleSpawnOffset = ebimath.V(100, 0) // Wide spawn area
-	self.InitialColorMin = color.RGBA{100, 150, 255, 200}
-	self.InitialColorMax = color.RGBA{100, 150, 255, 200}
-	self.TargetColorMin = color.RGBA{100, 150, 255, 0}
-	self.TargetColorMax = color.RGBA{100, 150, 255, 0}
-	self.FadeMode = ParticleFadeModeFadeOut
-	self.Gravity = ebimath.V(0, 150) // Gravity pulls particles down
-	self.BlendMode = ebiten.BlendSourceOver
-	self.MinScale = 0.2
-	self.MaxScale = 0.5
-	self.ScaleMode = ParticleScaleModeNone
-	self.MinRotation = 0
-	self.MaxRotation = 0
+func RainPreset(textureID int) *ParticleEmitterComponent {
+	res := NewParticleEmitterComponent([]int{textureID})
+	res.Active = true
+	res.EmitRate = 200
+	res.MaxParticles = 1000
+	res.ParticleLifetime = 1.0
+	res.InitialParticleSpeedMin = 200
+	res.InitialParticleSpeedMax = 300
+	res.ParticleSpawnOffset = ebimath.V(100, 0) // Wide spawn area
+	res.InitialColorMin = color.RGBA{100, 150, 255, 200}
+	res.InitialColorMax = color.RGBA{100, 150, 255, 200}
+	res.TargetColorMin = color.RGBA{100, 150, 255, 0}
+	res.TargetColorMax = color.RGBA{100, 150, 255, 0}
+	res.FadeMode = ParticleFadeModeFadeOut
+	res.Gravity = ebimath.V(0, 150) // Gravity pulls particles down
+	res.BlendMode = ebiten.BlendSourceOver
+	res.MinScale = 0.2
+	res.MaxScale = 0.5
+	res.ScaleMode = ParticleScaleModeNone
+	res.MinRotation = 0
+	res.MaxRotation = 0
+	return res
 }
 
-func (self *ParticleEmitterComponent) SmokePreset(textureIDs []int) {
-	self.Init(textureIDs)
-	self.Active = true
-	self.EmitRate = 10
-	self.MaxParticles = 100
-	self.ParticleLifetime = 5.0
-	self.InitialParticleSpeedMin = 10
-	self.InitialParticleSpeedMax = 20
-	self.ParticleSpawnOffset = ebimath.V(5, 5)
-	self.InitialColorMin = color.RGBA{150, 150, 150, 100}
-	self.InitialColorMax = color.RGBA{200, 200, 200, 100}
-	self.TargetColorMin = color.RGBA{50, 50, 50, 0}
-	self.TargetColorMax = color.RGBA{50, 50, 50, 0}
-	self.FadeMode = ParticleFadeModeFadeOut
-	self.BlendMode = ebiten.BlendSourceOver
-	self.MinScale = 0.5
-	self.MaxScale = 2.0
-	self.MinRotation = 0
-	self.MaxRotation = 2 * math.Pi
+func SmokePreset(textureIDs []int) *ParticleEmitterComponent {
+	res := NewParticleEmitterComponent(textureIDs)
+	res.Active = true
+	res.EmitRate = 10
+	res.MaxParticles = 100
+	res.ParticleLifetime = 5.0
+	res.InitialParticleSpeedMin = 10
+	res.InitialParticleSpeedMax = 20
+	res.ParticleSpawnOffset = ebimath.V(5, 5)
+	res.InitialColorMin = color.RGBA{150, 150, 150, 100}
+	res.InitialColorMax = color.RGBA{200, 200, 200, 100}
+	res.TargetColorMin = color.RGBA{50, 50, 50, 0}
+	res.TargetColorMax = color.RGBA{50, 50, 50, 0}
+	res.FadeMode = ParticleFadeModeFadeOut
+	res.BlendMode = ebiten.BlendSourceOver
+	res.MinScale = 0.5
+	res.MaxScale = 2.0
+	res.MinRotation = 0
+	res.MaxRotation = 2 * math.Pi
+	return res
 }
 
-func (self *ParticleEmitterComponent) ExplosionPreset(textureIDs []int) {
-	self.Init(textureIDs)
-	self.Active = false
-	self.BurstCount = 100
-	self.MaxParticles = 100
-	self.ParticleLifetime = 0.8
-	self.InitialParticleSpeedMin = 50
-	self.InitialParticleSpeedMax = 100
-	self.InitialColorMin = color.RGBA{255, 150, 0, 255}
-	self.InitialColorMax = color.RGBA{255, 255, 0, 255}
-	self.TargetColorMin = color.RGBA{255, 0, 0, 0}
-	self.TargetColorMax = color.RGBA{255, 0, 0, 0}
-	self.FadeMode = ParticleFadeModeFadeOut
-	self.BlendMode = ebiten.BlendLighter
-	self.MinScale = 0.5
-	self.MaxScale = 1.5
-	self.MinRotation = 0
-	self.MaxRotation = 2 * math.Pi
+func ExplosionPreset(textureIDs []int) *ParticleEmitterComponent {
+	res := NewParticleEmitterComponent(textureIDs)
+	res.Active = false
+	res.BurstCount = 100
+	res.MaxParticles = 100
+	res.ParticleLifetime = 0.8
+	res.InitialParticleSpeedMin = 50
+	res.InitialParticleSpeedMax = 100
+	res.InitialColorMin = color.RGBA{255, 150, 0, 255}
+	res.InitialColorMax = color.RGBA{255, 255, 0, 255}
+	res.TargetColorMin = color.RGBA{255, 0, 0, 0}
+	res.TargetColorMax = color.RGBA{255, 0, 0, 0}
+	res.FadeMode = ParticleFadeModeFadeOut
+	res.BlendMode = ebiten.BlendLighter
+	res.MinScale = 0.5
+	res.MaxScale = 1.5
+	res.MinRotation = 0
+	res.MaxRotation = 2 * math.Pi
+	return res
 }
 
-func (self *ParticleEmitterComponent) WhimsicalPreset(textureID int) {
-	self.Init([]int{textureID})
-	self.Active = true
-	self.EmitRate = 50
-	self.MaxParticles = 200
-	self.ParticleLifetime = 3.0
-	self.InitialParticleSpeedMin = 20
-	self.InitialParticleSpeedMax = 40
-	self.ParticleSpawnOffset = ebimath.V(10, 10)
-	self.InitialColorMin = color.RGBA{255, 0, 255, 255} // Magenta
-	self.InitialColorMax = color.RGBA{0, 255, 255, 255} // Cyan
-	self.TargetColorMin = color.RGBA{255, 255, 0, 0}    // Yellow, transparent
-	self.TargetColorMax = color.RGBA{0, 255, 0, 0}      // Green, transparent
-	self.FadeMode = ParticleFadeModeFadeInOut
-	self.ScaleMode = ParticleScaleModeScaleInOut
-	self.MinScale = 0.2
-	self.MaxScale = 0.8
-	self.TargetScaleMin = 0.1
-	self.TargetScaleMax = 0.4
-	self.DirectionMode = ParticleDirectionModeNoise
-	self.NoiseFactor = 0.1
-	self.RotationSpeedMin = -math.Pi
-	self.RotationSpeedMax = math.Pi
-	self.BlendMode = ebiten.BlendLighter
+func WhimsicalPreset(textureID int) *ParticleEmitterComponent {
+	res := NewParticleEmitterComponent([]int{textureID})
+	res.Active = true
+	res.EmitRate = 50
+	res.MaxParticles = 200
+	res.ParticleLifetime = 3.0
+	res.InitialParticleSpeedMin = 20
+	res.InitialParticleSpeedMax = 40
+	res.ParticleSpawnOffset = ebimath.V(10, 10)
+	res.InitialColorMin = color.RGBA{255, 0, 255, 255} // Magenta
+	res.InitialColorMax = color.RGBA{0, 255, 255, 255} // Cyan
+	res.TargetColorMin = color.RGBA{255, 255, 0, 0}    // Yellow, transparent
+	res.TargetColorMax = color.RGBA{0, 255, 0, 0}      // Green, transparent
+	res.FadeMode = ParticleFadeModeFadeInOut
+	res.ScaleMode = ParticleScaleModeScaleInOut
+	res.MinScale = 0.2
+	res.MaxScale = 0.8
+	res.TargetScaleMin = 0.1
+	res.TargetScaleMax = 0.4
+	res.DirectionMode = ParticleDirectionModeNoise
+	res.NoiseFactor = 0.1
+	res.RotationSpeedMin = -math.Pi
+	res.RotationSpeedMax = math.Pi
+	res.BlendMode = ebiten.BlendLighter
+	return res
 }

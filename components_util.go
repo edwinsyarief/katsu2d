@@ -6,7 +6,8 @@ type TagComponent struct {
 	Tag string // The identifying string for this entity
 }
 
-func (self *TagComponent) Init(tag string) *TagComponent {
-	self.Tag = tag
-	return self
+func NewTagComponent(tag string) *TagComponent {
+	return &TagComponent{
+		Tag: tag,
+	}
 }

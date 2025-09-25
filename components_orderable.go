@@ -7,9 +7,10 @@ type OrderableComponent struct {
 	IsStatic    bool
 }
 
-func (self *OrderableComponent) Init(indexFunc func() float64) *OrderableComponent {
-	self.IndexFunc = indexFunc
-	return self
+func NewOrderableComponent(indexFunc func() float64) *OrderableComponent {
+	return &OrderableComponent{
+		IndexFunc: indexFunc,
+	}
 }
 
 // SetIndex sets a static sorting index for the entity.

@@ -48,17 +48,18 @@ type InputComponent struct {
 	MouseWheelY float64
 }
 
-func (self *InputComponent) Init(bindinds map[Action][]KeyConfig) *InputComponent {
-	self.Bindings = make(map[Action][]Binding)
-	self.JustPressed = make(map[Action]bool)
-	self.Pressed = make(map[Action]bool)
-	self.JustReleased = make(map[Action]bool)
+func NewInputComponent(bindinds map[Action][]KeyConfig) *InputComponent {
+	res := &InputComponent{}
+	res.Bindings = make(map[Action][]Binding)
+	res.JustPressed = make(map[Action]bool)
+	res.Pressed = make(map[Action]bool)
+	res.JustReleased = make(map[Action]bool)
 
 	if len(bindinds) > 0 {
-		self.BatchBind(bindinds)
+		res.BatchBind(bindinds)
 	}
 
-	return self
+	return res
 }
 
 // toInputCode converts a generic Ebitengine input type to a standardized InputCode.

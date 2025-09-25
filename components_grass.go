@@ -196,41 +196,42 @@ type GrassControllerComponent struct {
 	Z float64
 }
 
-func (self *GrassControllerComponent) Init(
+func NewGrassControllerComponent(
 	world *lazyecs.World, tm *TextureManager,
 	worldWidth, worldHeight int, textureID int, z float64,
 	opts ...GrassOption) *GrassControllerComponent {
-	self.WorldWidth = worldWidth
-	self.WorldHeight = worldHeight
-	self.TileSize = 32
-	self.GrassDensity = 20
-	self.Tm = tm
-	self.NoiseMapSize = 512
-	self.NoiseFrequency = 100.0
-	self.SwaySpringStrength = 0.5
-	self.SwayDamping = 0.5
-	self.ForceBaseAcceleration = 800.0
-	self.WindDirection = ebimath.Vector{X: 1.0, Y: 0.0}
-	self.WindForce = 0.3
-	self.WindSpeed = 0.5
-	self.TextureID = textureID
-	self.Z = z
+	res := &GrassControllerComponent{}
+	res.WorldWidth = worldWidth
+	res.WorldHeight = worldHeight
+	res.TileSize = 32
+	res.GrassDensity = 20
+	res.Tm = tm
+	res.NoiseMapSize = 512
+	res.NoiseFrequency = 100.0
+	res.SwaySpringStrength = 0.5
+	res.SwayDamping = 0.5
+	res.ForceBaseAcceleration = 800.0
+	res.WindDirection = ebimath.Vector{X: 1.0, Y: 0.0}
+	res.WindForce = 0.3
+	res.WindSpeed = 0.5
+	res.TextureID = textureID
+	res.Z = z
 
 	// Apply all functional options to configure the component.
 	for _, opt := range opts {
-		opt(self)
+		opt(res)
 	}
 
 	bounds := ebimath.Rectangle{
 		Min: ebimath.Vector{X: 0, Y: 0},
 		Max: ebimath.Vector{X: float64(worldWidth), Y: float64(worldHeight)},
 	}
-	self.Quadtree = NewQuadtree(world, bounds)
+	res.Quadtree = NewQuadtree(world, bounds)
 	// Generate a Perlin noise image to simulate complex wind patterns.
-	self.NoiseImage = utils.GeneratePerlinNoiseImage(self.NoiseMapSize, self.NoiseMapSize, self.NoiseFrequency)
-	self.initGrass(world)
+	res.NoiseImage = utils.GeneratePerlinNoiseImage(res.NoiseMapSize, res.NoiseMapSize, res.NoiseFrequency)
+	res.initGrass(world)
 
-	return self
+	return res
 }
 
 // initGrass generates and places all grass blades within the specified areas.
@@ -259,31 +260,15 @@ func (self *GrassControllerComponent) initGrass(world *lazyecs.World) {
 
 					entity := world.CreateEntity()
 
-					lazyecs.AddComponent[GrassComponent](world, entity)
-					lazyecs.AddComponent[TransformComponent](world, entity)
-					lazyecs.AddComponent[SpriteComponent](world, entity)
-
-					if self.Orderable {
-						lazyecs.AddComponent[OrderableComponent](world, entity)
-					}
-
-					grass, _ := lazyecs.GetComponent[GrassComponent](world, entity)
+					grass := GrassComponent{}
 					grass.SwaySeed = rand.Float64() * 2 * math.Pi
 					grass.InteractionSway = 0
 					grass.SwayVelocity = 0
 					grass.CurrentSway = 0
 
-					transform, _ := lazyecs.GetComponent[TransformComponent](world, entity)
-					transform.Init()
+					transform := NewTransformComponent()
 					transform.SetPosition(ebimath.V(posX, posY))
 					transform.Z = self.Z
-
-					// If orderable, create and add an orderable component for rendering.
-					if self.Orderable {
-						orderable, _ := lazyecs.GetComponent[OrderableComponent](world, entity)
-						orderable.Init(nil)
-						orderable.SetIndex(transform.Position().Y)
-					}
 
 					textureID := self.TextureID
 					// Use a random texture from the area's list if specified.
@@ -292,8 +277,7 @@ func (self *GrassControllerComponent) initGrass(world *lazyecs.World) {
 					}
 
 					img := self.Tm.Get(textureID)
-					sprite, _ := lazyecs.GetComponent[SpriteComponent](world, entity)
-					sprite.Init(textureID, img.Bounds())
+					sprite := NewSpriteComponent(textureID, img.Bounds())
 
 					// Manually adjust the vertices to set the anchor to the bottom-center.
 					// This ensures the physics position (at the base) aligns with the visual representation.
@@ -303,6 +287,17 @@ func (self *GrassControllerComponent) initGrass(world *lazyecs.World) {
 					for i := range sprite.Vertices {
 						sprite.Vertices[i].DstX -= offsetX
 						sprite.Vertices[i].DstY -= offsetY
+					}
+
+					lazyecs.SetComponent(world, entity, grass)
+					lazyecs.SetComponent(world, entity, *transform)
+					lazyecs.SetComponent(world, entity, *sprite)
+
+					// If orderable, create and add an orderable component for rendering.
+					if self.Orderable {
+						orderable := NewOrderableComponent(nil)
+						orderable.SetIndex(transform.Position().Y)
+						lazyecs.SetComponent(world, entity, *orderable)
 					}
 
 					// Insert the new grass entity into the quadtree for efficient spatial queries.

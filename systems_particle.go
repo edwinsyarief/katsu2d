@@ -71,35 +71,13 @@ func (self *ParticleEmitterSystem) spawnParticle(world *lazyecs.World, emitterEn
 
 	newParticleEntity := world.CreateEntity()
 
-	// Add all components first
-	lazyecs.AddComponent[TransformComponent](world, newParticleEntity)
-	lazyecs.AddComponent[SpriteComponent](world, newParticleEntity)
-	lazyecs.AddComponent[ParticleComponent](world, newParticleEntity)
-	lazyecs.AddComponent[ParentComponent](world, newParticleEntity)
-	lazyecs.AddComponent[OrderableComponent](world, newParticleEntity)
-
-	// Now get pointers to the actual components in storage
-	parentComponent, _ := lazyecs.GetComponent[ParentComponent](world, newParticleEntity)
-	parentComponent.Init(emitterEntity)
-	particleTransform, _ := lazyecs.GetComponent[TransformComponent](world, newParticleEntity)
-	particleTransform.Init()
-	particleSprite, _ := lazyecs.GetComponent[SpriteComponent](world, newParticleEntity)
-	tex := self.tm.Get(texID)
-	particleSprite.Init(texID, tex.Bounds())
-	particleData, _ := lazyecs.GetComponent[ParticleComponent](world, newParticleEntity)
-
-	particleOrderable, _ := lazyecs.GetComponent[OrderableComponent](world, newParticleEntity)
-	if parentOrderable, ok := lazyecs.GetComponent[OrderableComponent](world, emitterEntity); ok {
-		particleOrderable.SetIndex(parentOrderable.Index())
-	}
-
-	particleTransform.Z = emitterTransform.Z
 	randAngle := self.r.Float64() * 2 * math.Pi
 	randSpeed := self.r.FloatRange(
 		emitter.InitialParticleSpeedMin,
 		emitter.InitialParticleSpeedMax)
 	randOffset := ebimath.V(self.r.Float64()*emitter.ParticleSpawnOffset.X, self.r.Float64()*emitter.ParticleSpawnOffset.Y)
-
+	particleTransform := NewTransformComponent()
+	particleTransform.Z = emitterTransform.Z
 	particleTransform.SetPosition(emitterTransform.Position().Add(randOffset))
 	particleTransform.SetRotation(ebimath.Lerp(emitter.MinRotation, emitter.MaxRotation, self.r.Float64()))
 	particleTransform.SetScale(ebimath.V(
@@ -107,6 +85,7 @@ func (self *ParticleEmitterSystem) spawnParticle(world *lazyecs.World, emitterEn
 		ebimath.Lerp(emitter.MinScale, emitter.MaxScale, self.r.Float64()),
 	))
 
+	particleData := ParticleComponent{}
 	particleData.Velocity = ebimath.V(randSpeed*math.Cos(randAngle), randSpeed*math.Sin(randAngle))
 	particleData.Lifetime = emitter.ParticleLifetime
 	particleData.TotalLifetime = emitter.ParticleLifetime
@@ -121,7 +100,23 @@ func (self *ParticleEmitterSystem) spawnParticle(world *lazyecs.World, emitterEn
 	particleData.NoiseOffsetX = self.r.Float64() * 1000
 	particleData.NoiseOffsetY = self.r.Float64() * 1000
 
+	tex := self.tm.Get(texID)
+	particleSprite := NewSpriteComponent(texID, tex.Bounds())
 	particleSprite.Color = particleData.InitialColor
+
+	parent := NewParentComponent(emitterEntity)
+
+	// Add all components first
+	lazyecs.SetComponent(world, newParticleEntity, particleData)
+	lazyecs.SetComponent(world, newParticleEntity, *particleTransform)
+	lazyecs.SetComponent(world, newParticleEntity, *particleSprite)
+	lazyecs.SetComponent(world, newParticleEntity, *parent)
+
+	if parentOrderable, ok := lazyecs.GetComponent[OrderableComponent](world, emitterEntity); ok {
+		particleOrderable := NewOrderableComponent(nil)
+		particleOrderable.SetIndex(parentOrderable.Index())
+		lazyecs.SetComponent(world, newParticleEntity, *particleOrderable)
+	}
 }
 
 // ParticleUpdateSystem is an UpdateSystem that handles the movement and lifecycle of particles.

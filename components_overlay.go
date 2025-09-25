@@ -32,8 +32,10 @@ type FadeOverlayComponent struct {
 	Callback    func()
 }
 
-func (self *FadeOverlayComponent) Init(
+func NewFadeOverlayComponent(
 	fadeType FadeType, fadeColor color.RGBA, duration float64, callback func()) *FadeOverlayComponent {
+	res := &FadeOverlayComponent{}
+
 	begin, end := float32(0.0), float32(1.0)
 	easing := ease.CubicInOut
 	if fadeType == FadeTypeIn {
@@ -43,13 +45,13 @@ func (self *FadeOverlayComponent) Init(
 	overlay := ebiten.NewImage(1, 1)
 	overlay.Fill(fadeColor)
 
-	self.FadeType = fadeType
-	self.FadeColor = fadeColor
-	self.Overlay = overlay
-	self.Tween = tween.New(begin, end, float32(duration), easing)
-	self.Callback = callback
+	res.FadeType = fadeType
+	res.FadeColor = fadeColor
+	res.Overlay = overlay
+	res.Tween = tween.New(begin, end, float32(duration), easing)
+	res.Callback = callback
 
-	return self
+	return res
 }
 
 func (self *FadeOverlayComponent) SetDelay(delay float64) *FadeOverlayComponent {
@@ -92,42 +94,44 @@ type CinematicOverlayComponent struct {
 	Callback                                               func()
 }
 
-func (self *CinematicOverlayComponent) Init(width, height int, col color.RGBA, opacity float64, cinematicType CinematicType,
+func NewCinematicOverlayComponent(width, height int, col color.RGBA, opacity float64, cinematicType CinematicType,
 	startType, endType CinematicOverlayType, startFade, endFade, autoFinish bool,
 	cinematicDelay, radius, startSpeed, endSpeed float64, offset ebimath.Vector, callback func()) *CinematicOverlayComponent {
-	self.OverlayColor = col
-	self.OverlayOpacity = opacity
-	self.Width = width
-	self.Height = height
-	self.CinematicType = cinematicType
-	self.StartType = startType
-	self.EndType = endType
-	self.StartFade = startFade
-	self.EndFade = endFade
-	self.AutoFinish = autoFinish
-	self.CinematicDelay = cinematicDelay
-	self.Radius = radius
-	self.StartSpeed = startSpeed
-	self.EndSpeed = endSpeed
-	self.Offset = offset
-	self.Delayer = managers.NewDelayManager()
-	self.Callback = callback
+	res := &CinematicOverlayComponent{}
 
-	self.Delayer.Add("cinematic_delay", cinematicDelay, func() {
-		self.DelayFinished = true
+	res.OverlayColor = col
+	res.OverlayOpacity = opacity
+	res.Width = width
+	res.Height = height
+	res.CinematicType = cinematicType
+	res.StartType = startType
+	res.EndType = endType
+	res.StartFade = startFade
+	res.EndFade = endFade
+	res.AutoFinish = autoFinish
+	res.CinematicDelay = cinematicDelay
+	res.Radius = radius
+	res.StartSpeed = startSpeed
+	res.EndSpeed = endSpeed
+	res.Offset = offset
+	res.Delayer = managers.NewDelayManager()
+	res.Callback = callback
+
+	res.Delayer.Add("cinematic_delay", cinematicDelay, func() {
+		res.DelayFinished = true
 	})
-	self.RenderTarget = ebiten.NewImage(width, height)
-	self.Overlay = ebiten.NewImage(1, 1)
-	self.Placeholder = ebiten.NewImage(1, 1)
-	self.Overlay.Fill(self.OverlayColor)
-	self.Placeholder.Fill(color.RGBA{R: 255, G: 255, B: 255, A: 255})
-	self.CinematicAlphaValue = 1.0
-	if self.CinematicType == CinematicSpotlight {
-		self.SpotlightMaxValue = float64(height) * (1 + SpotlightOvershootFactor)
+	res.RenderTarget = ebiten.NewImage(width, height)
+	res.Overlay = ebiten.NewImage(1, 1)
+	res.Placeholder = ebiten.NewImage(1, 1)
+	res.Overlay.Fill(res.OverlayColor)
+	res.Placeholder.Fill(color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	res.CinematicAlphaValue = 1.0
+	if res.CinematicType == CinematicSpotlight {
+		res.SpotlightMaxValue = float64(height) * (1 + SpotlightOvershootFactor)
 	}
-	self.Tween = self.createStartTween()
+	res.Tween = res.createStartTween()
 
-	return self
+	return res
 }
 
 func (self *CinematicOverlayComponent) createStartTween() *tween.Sequence {
