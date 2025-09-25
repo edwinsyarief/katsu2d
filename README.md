@@ -2,27 +2,16 @@
 
 Unleash your game ideas with this high-performance game framework built in Go, leveraging the power of Ebitengine. This framework features a fast and unique Entity Component System (ECS) architecture, an optimized batching renderer with support for position, rotation, and scaling, and a simplified API designed for both power and ease of use.
 
-## 🚧 WORK IN PROGRESS 🚧
-
-This project is currently under active development. While core functionalities are in place and demonstrate high performance, the API and internal structures may undergo significant changes. It is not yet recommended for production use.
-
-**Your feedback and contributions are highly welcome!** If you encounter issues, have suggestions, or wish to contribute, please feel free to do so.
-
 ## Features
 
-- **Fast & Unique ECS Architecture:** Lazy ECS. [https://github.com/edwinsyarief/lazyecs](https://github.com/edwinsyarief/lazyecs)
-- **Optimized Batching Renderer:** Efficiently draws multiple sprites in a single draw call, significantly reducing overhead. Supports advanced transformations like rotation and scaling for batched entities.
-- **Powerful Audio Manager:** Feature-rich audio system supporting music and sound effects with:
-  - Fade in/out transitions for smooth audio blending
-  - Stereo panning for positional audio
-  - Sound stacking for multiple concurrent instances
-  - Independent volume control for each audio source
-- **Smooth Slow Motion Control:** Implement dynamic time scaling with smooth interpolation (lerping) between normal and slow-motion speeds, allowing for compelling gameplay effects.
-- **Flexible Line Renderer:** 2D polyline, easily draw line with color and width interpolation, join and cap options, etc.
-- **Flexible Cooldown System:** Easily manage ability cooldowns or timed events with a dedicated component and system.
-- **Simplified API with Functional Options:** A fluent, chainable API for engine configuration and entity creation, inspired by the "Functional Options" pattern, making setup and game logic development more intuitive.
-- **Modular and Extensible:** Designed with clear separation of concerns, making it easy to add new components, systems, or features.
-- **Built-in components:** Too lazy to create sprite, text, or other components? No worries, we have built-int components and systems that are ready to use.
+- **Lazy ECS Architecture**: Built on a high-performance, data-oriented, and cache-friendly [Entity Component System](https://github.com/edwinsyarief/lazyecs).
+- **Optimized Batch Renderer**: Efficiently draws multiple sprites in a single draw call, supporting position, rotation, and scaling.
+- **Powerful Audio Manager**: Supports fade in/out, stereo panning, and sound stacking for complex audio scenes.
+- **Flexible Line Renderer**: Easily draw lines with color and width interpolation, join, and cap options.
+- **Flexible Ribbon Trail**: Create smooth, ribbon-like trails for dynamic visual effects.
+- **Modular and Extensible**: Designed for easy extension, allowing you to add new components and systems.
+- **Rich Set of Built-in Components**: Includes components for sprites, text, animation, input, and more, ready to use out-of-the-box.
+- **And much more!**
 
 ## Getting Started
 
@@ -39,15 +28,9 @@ The engine is designed to be highly configurable and easy to use through its eng
 go get github.com/edwinsyarief/katsu2d
 ```
 
-### Usage example
+### Usage
 
-Here is the example repo: [https://github.com/edwinsyarief/katsu2d-simple-demo](https://github.com/edwinsyarief/katsu2d-simple-demo)
-
-Various examples repo: [https://github.com/edwinsyarief/katsu2d-examples](https://github.com/edwinsyarief/katsu2d-examples)
-
-#### Screenshot
-
-![Simple Demo](./screenshot.png)
+For detailed examples and usage, please see the [katsu2d-examples](https://github.com/edwinsyarief/katsu2d-examples) repository.
 
 ### Functional options
 
@@ -87,140 +70,6 @@ func loadAssets(e *katsu2d.Engine) {
 ```
 
 By calling a function like this at startup, you can refer to your assets using the stored IDs (e.g., `assets.EbitengineLogoTextureID`) when creating components later.
-
-### Working with Entities and Components
-
-The ECS (Entity Component System) is the core of Katsu2D. It allows you to organize your game objects in a data-oriented way, which is great for performance and keeping your code clean.
-
-#### Creating an Entity
-
-An entity is just a unique ID. You can create one using the `world.CreateEntity()` method:
-
-```go
-// Assuming 'world' is your *lazyecs.World instance
-entity := world.CreateEntity()
-```
-
-#### Adding a Component
-
-Once you have an entity, you can add components to it.
-
-**TransformComponent:**
-The `TransformComponent` manages an entity's position, scale, and rotation.
-
-```go
-// Create and initialize the transform component
-t := katsu2d.TransformComponent{}
-t.Init()
-t.SetPosition(ebimath.V(consts.WindowWidth/2, consts.WindowHeight/2))
-
-// Add the component to the entity
-lazyecs.SetComponent(world, entity, t)
-```
-
-**SpriteComponent:**
-The `SpriteComponent` allows an entity to be rendered as a sprite. It requires a `textureID` that you get from the `TextureManager` when you load your assets.
-
-```go
-// Create and initialize the sprite component
-s := katsu2d.SpriteComponent{}
-s.Init(assets.EbitengineLogoTextureID, image.Rect(0, 0, 256, 256))
-
-// Add the component to the entity
-lazyecs.SetComponent(world, entity, s)
-```
-
-#### Component IDs
-
-For operations like removing components or querying entities, you need a way to refer to a component's *type*. Katsu2D provides a set of built-in constants for this purpose. Each constant represents a unique `ComponentID`.
-
-Here are some of the most common ones:
-
-- `katsu2d.CTTransform`: ID for `TransformComponent`
-- `katsu2d.CTSprite`: ID for `SpriteComponent`
-- `katsu2d.CTAnimation`: ID for `AnimationComponent`
-- `katsu2d.CTText`: ID for `TextComponent`
-- `katsu2d.CTInput`: ID for `InputComponent`
-
-You can find the full list of built-in component IDs in `components.go`.
-
-#### Removing a Component
-
-You can remove a component from an entity using its `ComponentID`.
-
-```go
-// Remove the TransformComponent from the entity
-success := lazyecs.RemoveComponent[katsu2d.TransformComponent](world,entity)
-```
-
-#### Filtering Entities (Querying)
-
-Systems use queries to find entities that have a specific set of components. The `world.Query()` method takes one or more `ComponentID`s and returns a slice of all entities that have *all* of the specified components.
-
-```go
-// Find all entities that have both a TransformComponent and a SpriteComponent
-query := world.Query(katsu2d.CTTransform, katsu2d.CTSprite)
-
-for query.Next() {
-    // You can now loop through the returned entities
-    for _, entity := range query.Entities() {
-        // Get a specific component from the entity
-        transform, _ := lazecs.GetComponent[katsu2d.TransformComponent](world, entity)
-        
-        // ... do something with the transform ...
-    }
-}
-```
-
-### Creating Custom Components
-
-While Katsu2D provides several built-in components, you'll often need to create your own to manage game-specific data.
-
-#### 1. Defining a Component
-
-A component is simply a Go struct that holds data. It's best practice to keep components as plain data objects, without any logic or methods.
-
-For example, if you wanted to create a component to manage player-specific attributes, you could define it like this:
-
-```go
-// in file mygame/components/player.go
-package components
-
-// PlayerComponent holds data specific to the player entity.
-type PlayerComponent struct {
-    Health int
-    Score  int
-    Speed  float64
-}
-```
-
-#### 2. Registering the Component
-
-Before you can use a custom component, you must register it with the Katsu2D engine. This assigns a unique `ComponentID` to your component type, which is necessary for the ECS to manage it efficiently.
-
-Registration should be done once at startup. The recommended way is to use an `init()` function in a centralized components package within your game.
-
-```go
-// in file mygame/components/components.go
-package components
-
-import (
-    "github.com/edwinsyarief/katsu2d"
-)
-
-var (
-    // CTPlayer will hold the ComponentID for our custom component.
-    CTPlayer lazyecs.ComponentID
-)
-
-func init() {
-    // Register the component and store its ID.
-    // The component type is passed as a type parameter.
-    CTPlayer = lazyecs.RegisterComponent[PlayerComponent]()
-}
-```
-
-Once registered, you can use `components.CTPlayer` just like you would with a built-in component ID. You can add it to entities, query for it in systems, and manage your game logic in a clean, data-oriented way.
 
 ## Why Katsu2D?
 
