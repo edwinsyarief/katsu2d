@@ -21,9 +21,10 @@ func NewTextRenderSystem() *TextRenderSystem {
 
 // Draw renders all text components in the world using their transforms.
 func (self *TextRenderSystem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
+	renderer.Flush()
+
 	query := world.Query(CTText, CTTransform)
 	for query.Next() {
-		renderer.Flush()
 		txts, _ := lazyecs.GetComponentSlice[TextComponent](query)
 		tranforms, _ := lazyecs.GetComponentSlice[TransformComponent](query)
 
