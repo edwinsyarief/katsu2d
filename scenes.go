@@ -53,11 +53,12 @@ func (self *Scene) Update(world *lazyecs.World, dt float64) {
 	for _, us := range self.UpdateSystems {
 		us.Update(world, dt)
 	}
-	// Process event bus
-	ProcessEventBus(self.World)
 
 	// First, process any deferred entity removals for this scene's world.
 	self.World.ProcessRemovals()
+
+	// Process event bus
+	ProcessEventBus(self.World)
 }
 
 // OnLayoutChanged publishes an engine layout change event

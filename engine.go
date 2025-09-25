@@ -277,11 +277,11 @@ func (self *Engine) Update() error {
 		us.Update(self.world, dt)
 	}
 
-	// Process event bus
-	ProcessEventBus(self.world)
-
 	// Process deferred removals for the engine's world.
 	self.World().ProcessRemovals()
+
+	// Process event bus
+	ProcessEventBus(self.world)
 
 	// Then, update the active scene's systems.
 	if self.sm.current != nil {
