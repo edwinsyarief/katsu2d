@@ -238,7 +238,7 @@ func SineInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
-	cos := math.Cos(float64(t/d) * float64(pi))
+	cos := math.Cos(float64(t/d) * pi)
 	return -c/2*(T(cos)-1) + b
 }
 
@@ -249,22 +249,22 @@ func SineOutIn[T Float](t, b, c, d T) T {
 	}
 	t /= d / 2
 	if t < 1 {
-		sin := math.Sin(float64(t) * float64(halfPi))
+		sin := math.Sin(float64(t) * halfPi)
 		return c/2*T(sin) + b
 	}
 	t--
-	cos := math.Cos(float64(t) * float64(halfPi))
-	return -c/2*T(cos) + c/2 + b + c/2
+	cos := math.Cos(float64(t) * halfPi)
+	return -c/2*T(cos) + c + b
 }
 
-// ExpoIn provides exponential ease-in (accelerating).
 // ExpoIn provides exponential ease-in (accelerating).
 func ExpoIn[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
-	pow := math.Pow(2, float64(10*(t/d-1)))
-	return c*T(pow) + b - c*0.001
+	t /= d
+	pow := math.Pow(2, float64(10*(t-1)))
+	return c*T(pow) + b
 }
 
 // ExpoOut provides exponential ease-out (decelerating).
@@ -272,11 +272,12 @@ func ExpoOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
-	if t == d {
+	t /= d
+	if t == 1 {
 		return b + c
 	}
-	pow := math.Pow(2, float64(-10*t/d))
-	return c*1.001*(-T(pow)+1) + b
+	pow := math.Pow(2, float64(-10*t))
+	return c*(1-T(pow)) + b
 }
 
 // ExpoInOut provides exponential ease-in for the first half and ease-out for the second half.
@@ -293,11 +294,11 @@ func ExpoInOut[T Float](t, b, c, d T) T {
 	t /= d / 2
 	if t < 1 {
 		pow := math.Pow(2, float64(10*(t-1)))
-		return c/2*T(pow) + b - c*0.0005
+		return c/2*T(pow) + b
 	}
 	t--
 	pow := math.Pow(2, float64(-10*t))
-	return c/2*1.0005*(2-T(pow)) + b
+	return c/2*(2-T(pow)) + b
 }
 
 // ExpoOutIn provides exponential ease-out for the first half and ease-in for the second half.
@@ -364,20 +365,29 @@ func CircOutIn[T Float](t, b, c, d T) T {
 
 // BackIn provides back ease-in (overshooting backward before moving forward).
 func BackIn[T Float](t, b, c, d T) T {
+	if d == 0 {
+		return b
+	}
 	t /= d
 	return c*t*t*((backS+1)*t-backS) + b
 }
 
 // BackOut provides back ease-out (overshooting forward before settling).
 func BackOut[T Float](t, b, c, d T) T {
+	if d == 0 {
+		return b
+	}
 	t = t/d - 1
 	return c*(t*t*((backS+1)*t+backS)+1) + b
 }
 
 // BackInOut provides back ease-in for the first half and ease-out for the second half.
 func BackInOut[T Float](t, b, c, d T) T {
+	if d == 0 {
+		return b
+	}
 	s := T(backS * 1.525)
-	t = t / d * 2
+	t /= d / 2
 	if t < 1 {
 		return c/2*(t*t*((s+1)*t-s)) + b
 	}
@@ -387,7 +397,10 @@ func BackInOut[T Float](t, b, c, d T) T {
 
 // BackOutIn provides back ease-out for the first half and ease-in for the second half.
 func BackOutIn[T Float](t, b, c, d T) T {
-	if t < (d / 2) {
+	if d == 0 {
+		return b
+	}
+	if t < d/2 {
 		return BackOut(t*2, b, c/2, d)
 	}
 	return BackIn((t*2)-d, b+c/2, c/2, d)
@@ -407,17 +420,14 @@ func BounceOut[T Float](t, b, c, d T) T {
 		return b
 	}
 	t /= d
-	if t < 1/2.75 {
-		return c*(7.5625*t*t) + b
-	} else if t < 2/2.75 {
-		t -= 1.5 / 2.75
-		return c*(7.5625*t*t+0.75) + b
-	} else if t < 2.5/2.75 {
-		t -= 2.25 / 2.75
-		return c*(7.5625*t*t+0.9375) + b
+	if t < 4.0/11.0 {
+		return c*((121.0*t*t)/16.0) + b
+	} else if t < 8.0/11.0 {
+		return c*((363.0/40.0*t*t)-(99.0/10.0*t)+17.0/5.0) + b
+	} else if t < 9.0/10.0 {
+		return c*((4356.0/361.0*t*t)-(35442.0/1805.0*t)+16061.0/1805.0) + b
 	}
-	t -= 2.625 / 2.75
-	return c*(7.5625*t*t+0.984375) + b
+	return c*((54.0/5.0*t*t)-(513.0/25.0*t)+268.0/25.0) + b
 }
 
 // BounceInOut provides bounce ease-in for the first half and ease-out for the second half.
@@ -437,11 +447,10 @@ func BounceOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
-	t /= d / 2
-	if t < 1 {
-		return BounceOut(t*d, 0, c, d)/2 + b
+	if t < d/2 {
+		return BounceOut(t*2, b, c/2, d)
 	}
-	return BounceIn(t*d-d, 0, c, d)/2 + c/2 + b
+	return BounceIn((t*2)-d, b+c/2, c/2, d)
 }
 
 // ElasticIn provides elastic ease-in (oscillating with increasing amplitude).
@@ -449,15 +458,16 @@ func ElasticIn[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
-	if t == d {
+	t /= d
+	if t == 1 {
 		return b + c
 	}
-	p := d * 0.3
+	p := 0.5
 	s := p / 4
-	t = t/d - 1
-	pow := math.Pow(2, float64(10*t))
-	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
-	return -(c * T(pow) * T(sin)) + b
+	t -= 1
+	pow := math.Pow(2, 10*float64(t))
+	sin := math.Sin((float64(t) - s) * twoPi / p)
+	return -c*T(pow)*T(sin) + b
 }
 
 // ElasticOut provides elastic ease-out (oscillating with decreasing amplitude).
@@ -465,14 +475,14 @@ func ElasticOut[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
-	if t == d {
+	t /= d
+	if t == 1 {
 		return b + c
 	}
-	p := d * 0.3
+	p := 0.5
 	s := p / 4
-	t /= d
-	pow := math.Pow(2, float64(-10*t))
-	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+	pow := math.Pow(2, -10*float64(t))
+	sin := math.Sin((float64(t) - s) * twoPi / p)
 	return c*T(pow)*T(sin) + c + b
 }
 
@@ -484,18 +494,18 @@ func ElasticInOut[T Float](t, b, c, d T) T {
 	if t == d {
 		return b + c
 	}
-	p := d * 0.3 * 1.5
+	p := 0.5
 	s := p / 4
 	t /= d / 2
 	if t < 1 {
-		t--
-		pow := math.Pow(2, float64(10*t))
-		sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+		t -= 1
+		pow := math.Pow(2, 10*float64(t))
+		sin := math.Sin((float64(t) - s) * twoPi / p)
 		return -0.5*(c*T(pow)*T(sin)) + b
 	}
-	t--
-	pow := math.Pow(2, float64(-10*t))
-	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+	t -= 1
+	pow := math.Pow(2, -10*float64(t))
+	sin := math.Sin((float64(t) - s) * twoPi / p)
 	return c*T(pow)*T(sin)*0.5 + c + b
 }
 
@@ -507,16 +517,8 @@ func ElasticOutIn[T Float](t, b, c, d T) T {
 	if t == d {
 		return b + c
 	}
-	p := d * 0.3 * 1.5
-	s := p / 4
-	t /= d / 2
-	if t < 1 {
-		pow := math.Pow(2, float64(-10*t))
-		sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
-		return c/2*T(pow)*T(sin) + c/2 + b
+	if t < d/2 {
+		return ElasticOut(t*2, b, c/2, d)
 	}
-	t--
-	pow := math.Pow(2, float64(10*t))
-	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
-	return -(c / 2 * T(pow) * T(sin)) + b + c/2
+	return ElasticIn((t*2)-d, b+c/2, c/2, d)
 }
