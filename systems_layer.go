@@ -2,7 +2,6 @@ package katsu2d
 
 import (
 	"image/color"
-	"sync"
 
 	"github.com/edwinsyarief/lazyecs"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -46,8 +45,6 @@ type LayerSytem struct {
 	drawSystems             []DrawSystem   // Collection of drawing systems to be executed
 	updateSystems           []UpdateSystem // Collection of update systems to be executed
 	stretched, pixelPerfect bool
-
-	once sync.Once
 }
 
 // NewLayerSystem creates a new layer renderer with specified dimensions
@@ -70,25 +67,30 @@ func NewLayerSystem(width, height int, opts ...LayerOption) *LayerSytem {
 	return ls
 }
 
-func (self *LayerSytem) onEngineLayoutChanged(obj interface{}) {
-	data := obj.(EngineLayoutChangedEvent)
+func (self *LayerSytem) Initialize(w *lazyecs.World) {
+	for _, us := range self.updateSystems {
+		us.Initialize(w)
+	}
+	for _, ds := range self.drawSystems {
+		ds.Initialize(w)
+	}
+
+	Subscribe(w, self.onEngineLayoutChanged)
+}
+
+func (self *LayerSytem) onEngineLayoutChanged(data EngineLayoutChangedEvent) {
 	self.canvas.Resize(data.Width, data.Height)
 }
 
-func (self *LayerSytem) Update(world *lazyecs.World, dt float64) {
-	self.once.Do(func() {
-		eb := GetEventBus(world)
-		eb.Subscribe(EngineLayoutChangedEvent{}, self.onEngineLayoutChanged)
-	})
-
+func (self *LayerSytem) Update(w *lazyecs.World, dt float64) {
 	for _, us := range self.updateSystems {
-		us.Update(world, dt)
+		us.Update(w, dt)
 	}
 }
 
 // Draw executes all registered render systems and handles scaling of the final output.
 // It maintains aspect ratio while scaling and centers the result on the screen.
-func (self *LayerSytem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
+func (self *LayerSytem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
 	// Clear the buffer with transparency
 	self.buffer.Fill(color.Transparent)
 
@@ -97,12 +99,12 @@ func (self *LayerSytem) Draw(world *lazyecs.World, renderer *BatchRenderer) {
 
 	// Execute all registered drawing systems
 	for _, ds := range self.drawSystems {
-		ds.Draw(world, self.batchRenderer)
+		ds.Draw(w, self.batchRenderer)
 	}
 
 	// Ensure all batched operations are executed
 	self.batchRenderer.Flush()
-	renderer.Flush()
+	rdr.Flush()
 
-	self.canvas.Draw(self.buffer, renderer.screen)
+	self.canvas.Draw(self.buffer, rdr.screen)
 }

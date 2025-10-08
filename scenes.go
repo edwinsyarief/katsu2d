@@ -8,25 +8,30 @@ import (
 // Scene represents a game scene. It is a self-contained unit
 // with its own World, systems, and lifecycle hooks.
 type Scene struct {
-	World         *lazyecs.World
-	Width, Height int
-	UpdateSystems []UpdateSystem
-	DrawSystems   []DrawSystem
+	world         lazyecs.World
 	OnEnter       func(*Engine)
 	OnExit        func(*Engine)
 	OnUpdate      func(float64)
 	OnBeforeDraw  func(*ebiten.Image)
 	OnAfterDraw   func(*ebiten.Image)
+	UpdateSystems []UpdateSystem
+	DrawSystems   []DrawSystem
+	Width, Height int
 }
 
 // NewScene creates a new scene with its own dedicated World.
 func NewScene() *Scene {
+	return NewSceneWithInitialCapacity(defaultCapacity)
+}
+func NewSceneWithInitialCapacity(cap int) *Scene {
 	scn := &Scene{
-		World: lazyecs.NewWorld(),
+		world: lazyecs.NewWorld(cap),
 	}
-	_ = GetEventBus(scn.World)
-
 	return scn
+}
+
+func (self *Scene) World() *lazyecs.World {
+	return &self.world
 }
 
 // AddSystem adds an update and/or draw system to the scene.
@@ -38,36 +43,30 @@ func (self *Scene) AddSystem(sys any) {
 		self.AddDrawSystem(ds)
 	}
 }
-
 func (self *Scene) AddUpdateSystem(us UpdateSystem) {
 	self.UpdateSystems = append(self.UpdateSystems, us)
 }
-
 func (self *Scene) AddDrawSystem(ds DrawSystem) {
 	self.DrawSystems = append(self.DrawSystems, ds)
 }
+func (self *Scene) ClearSystems() {
+	self.UpdateSystems = self.UpdateSystems[:0]
+	self.DrawSystems = self.DrawSystems[:0]
+}
 
 // Update runs all the scene's update systems.
-func (self *Scene) Update(world *lazyecs.World, dt float64) {
+func (self *Scene) Update(dt float64) {
 	// Then, run the scene's own update systems.
 	for _, us := range self.UpdateSystems {
-		us.Update(world, dt)
+		us.Update(self.World(), dt)
 	}
-
-	// First, process any deferred entity removals for this scene's world.
-	self.World.ProcessRemovals()
-
-	// Process event bus
-	ProcessEventBus(self.World)
 }
 
 // OnLayoutChanged publishes an engine layout change event
 func (self *Scene) OnLayoutChanged(width, height int) {
 	self.Width = width
 	self.Height = height
-
-	eb := GetEventBus(self.World)
-	eb.Publish(EngineLayoutChangedEvent{
+	Publish(self.World(), EngineLayoutChangedEvent{
 		Width:  width,
 		Height: height,
 	})
@@ -82,13 +81,17 @@ func (self *Scene) Draw(world *lazyecs.World, renderer *BatchRenderer) {
 
 // SceneManager manages scenes and scene transitions.
 type SceneManager struct {
+	engine  *Engine
 	scenes  map[string]*Scene
 	current *Scene
 }
 
 // NewSceneManager creates a new scene manager.
-func NewSceneManager() *SceneManager {
-	return &SceneManager{scenes: make(map[string]*Scene)}
+func NewSceneManager(e *Engine) *SceneManager {
+	return &SceneManager{
+		engine: e,
+		scenes: make(map[string]*Scene),
+	}
 }
 
 // AddScene adds a scene by name.
@@ -108,18 +111,31 @@ func (self *SceneManager) CurrentScene() *Scene {
 
 // SwitchTo switches to a new scene, running its OnEnter hook and the old scene's OnExit hook.
 // This is the only place where the active scene is changed.
-func (self *SceneManager) SwitchTo(e *Engine, name string) {
+func (self *SceneManager) SwitchTo(name string) {
 	newScene, ok := self.scenes[name]
 	if !ok {
 		return
 	}
 	if self.current != nil && self.current.OnExit != nil {
-		self.current.OnExit(e)
+		self.current.OnExit(self.engine)
 	}
 	self.current = newScene
+	initializeAssetManagers(self.current.World(),
+		self.engine.TextureManager(),
+		self.engine.FontManager(),
+		self.engine.AudioManager(),
+		self.engine.ShaderManager(),
+		self,
+	)
 	if self.current.OnEnter != nil {
-		self.current.OnEnter(e)
-		w, h := e.HiResSize()
-		self.current.OnLayoutChanged(w, h)
+		self.current.OnEnter(self.engine)
 	}
+	for _, us := range self.current.UpdateSystems {
+		us.Initialize(self.current.World())
+	}
+	for _, ds := range self.current.DrawSystems {
+		ds.Initialize(self.current.World())
+	}
+	w, h := self.engine.HiResSize()
+	self.current.OnLayoutChanged(w, h)
 }

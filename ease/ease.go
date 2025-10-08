@@ -5,6 +5,10 @@ package ease
 
 import "math"
 
+type Float interface {
+	~float32 | ~float64
+}
+
 // EaseFunc defines the signature for easing functions.
 // Parameters:
 //   t: Current time (0 to d).
@@ -12,18 +16,18 @@ import "math"
 //   c: Change in value (end - start).
 //   d: Total duration.
 // Returns the interpolated value.
-type EaseFunc func(t, b, c, d float32) float32
+type EaseFunc[T Float] func(t, b, c, d T) T
 
 // Constants for trigonometric calculations
 const (
-	pi     = float32(math.Pi)
+	pi     = math.Pi
 	halfPi = pi / 2
 	twoPi  = 2 * pi
 	backS  = 1.70158 // Overshoot factor for Back easing
 )
 
 // Linear provides linear interpolation with no easing.
-func Linear(t, b, c, d float32) float32 {
+func Linear[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -31,7 +35,7 @@ func Linear(t, b, c, d float32) float32 {
 }
 
 // QuadIn provides quadratic ease-in (accelerating).
-func QuadIn(t, b, c, d float32) float32 {
+func QuadIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -40,7 +44,7 @@ func QuadIn(t, b, c, d float32) float32 {
 }
 
 // QuadOut provides quadratic ease-out (decelerating).
-func QuadOut(t, b, c, d float32) float32 {
+func QuadOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -49,7 +53,7 @@ func QuadOut(t, b, c, d float32) float32 {
 }
 
 // QuadInOut provides quadratic ease-in for the first half and ease-out for the second half.
-func QuadInOut(t, b, c, d float32) float32 {
+func QuadInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -62,7 +66,7 @@ func QuadInOut(t, b, c, d float32) float32 {
 }
 
 // QuadOutIn provides quadratic ease-out for the first half and ease-in for the second half.
-func QuadOutIn(t, b, c, d float32) float32 {
+func QuadOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -75,7 +79,7 @@ func QuadOutIn(t, b, c, d float32) float32 {
 }
 
 // CubicIn provides cubic ease-in (accelerating).
-func CubicIn(t, b, c, d float32) float32 {
+func CubicIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -84,7 +88,7 @@ func CubicIn(t, b, c, d float32) float32 {
 }
 
 // CubicOut provides cubic ease-out (decelerating).
-func CubicOut(t, b, c, d float32) float32 {
+func CubicOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -93,7 +97,7 @@ func CubicOut(t, b, c, d float32) float32 {
 }
 
 // CubicInOut provides cubic ease-in for the first half and ease-out for the second half.
-func CubicInOut(t, b, c, d float32) float32 {
+func CubicInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -106,7 +110,7 @@ func CubicInOut(t, b, c, d float32) float32 {
 }
 
 // CubicOutIn provides cubic ease-out for the first half and ease-in for the second half.
-func CubicOutIn(t, b, c, d float32) float32 {
+func CubicOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -120,7 +124,7 @@ func CubicOutIn(t, b, c, d float32) float32 {
 }
 
 // QuartIn provides quartic ease-in (accelerating).
-func QuartIn(t, b, c, d float32) float32 {
+func QuartIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -129,7 +133,7 @@ func QuartIn(t, b, c, d float32) float32 {
 }
 
 // QuartOut provides quartic ease-out (decelerating).
-func QuartOut(t, b, c, d float32) float32 {
+func QuartOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -138,7 +142,7 @@ func QuartOut(t, b, c, d float32) float32 {
 }
 
 // QuartInOut provides quartic ease-in for the first half and ease-out for the second half.
-func QuartInOut(t, b, c, d float32) float32 {
+func QuartInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -151,7 +155,7 @@ func QuartInOut(t, b, c, d float32) float32 {
 }
 
 // QuartOutIn provides quartic ease-out for the first half and ease-in for the second half.
-func QuartOutIn(t, b, c, d float32) float32 {
+func QuartOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -165,7 +169,7 @@ func QuartOutIn(t, b, c, d float32) float32 {
 }
 
 // QuintIn provides quintic ease-in (accelerating).
-func QuintIn(t, b, c, d float32) float32 {
+func QuintIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -174,7 +178,7 @@ func QuintIn(t, b, c, d float32) float32 {
 }
 
 // QuintOut provides quintic ease-out (decelerating).
-func QuintOut(t, b, c, d float32) float32 {
+func QuintOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -183,7 +187,7 @@ func QuintOut(t, b, c, d float32) float32 {
 }
 
 // QuintInOut provides quintic ease-in for the first half and ease-out for the second half.
-func QuintInOut(t, b, c, d float32) float32 {
+func QuintInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -196,7 +200,7 @@ func QuintInOut(t, b, c, d float32) float32 {
 }
 
 // QuintOutIn provides quintic ease-out for the first half and ease-in for the second half.
-func QuintOutIn(t, b, c, d float32) float32 {
+func QuintOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -210,66 +214,73 @@ func QuintOutIn(t, b, c, d float32) float32 {
 }
 
 // SineIn provides sinusoidal ease-in (accelerating).
-func SineIn(t, b, c, d float32) float32 {
+func SineIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t /= d
-	return -c*float32(math.Cos(float64(t)*float64(halfPi))) + c + b
+	cos := math.Cos(float64(t) * halfPi)
+	return -c*T(cos) + c + b
 }
 
 // SineOut provides sinusoidal ease-out (decelerating).
-func SineOut(t, b, c, d float32) float32 {
+func SineOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t /= d
-	return c*float32(math.Sin(float64(t)*float64(halfPi))) + b
+	sin := math.Sin(float64(t) * halfPi)
+	return c*T(sin) + b
 }
 
 // SineInOut provides sinusoidal ease-in for the first half and ease-out for the second half.
-func SineInOut(t, b, c, d float32) float32 {
+func SineInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
-	return -c/2*(float32(math.Cos(float64(t/d)*float64(pi)))-1) + b
+	cos := math.Cos(float64(t/d) * float64(pi))
+	return -c/2*(T(cos)-1) + b
 }
 
 // SineOutIn provides sinusoidal ease-out for the first half and ease-in for the second half.
-func SineOutIn(t, b, c, d float32) float32 {
+func SineOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t /= d / 2
 	if t < 1 {
-		return c/2*float32(math.Sin(float64(t)*float64(halfPi))) + b
+		sin := math.Sin(float64(t) * float64(halfPi))
+		return c/2*T(sin) + b
 	}
 	t--
-	return -c/2*float32(math.Cos(float64(t)*float64(halfPi))) + c/2 + b + c/2
+	cos := math.Cos(float64(t) * float64(halfPi))
+	return -c/2*T(cos) + c/2 + b + c/2
 }
 
 // ExpoIn provides exponential ease-in (accelerating).
 // ExpoIn provides exponential ease-in (accelerating).
-func ExpoIn(t, b, c, d float32) float32 {
+func ExpoIn[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
-	return c*float32(math.Pow(2, float64(10*(t/d-1)))) + b - c*0.001
+	pow := math.Pow(2, float64(10*(t/d-1)))
+	return c*T(pow) + b - c*0.001
 }
 
 // ExpoOut provides exponential ease-out (decelerating).
-func ExpoOut(t, b, c, d float32) float32 {
+func ExpoOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	if t == d {
 		return b + c
 	}
-	return c*1.001*(-float32(math.Pow(2, float64(-10*t/d)))+1) + b
+	pow := math.Pow(2, float64(-10*t/d))
+	return c*1.001*(-T(pow)+1) + b
 }
 
 // ExpoInOut provides exponential ease-in for the first half and ease-out for the second half.
-func ExpoInOut(t, b, c, d float32) float32 {
+func ExpoInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -281,14 +292,16 @@ func ExpoInOut(t, b, c, d float32) float32 {
 	}
 	t /= d / 2
 	if t < 1 {
-		return c/2*float32(math.Pow(2, float64(10*(t-1)))) + b - c*0.0005
+		pow := math.Pow(2, float64(10*(t-1)))
+		return c/2*T(pow) + b - c*0.0005
 	}
 	t--
-	return c/2*1.0005*(2-float32(math.Pow(2, float64(-10*t)))) + b
+	pow := math.Pow(2, float64(-10*t))
+	return c/2*1.0005*(2-T(pow)) + b
 }
 
 // ExpoOutIn provides exponential ease-out for the first half and ease-in for the second half.
-func ExpoOutIn(t, b, c, d float32) float32 {
+func ExpoOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -299,65 +312,71 @@ func ExpoOutIn(t, b, c, d float32) float32 {
 }
 
 // CircIn provides circular ease-in (accelerating).
-func CircIn(t, b, c, d float32) float32 {
+func CircIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t /= d
-	return -c*(float32(math.Sqrt(float64(1-t*t)))-1) + b
+	sqrt := math.Sqrt(float64(1 - t*t))
+	return -c*(T(sqrt)-1) + b
 }
 
 // CircOut provides circular ease-out (decelerating).
-func CircOut(t, b, c, d float32) float32 {
+func CircOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t = t/d - 1
-	return c*float32(math.Sqrt(float64(1-t*t))) + b
+	sqrt := math.Sqrt(float64(1 - t*t))
+	return c*T(sqrt) + b
 }
 
 // CircInOut provides circular ease-in for the first half and ease-out for the second half.
-func CircInOut(t, b, c, d float32) float32 {
+func CircInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t /= d / 2
 	if t < 1 {
-		return -c/2*(float32(math.Sqrt(float64(1-t*t)))-1) + b
+		sqrt := math.Sqrt(float64(1 - t*t))
+		return -c/2*(T(sqrt)-1) + b
 	}
 	t -= 2
-	return c/2*(float32(math.Sqrt(float64(1-t*t)))+1) + b
+	sqrt := math.Sqrt(float64(1 - t*t))
+	return c/2*(T(sqrt)+1) + b
 }
 
 // CircOutIn provides circular ease-out for the first half and ease-in for the second half.
-func CircOutIn(t, b, c, d float32) float32 {
+func CircOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
 	t /= d / 2
 	if t < 1 {
 		t--
-		return c/2*float32(math.Sqrt(float64(1-t*t))) + b
+		sqrt := math.Sqrt(float64(1 - t*t))
+		return c/2*T(sqrt) + b
 	}
 	t--
-	return -c/2*(float32(math.Sqrt(float64(1-t*t)))-1) + b + c/2
+	sqrt := math.Sqrt(float64(1 - t*t))
+	return -c/2*(T(sqrt)-1) + b + c/2
 }
 
 // BackIn provides back ease-in (overshooting backward before moving forward).
-func BackIn(t, b, c, d float32) float32 {
+func BackIn[T Float](t, b, c, d T) T {
 	t /= d
 	return c*t*t*((backS+1)*t-backS) + b
 }
 
 // BackOut provides back ease-out (overshooting forward before settling).
-func BackOut(t, b, c, d float32) float32 {
+func BackOut[T Float](t, b, c, d T) T {
 	t = t/d - 1
 	return c*(t*t*((backS+1)*t+backS)+1) + b
 }
 
 // BackInOut provides back ease-in for the first half and ease-out for the second half.
-func BackInOut(t, b, c, d float32) float32 {
-	s := float32(backS * 1.525)
+func BackInOut[T Float](t, b, c, d T) T {
+	s := T(backS * 1.525)
 	t = t / d * 2
 	if t < 1 {
 		return c/2*(t*t*((s+1)*t-s)) + b
@@ -367,7 +386,7 @@ func BackInOut(t, b, c, d float32) float32 {
 }
 
 // BackOutIn provides back ease-out for the first half and ease-in for the second half.
-func BackOutIn(t, b, c, d float32) float32 {
+func BackOutIn[T Float](t, b, c, d T) T {
 	if t < (d / 2) {
 		return BackOut(t*2, b, c/2, d)
 	}
@@ -375,7 +394,7 @@ func BackOutIn(t, b, c, d float32) float32 {
 }
 
 // BounceIn provides bounce ease-in (simulating bounces with increasing amplitude).
-func BounceIn(t, b, c, d float32) float32 {
+func BounceIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -383,7 +402,7 @@ func BounceIn(t, b, c, d float32) float32 {
 }
 
 // BounceOut provides bounce ease-out (simulating bounces with decreasing amplitude).
-func BounceOut(t, b, c, d float32) float32 {
+func BounceOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -402,7 +421,7 @@ func BounceOut(t, b, c, d float32) float32 {
 }
 
 // BounceInOut provides bounce ease-in for the first half and ease-out for the second half.
-func BounceInOut(t, b, c, d float32) float32 {
+func BounceInOut[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -414,7 +433,7 @@ func BounceInOut(t, b, c, d float32) float32 {
 }
 
 // BounceOutIn provides bounce ease-out for the first half and ease-in for the second half.
-func BounceOutIn(t, b, c, d float32) float32 {
+func BounceOutIn[T Float](t, b, c, d T) T {
 	if d == 0 {
 		return b
 	}
@@ -426,7 +445,7 @@ func BounceOutIn(t, b, c, d float32) float32 {
 }
 
 // ElasticIn provides elastic ease-in (oscillating with increasing amplitude).
-func ElasticIn(t, b, c, d float32) float32 {
+func ElasticIn[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
@@ -436,11 +455,13 @@ func ElasticIn(t, b, c, d float32) float32 {
 	p := d * 0.3
 	s := p / 4
 	t = t/d - 1
-	return -(c * float32(math.Pow(2, float64(10*t))) * float32(math.Sin(float64(t*d-s)*float64(twoPi)/float64(p)))) + b
+	pow := math.Pow(2, float64(10*t))
+	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+	return -(c * T(pow) * T(sin)) + b
 }
 
 // ElasticOut provides elastic ease-out (oscillating with decreasing amplitude).
-func ElasticOut(t, b, c, d float32) float32 {
+func ElasticOut[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
@@ -450,11 +471,13 @@ func ElasticOut(t, b, c, d float32) float32 {
 	p := d * 0.3
 	s := p / 4
 	t /= d
-	return c*float32(math.Pow(2, float64(-10*t)))*float32(math.Sin(float64(t*d-s)*float64(twoPi)/float64(p))) + c + b
+	pow := math.Pow(2, float64(-10*t))
+	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+	return c*T(pow)*T(sin) + c + b
 }
 
 // ElasticInOut provides elastic ease-in for the first half and ease-out for the second half.
-func ElasticInOut(t, b, c, d float32) float32 {
+func ElasticInOut[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
@@ -466,14 +489,18 @@ func ElasticInOut(t, b, c, d float32) float32 {
 	t /= d / 2
 	if t < 1 {
 		t--
-		return -0.5*(c*float32(math.Pow(2, float64(10*t)))*float32(math.Sin(float64(t*d-s)*float64(twoPi)/float64(p)))) + b
+		pow := math.Pow(2, float64(10*t))
+		sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+		return -0.5*(c*T(pow)*T(sin)) + b
 	}
 	t--
-	return c*float32(math.Pow(2, float64(-10*t)))*float32(math.Sin(float64(t*d-s)*float64(twoPi)/float64(p)))*0.5 + c + b
+	pow := math.Pow(2, float64(-10*t))
+	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+	return c*T(pow)*T(sin)*0.5 + c + b
 }
 
 // ElasticOutIn provides elastic ease-out for the first half and ease-in for the second half.
-func ElasticOutIn(t, b, c, d float32) float32 {
+func ElasticOutIn[T Float](t, b, c, d T) T {
 	if d == 0 || t == 0 {
 		return b
 	}
@@ -484,8 +511,12 @@ func ElasticOutIn(t, b, c, d float32) float32 {
 	s := p / 4
 	t /= d / 2
 	if t < 1 {
-		return c/2*float32(math.Pow(2, float64(-10*t)))*float32(math.Sin(float64(t*d-s)*float64(twoPi)/float64(p))) + c/2 + b
+		pow := math.Pow(2, float64(-10*t))
+		sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+		return c/2*T(pow)*T(sin) + c/2 + b
 	}
 	t--
-	return -(c / 2 * float32(math.Pow(2, float64(10*t))) * float32(math.Sin(float64(t*d-s)*float64(twoPi)/float64(p)))) + b + c/2
+	pow := math.Pow(2, float64(10*t))
+	sin := math.Sin(float64(t*d-s) * float64(twoPi) / float64(p))
+	return -(c / 2 * T(pow) * T(sin)) + b + c/2
 }

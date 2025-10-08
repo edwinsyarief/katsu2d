@@ -10,13 +10,12 @@ import (
 // It uses a rectangle packing algorithm to keep track of used and empty
 // areas, allowing for efficient insertion and removal of rectangles.
 type Set struct {
-	width   int                // width is the total width of the area being managed.
-	height  int                // height is the total height of the area being managed.
 	rects   []*image.Rectangle // rects stores the currently allocated (filled) regions.
 	empties []image.Rectangle  // empties stores the available (free) regions.
 	tmps    []image.Rectangle  // tmps is a temporary slice used for intermediate calculations to reduce allocations.
-
-	minSize image.Point // minSize specifies the minimum dimensions for an empty region to be considered usable.
+	minSize image.Point        // minSize specifies the minimum dimensions for an empty region to be considered usable.
+	width   int                // width is the total width of the area being managed.
+	height  int                // height is the total height of the area being managed.
 }
 
 // NewSetOptions provides optional configuration for creating a new Set.
@@ -42,7 +41,6 @@ func NewSet(width, height int, opts *NewSetOptions) *Set {
 	// Ensure minSize is at least 1x1 to avoid issues with zero-sized regions.
 	s.minSize.X = max(s.minSize.X, 1)
 	s.minSize.Y = max(s.minSize.Y, 1)
-
 	return s
 }
 
@@ -150,7 +148,6 @@ func (self *Set) Insert(rect *image.Rectangle) bool {
 	// Position the input rectangle at the top-left corner of the best-fit empty region.
 	*rect = rect.Add(best.Min)
 	self.rects = append(self.rects, rect)
-
 	// Recalculate the empty regions based on the new allocation.
 	self.tmps = self.tmps[:0]
 	for i := range self.empties {
@@ -164,7 +161,6 @@ func (self *Set) Insert(rect *image.Rectangle) bool {
 	}
 	// Clean up the newly calculated empty regions for the next insertion.
 	self.sanitizeEmptyRegions(self.tmps)
-
 	return true
 }
 
@@ -188,10 +184,8 @@ func (self *Set) Free(rect *image.Rectangle) {
 	idx := slices.Index(self.rects, rect)
 	if idx != -1 {
 		self.rects = slices.Delete(self.rects, idx, idx+1)
-
 		// This algorithm attempts to grow the freed region by expanding it horizontally
 		// and vertically until it hits another allocated region.
-
 		// Grow horizontally.
 		pushX := func(base image.Rectangle) image.Rectangle {
 			// Consider only rects that could block horizontal expansion.
@@ -246,15 +240,12 @@ func (self *Set) Free(rect *image.Rectangle) {
 			}
 			return base
 		}
-
 		// Calculate the largest possible free rectangle by trying both expansion orders.
 		// Order matters: expanding X then Y can result in a different shape than Y then X.
 		rX := pushX(*rect)
 		rX = pushY(rX)
-
 		rY := pushY(*rect)
 		rY = pushX(rY)
-
 		// Keep the resulting rectangle with the largest area.
 		sX := rX.Dx() * rX.Dy()
 		sY := rY.Dx() * rY.Dy()
@@ -264,11 +255,9 @@ func (self *Set) Free(rect *image.Rectangle) {
 		} else {
 			freed = rY
 		}
-
 		// Add the new, larger freed region to the list of empty regions.
 		self.empties = append(self.empties, freed)
 		self.tmps = append(self.tmps[:0], self.empties...)
-
 		// Sanitize the list to merge overlapping empty regions.
 		self.sanitizeEmptyRegions(self.tmps)
 	}
