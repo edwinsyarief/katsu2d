@@ -217,7 +217,7 @@ func (self *BatchRenderer) AddCustomMeshes(verts []ebiten.Vertex, inds []uint16,
 
 // AddQuad draws a quad (sprite) with specified source rectangle and destination size.
 func (self *BatchRenderer) AddQuad(
-	pos, scale Vector, rotation float64, // transform parameters
+	pos, offset, origin, scale Vector, rotation float64, // transform parameters
 	img *ebiten.Image, clr color.RGBA, // image & color parameters
 	srcMinX, srcMinY, srcMaxX, srcMaxY float32, // source rectangle
 	// destination size
@@ -229,6 +229,8 @@ func (self *BatchRenderer) AddQuad(
 	if img != self.currentImage && self.currentImage != nil {
 		self.Flush()
 	}
+	pos = pos.Sub(offset).Sub(origin)
+
 	self.currentImage = img
 	srcProjMinX := pos.X
 	srcProjMinY := pos.Y

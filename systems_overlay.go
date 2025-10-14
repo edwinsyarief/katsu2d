@@ -39,12 +39,6 @@ func (self *FadeOverlaySystem) Update(w *lazyecs.World, dt float64) {
 		}
 
 		fade.CurrentFade, fade.Finished = tween.Current, tween.Finished
-
-		if fade.Finished {
-			Publish(w, TweenFinishedEvent{
-				Entity: self.filter.Entity(),
-			})
-		}
 	}
 	for _, e := range self.toRemove {
 		w.RemoveEntity(e)

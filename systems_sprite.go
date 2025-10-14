@@ -91,10 +91,11 @@ func (self *SpriteSystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
 			}
 			rdr.AddCustomMeshes(worldVertices, m.Indices, img)
 		} else {
-			pos := V2(0).Apply(matrix)
 			col := s.Color
 			col.A = uint8(float64(col.A) * s.Opacity)
-			rdr.AddQuad(pos,
+			rdr.AddQuad(self.transform.Position(),
+				self.transform.Offset(),
+				self.transform.Origin(),
 				self.transform.Scale(), self.transform.Rotation(),
 				img, col,
 				float32(s.Bound.Min.X), float32(s.Bound.Min.Y),
