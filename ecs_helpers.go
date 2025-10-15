@@ -3,84 +3,84 @@ package katsu2d
 import (
 	"image"
 
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-func updateHiResDisplayResource(w *lazyecs.World, width, height int) {
-	if ok, _ := lazyecs.HasResource[HiResDisplaySize](w.Resources()); !ok {
+func updateHiResDisplayResource(w *teishoku.World, width, height int) {
+	if ok, _ := teishoku.HasResource[HiResDisplaySize](w.Resources()); !ok {
 		w.Resources().Add(&HiResDisplaySize{
 			Width:  width,
 			Height: height,
 		})
 	} else {
-		layout, _ := lazyecs.GetResource[HiResDisplaySize](w.Resources())
+		layout, _ := teishoku.GetResource[HiResDisplaySize](w.Resources())
 		layout.Width = width
 		layout.Height = height
 	}
 }
 
-func initializeAssetManagers(w *lazyecs.World,
+func initializeAssetManagers(w *teishoku.World,
 	tm *TextureManager, fm *FontManager, am *AudioManager, shm *ShaderManager, scm *SceneManager) {
-	if ok, _ := lazyecs.HasResource[TextureManager](w.Resources()); !ok {
+	if ok, _ := teishoku.HasResource[TextureManager](w.Resources()); !ok {
 		w.Resources().Add(tm)
 	}
-	if ok, _ := lazyecs.HasResource[FontManager](w.Resources()); !ok {
+	if ok, _ := teishoku.HasResource[FontManager](w.Resources()); !ok {
 		w.Resources().Add(fm)
 	}
-	if ok, _ := lazyecs.HasResource[AudioManager](w.Resources()); !ok {
+	if ok, _ := teishoku.HasResource[AudioManager](w.Resources()); !ok {
 		w.Resources().Add(am)
 	}
-	if ok, _ := lazyecs.HasResource[ShaderManager](w.Resources()); !ok {
+	if ok, _ := teishoku.HasResource[ShaderManager](w.Resources()); !ok {
 		w.Resources().Add(shm)
 	}
-	if ok, _ := lazyecs.HasResource[SceneManager](w.Resources()); !ok {
+	if ok, _ := teishoku.HasResource[SceneManager](w.Resources()); !ok {
 		w.Resources().Add(scm)
 	}
 }
 
-func GetTextureManager(w *lazyecs.World) *TextureManager {
-	res, _ := lazyecs.GetResource[TextureManager](w.Resources())
+func GetTextureManager(w *teishoku.World) *TextureManager {
+	res, _ := teishoku.GetResource[TextureManager](w.Resources())
 	return res
 }
 
-func GetFontManager(w *lazyecs.World) *FontManager {
-	res, _ := lazyecs.GetResource[FontManager](w.Resources())
+func GetFontManager(w *teishoku.World) *FontManager {
+	res, _ := teishoku.GetResource[FontManager](w.Resources())
 	return res
 }
 
-func GetAudioManager(w *lazyecs.World) *AudioManager {
-	res, _ := lazyecs.GetResource[AudioManager](w.Resources())
+func GetAudioManager(w *teishoku.World) *AudioManager {
+	res, _ := teishoku.GetResource[AudioManager](w.Resources())
 	return res
 }
 
-func GetShaderManager(w *lazyecs.World) *ShaderManager {
-	res, _ := lazyecs.GetResource[ShaderManager](w.Resources())
+func GetShaderManager(w *teishoku.World) *ShaderManager {
+	res, _ := teishoku.GetResource[ShaderManager](w.Resources())
 	return res
 }
 
-func GetSceneManager(w *lazyecs.World) *SceneManager {
-	res, _ := lazyecs.GetResource[SceneManager](w.Resources())
+func GetSceneManager(w *teishoku.World) *SceneManager {
+	res, _ := teishoku.GetResource[SceneManager](w.Resources())
 	return res
 }
 
-func getEventBus(w *lazyecs.World) *lazyecs.EventBus {
-	if ok, _ := lazyecs.HasResource[lazyecs.EventBus](w.Resources()); !ok {
-		w.Resources().Add(&lazyecs.EventBus{})
+func getEventBus(w *teishoku.World) *teishoku.EventBus {
+	if ok, _ := teishoku.HasResource[teishoku.EventBus](w.Resources()); !ok {
+		w.Resources().Add(&teishoku.EventBus{})
 	}
-	eb, _ := lazyecs.GetResource[lazyecs.EventBus](w.Resources())
+	eb, _ := teishoku.GetResource[teishoku.EventBus](w.Resources())
 	return eb
 }
 
-func Subscribe[T any](w *lazyecs.World, fn func(T)) {
+func Subscribe[T any](w *teishoku.World, fn func(T)) {
 	eb := getEventBus(w)
-	lazyecs.Subscribe(eb, fn)
+	teishoku.Subscribe(eb, fn)
 }
 
-func Publish[T any](w *lazyecs.World, o T) {
+func Publish[T any](w *teishoku.World, o T) {
 	eb := getEventBus(w)
-	lazyecs.Publish(eb, o)
+	teishoku.Publish(eb, o)
 }
 
 func (self *Transform) SetFromComponent(comp *TransformComponent) {

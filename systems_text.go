@@ -1,7 +1,7 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/text/language"
 )
@@ -20,11 +20,11 @@ var AlignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
 
 type TextSystem struct {
 	fm          *FontManager
-	filter      *lazyecs.Filter2[TransformComponent, TextComponent]
+	filter      *teishoku.Filter2[TransformComponent, TextComponent]
 	drawOpts    *text.DrawOptions
 	transform   *Transform
-	fontFaceMap map[lazyecs.Entity]*text.GoTextFace
-	entities    []lazyecs.Entity
+	fontFaceMap map[teishoku.Entity]*text.GoTextFace
+	entities    []teishoku.Entity
 }
 
 func NewTextSystem() *TextSystem {
@@ -33,13 +33,13 @@ func NewTextSystem() *TextSystem {
 		transform: T(),
 	}
 }
-func (self *TextSystem) Initialize(w *lazyecs.World) {
+func (self *TextSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 	self.fm = GetFontManager(w)
 }
-func (self *TextSystem) Update(w *lazyecs.World, dt float64) {
-	self.entities = make([]lazyecs.Entity, 0)
-	self.fontFaceMap = make(map[lazyecs.Entity]*text.GoTextFace)
+func (self *TextSystem) Update(w *teishoku.World, dt float64) {
+	self.entities = make([]teishoku.Entity, 0)
+	self.fontFaceMap = make(map[teishoku.Entity]*text.GoTextFace)
 	self.filter.Reset()
 	for self.filter.Next() {
 		self.entities = append(self.entities, self.filter.Entity())
@@ -48,10 +48,10 @@ func (self *TextSystem) Update(w *lazyecs.World, dt float64) {
 		self.updateCache(txt, f)
 	}
 }
-func (self *TextSystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
+func (self *TextSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 	rdr.Flush()
 	for _, e := range self.entities {
-		t, txt := lazyecs.GetComponent2[TransformComponent, TextComponent](w, e)
+		t, txt := teishoku.GetComponent2[TransformComponent, TextComponent](w, e)
 		self.drawOpts.LineSpacing = txt.LineSpacing
 		switch txt.Alignment {
 		case TextAlignmentTopRight, TextAlignmentMiddleRight, TextAlignmentBottomRight:

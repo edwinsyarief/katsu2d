@@ -1,14 +1,14 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // Scene represents a game scene. It is a self-contained unit
 // with its own World, systems, and lifecycle hooks.
 type Scene struct {
-	world         lazyecs.World
+	world         teishoku.World
 	OnEnter       func(*Engine)
 	OnExit        func(*Engine)
 	OnUpdate      func(float64)
@@ -25,12 +25,12 @@ func NewScene() *Scene {
 }
 func NewSceneWithInitialCapacity(cap int) *Scene {
 	scn := &Scene{
-		world: lazyecs.NewWorld(cap),
+		world: teishoku.NewWorld(cap),
 	}
 	return scn
 }
 
-func (self *Scene) World() *lazyecs.World {
+func (self *Scene) World() *teishoku.World {
 	return &self.world
 }
 
@@ -73,7 +73,7 @@ func (self *Scene) OnLayoutChanged(width, height int) {
 }
 
 // Draw runs all the scene's draw systems using the engine's shared renderer.
-func (self *Scene) Draw(world *lazyecs.World, renderer *BatchRenderer) {
+func (self *Scene) Draw(world *teishoku.World, renderer *BatchRenderer) {
 	for _, ds := range self.DrawSystems {
 		ds.Draw(world, renderer)
 	}

@@ -4,7 +4,7 @@ Unleash your game ideas with this high-performance game framework built in Go, l
 
 ## Features
 
-- **Lazy ECS Architecture**: Built on a high-performance, data-oriented, and cache-friendly [Entity Component System](https://github.com/edwinsyarief/lazyecs).
+- **Lazy ECS Architecture**: Built on a high-performance, data-oriented, and cache-friendly [Entity Component System](https://github.com/edwinsyarief/teishoku).
 - **Optimized Batch Renderer**: Efficiently draws multiple sprites in a single draw call, supporting position, rotation, and scaling.
 - **Powerful Audio Manager**: Supports fade in/out, stereo panning, and sound stacking for complex audio scenes.
 - **Flexible Line Renderer**: Easily draw lines with color and width interpolation, join, and cap options.

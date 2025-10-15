@@ -1,14 +1,14 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // ShapeRenderSystem renders shape components.
 type ShapeRenderSystem struct {
 	transform *Transform
-	filter    *lazyecs.Filter2[TransformComponent, ShapeComponent]
+	filter    *teishoku.Filter2[TransformComponent, ShapeComponent]
 }
 
 // NewShapeRenderSystem creates a new ShapeRenderSystem.
@@ -18,12 +18,12 @@ func NewShapeRenderSystem() *ShapeRenderSystem {
 	}
 }
 
-func (self *ShapeRenderSystem) Initialize(w *lazyecs.World) {
+func (self *ShapeRenderSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
 
 // Draw renders all shape components in the world.
-func (self *ShapeRenderSystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
+func (self *ShapeRenderSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 	tm := GetTextureManager(w)
 	for self.filter.Next() {
 		transform, shape := self.filter.Get()

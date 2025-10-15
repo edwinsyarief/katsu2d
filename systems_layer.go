@@ -3,7 +3,7 @@ package katsu2d
 import (
 	"image/color"
 
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -67,7 +67,7 @@ func NewLayerSystem(width, height int, opts ...LayerOption) *LayerSytem {
 	return ls
 }
 
-func (self *LayerSytem) Initialize(w *lazyecs.World) {
+func (self *LayerSytem) Initialize(w *teishoku.World) {
 	for _, us := range self.updateSystems {
 		us.Initialize(w)
 	}
@@ -82,7 +82,7 @@ func (self *LayerSytem) onEngineLayoutChanged(data EngineLayoutChangedEvent) {
 	self.canvas.Resize(data.Width, data.Height)
 }
 
-func (self *LayerSytem) Update(w *lazyecs.World, dt float64) {
+func (self *LayerSytem) Update(w *teishoku.World, dt float64) {
 	for _, us := range self.updateSystems {
 		us.Update(w, dt)
 	}
@@ -90,7 +90,7 @@ func (self *LayerSytem) Update(w *lazyecs.World, dt float64) {
 
 // Draw executes all registered render systems and handles scaling of the final output.
 // It maintains aspect ratio while scaling and centers the result on the screen.
-func (self *LayerSytem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
+func (self *LayerSytem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 	// Clear the buffer with transparency
 	self.buffer.Fill(color.Transparent)
 

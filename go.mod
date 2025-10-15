@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/edwinsyarief/assetpacker v1.0.0
-	github.com/edwinsyarief/lazyecs v1.5.0
+	github.com/edwinsyarief/teishoku v1.6.0
 	github.com/hajimehoshi/ebiten/v2 v2.9.1
 	golang.org/x/text v0.30.0
 )

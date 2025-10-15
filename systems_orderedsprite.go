@@ -3,30 +3,30 @@ package katsu2d
 import (
 	"sort"
 
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type OrderedSpriteSystem struct {
 	transform         *Transform
-	filter            *lazyecs.Filter3[TransformComponent, SpriteComponent, OrderableComponent]
-	lastFrameEntities map[lazyecs.Entity]struct{}
-	entities          []lazyecs.Entity
+	filter            *teishoku.Filter3[TransformComponent, SpriteComponent, OrderableComponent]
+	lastFrameEntities map[teishoku.Entity]struct{}
+	entities          []teishoku.Entity
 	zSortNeeded       bool
 }
 
 func NewOrderedSpriteSystem() *OrderedSpriteSystem {
 	return &OrderedSpriteSystem{
 		transform:         T(),
-		lastFrameEntities: make(map[lazyecs.Entity]struct{}),
-		entities:          make([]lazyecs.Entity, 0),
+		lastFrameEntities: make(map[teishoku.Entity]struct{}),
+		entities:          make([]teishoku.Entity, 0),
 	}
 }
-func (self *OrderedSpriteSystem) Initialize(w *lazyecs.World) {
+func (self *OrderedSpriteSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
-func (self *OrderedSpriteSystem) Update(w *lazyecs.World, dt float64) {
-	currentEntities := make([]lazyecs.Entity, 0)
+func (self *OrderedSpriteSystem) Update(w *teishoku.World, dt float64) {
+	currentEntities := make([]teishoku.Entity, 0)
 	self.filter.Reset()
 	for self.filter.Next() {
 		currentEntities = append(currentEntities, self.filter.Entity())
@@ -45,14 +45,14 @@ func (self *OrderedSpriteSystem) Update(w *lazyecs.World, dt float64) {
 	if zSortNeeded {
 		self.entities = currentEntities
 		sort.SliceStable(self.entities, func(i, j int) bool {
-			t1 := lazyecs.GetComponent[TransformComponent](w, self.entities[i])
-			t2 := lazyecs.GetComponent[TransformComponent](w, self.entities[j])
+			t1 := teishoku.GetComponent[TransformComponent](w, self.entities[i])
+			t2 := teishoku.GetComponent[TransformComponent](w, self.entities[j])
 			if t1.Z != t2.Z {
 				return t1.Z < t2.Z
 			}
 
-			o1 := lazyecs.GetComponent[OrderableComponent](w, self.entities[i])
-			o2 := lazyecs.GetComponent[OrderableComponent](w, self.entities[j])
+			o1 := teishoku.GetComponent[OrderableComponent](w, self.entities[i])
+			o2 := teishoku.GetComponent[OrderableComponent](w, self.entities[j])
 			index1 := o1.Index
 			index2 := o2.Index
 			if index1 != index2 {
@@ -64,15 +64,15 @@ func (self *OrderedSpriteSystem) Update(w *lazyecs.World, dt float64) {
 		self.zSortNeeded = false
 	}
 
-	self.lastFrameEntities = make(map[lazyecs.Entity]struct{}, len(currentEntities))
+	self.lastFrameEntities = make(map[teishoku.Entity]struct{}, len(currentEntities))
 	for _, entity := range currentEntities {
 		self.lastFrameEntities[entity] = struct{}{}
 	}
 }
-func (self *OrderedSpriteSystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
+func (self *OrderedSpriteSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 	tm := GetTextureManager(w)
 	for _, e := range self.entities {
-		t, s := lazyecs.GetComponent2[TransformComponent, SpriteComponent](w, e)
+		t, s := teishoku.GetComponent2[TransformComponent, SpriteComponent](w, e)
 		self.transform.SetFromComponent(t)
 		img := tm.Get(s.TextureID)
 		if img == nil {
@@ -86,7 +86,7 @@ func (self *OrderedSpriteSystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
 			}
 		}
 
-		if m := lazyecs.GetComponent[MeshComponent](w, e); m != nil {
+		if m := teishoku.GetComponent[MeshComponent](w, e); m != nil {
 			GenerateMesh(m, s)
 
 			worldVertices := make([]ebiten.Vertex, len(m.Vertices))

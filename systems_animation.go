@@ -1,10 +1,10 @@
 package katsu2d
 
-import "github.com/edwinsyarief/lazyecs"
+import "github.com/edwinsyarief/teishoku"
 
 // AnimationSystem updates animations.
 type AnimationSystem struct {
-	filter *lazyecs.Filter2[AnimationComponent, SpriteComponent]
+	filter *teishoku.Filter2[AnimationComponent, SpriteComponent]
 }
 
 // NewAnimationSystem creates a new AnimationSystem.
@@ -12,12 +12,12 @@ func NewAnimationSystem() *AnimationSystem {
 	return &AnimationSystem{}
 }
 
-func (self *AnimationSystem) Initialize(w *lazyecs.World) {
+func (self *AnimationSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
 
 // Update advances all active animations in the world by the given delta time.
-func (self *AnimationSystem) Update(w *lazyecs.World, dt float64) {
+func (self *AnimationSystem) Update(w *teishoku.World, dt float64) {
 	for self.filter.Next() {
 		anim, spr := self.filter.Get()
 		if !anim.Active || len(anim.Frames) == 0 {

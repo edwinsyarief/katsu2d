@@ -3,30 +3,30 @@ package katsu2d
 import (
 	"image/color"
 
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type FadeOverlaySystem struct {
-	filter   *lazyecs.Filter2[FadeOverlayComponent, TweenComponent]
+	filter   *teishoku.Filter2[FadeOverlayComponent, TweenComponent]
 	indices  Indices
 	vertices Vertices
-	toRemove []lazyecs.Entity
+	toRemove []teishoku.Entity
 }
 
 func NewFadeOverlaySystem() *FadeOverlaySystem {
 	return &FadeOverlaySystem{
 		indices:  Indices{0, 1, 2, 0, 2, 3},
 		vertices: make(Vertices, 4),
-		toRemove: make([]lazyecs.Entity, 0),
+		toRemove: make([]teishoku.Entity, 0),
 	}
 }
 
-func (self *FadeOverlaySystem) Initialize(w *lazyecs.World) {
+func (self *FadeOverlaySystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
 
-func (self *FadeOverlaySystem) Update(w *lazyecs.World, dt float64) {
+func (self *FadeOverlaySystem) Update(w *teishoku.World, dt float64) {
 	self.toRemove = self.toRemove[:0]
 	self.filter.Reset()
 	for self.filter.Next() {
@@ -45,7 +45,7 @@ func (self *FadeOverlaySystem) Update(w *lazyecs.World, dt float64) {
 	}
 }
 
-func (self *FadeOverlaySystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
+func (self *FadeOverlaySystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 	rdr.Flush()
 	tm := GetTextureManager(w)
 	width, height := rdr.screen.Bounds().Dx(), rdr.screen.Bounds().Dy()
@@ -78,7 +78,7 @@ func updateOverlayVertices(vertices Vertices, width, height int, col color.RGBA)
 }
 
 type CinematicOverlaySystem struct {
-	filter *lazyecs.Filter3[CinematicOverlayComponent, TweenComponent, TimerComponent]
+	filter *teishoku.Filter3[CinematicOverlayComponent, TweenComponent, TimerComponent]
 	// Pre-allocated buffers for performance
 	indices      []uint16
 	vertices     []ebiten.Vertex
@@ -104,7 +104,7 @@ func NewCinematicOverlaySystem() *CinematicOverlaySystem {
 	return res
 }
 
-func (self *CinematicOverlaySystem) Initialize(w *lazyecs.World) {
+func (self *CinematicOverlaySystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 
 	Subscribe(w, self.onEngineLayoutChanged)
@@ -124,10 +124,10 @@ func (self *CinematicOverlaySystem) onTweenFinished(obj TweenFinishedEvent) {
 
 }
 
-func (self *CinematicOverlaySystem) Update(w *lazyecs.World, dt float64) {
+func (self *CinematicOverlaySystem) Update(w *teishoku.World, dt float64) {
 
 }
 
-func (self *CinematicOverlaySystem) Draw(w *lazyecs.World, rdr *BatchRenderer) {
+func (self *CinematicOverlaySystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 
 }

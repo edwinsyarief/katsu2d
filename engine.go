@@ -5,14 +5,14 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type Engine struct {
 	clearColor color.Color
 	// Managers
-	world       lazyecs.World
+	world       teishoku.World
 	tm          *TextureManager
 	fm          *FontManager
 	am          *AudioManager
@@ -147,7 +147,7 @@ func NewEngine(opts ...Option) *Engine {
 }
 func NewEngineWithInitialCapacity(cap int, opts ...Option) *Engine {
 	e := &Engine{
-		world:    lazyecs.NewWorld(cap),
+		world:    teishoku.NewWorld(cap),
 		fm:       NewFontManager(),
 		am:       NewAudioManager(44100),
 		renderer: NewBatchRenderer(),
@@ -198,7 +198,7 @@ func (self *Engine) InitAssetReader(path string, key []byte) {
 }
 
 // World returns the engine's global ECS world.
-func (self *Engine) World() *lazyecs.World {
+func (self *Engine) World() *teishoku.World {
 	return &self.world
 }
 

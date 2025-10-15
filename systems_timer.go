@@ -1,22 +1,22 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 )
 
 type TimerSystem struct {
-	filter *lazyecs.Filter[TimerComponent]
+	filter *teishoku.Filter[TimerComponent]
 }
 
 func NewTimerSystem() *TimerSystem {
 	return &TimerSystem{}
 }
 
-func (self *TimerSystem) Initialize(w *lazyecs.World) {
+func (self *TimerSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
 
-func (self *TimerSystem) Update(w *lazyecs.World, dt float64) {
+func (self *TimerSystem) Update(w *teishoku.World, dt float64) {
 	self.filter.Reset()
 	for self.filter.Next() {
 		t := self.filter.Get()

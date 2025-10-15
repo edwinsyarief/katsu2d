@@ -1,13 +1,13 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type InputSystem struct {
 	bindinds map[Action][]KeyConfig
-	filter   *lazyecs.Filter[InputComponent]
+	filter   *teishoku.Filter[InputComponent]
 }
 
 func NewInputSystem(bindinds map[Action][]KeyConfig) *InputSystem {
@@ -16,11 +16,11 @@ func NewInputSystem(bindinds map[Action][]KeyConfig) *InputSystem {
 	}
 }
 
-func (self *InputSystem) Initialize(w *lazyecs.World) {
+func (self *InputSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
 
-func (self *InputSystem) Update(w *lazyecs.World, dt float64) {
+func (self *InputSystem) Update(w *teishoku.World, dt float64) {
 	// Get mouse wheel deltas once per frame
 	wx, wy := ebiten.Wheel()
 

@@ -1,22 +1,22 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/lazyecs"
+	"github.com/edwinsyarief/teishoku"
 )
 
 type TweenSystem struct {
-	filter *lazyecs.Filter[TweenComponent]
+	filter *teishoku.Filter[TweenComponent]
 }
 
 func NewTweenSystem() *TweenSystem {
 	return &TweenSystem{}
 }
 
-func (self *TweenSystem) Initialize(w *lazyecs.World) {
+func (self *TweenSystem) Initialize(w *teishoku.World) {
 	self.filter = self.filter.New(w)
 }
 
-func (self *TweenSystem) Update(w *lazyecs.World, dt float64) {
+func (self *TweenSystem) Update(w *teishoku.World, dt float64) {
 	self.filter.Reset()
 	for self.filter.Next() {
 		tw := self.filter.Get()

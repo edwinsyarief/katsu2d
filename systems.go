@@ -1,15 +1,15 @@
 package katsu2d
 
-import "github.com/edwinsyarief/lazyecs"
+import "github.com/edwinsyarief/teishoku"
 
 // UpdateSystem is an interface for update logic.
 type UpdateSystem interface {
-	Initialize(*lazyecs.World)
-	Update(*lazyecs.World, float64)
+	Initialize(*teishoku.World)
+	Update(*teishoku.World, float64)
 }
 
 // DrawSystem is an interface for draw logic.
 type DrawSystem interface {
-	Initialize(*lazyecs.World)
-	Draw(*lazyecs.World, *BatchRenderer)
+	Initialize(*teishoku.World)
+	Draw(*teishoku.World, *BatchRenderer)
 }
