@@ -5,7 +5,7 @@ go 1.25.1
 require (
 	github.com/edwinsyarief/assetpacker v1.0.0
 	github.com/edwinsyarief/teishoku v1.6.1
-	github.com/hajimehoshi/ebiten/v2 v2.9.1
+	github.com/hajimehoshi/ebiten/v2 v2.9.2
 	golang.org/x/text v0.30.0
 )
 
