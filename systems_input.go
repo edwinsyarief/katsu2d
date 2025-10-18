@@ -6,14 +6,11 @@ import (
 )
 
 type InputSystem struct {
-	bindinds map[Action][]KeyConfig
-	filter   *teishoku.Filter[InputComponent]
+	filter *teishoku.Filter[InputComponent]
 }
 
-func NewInputSystem(bindinds map[Action][]KeyConfig) *InputSystem {
-	return &InputSystem{
-		bindinds: bindinds,
-	}
+func NewInputSystem() *InputSystem {
+	return &InputSystem{}
 }
 
 func (self *InputSystem) Initialize(w *teishoku.World) {

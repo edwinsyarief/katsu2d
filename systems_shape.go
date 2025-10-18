@@ -7,8 +7,9 @@ import (
 
 // ShapeRenderSystem renders shape components.
 type ShapeRenderSystem struct {
-	transform *Transform
-	filter    *teishoku.Filter2[TransformComponent, ShapeComponent]
+	transform   *Transform
+	filter      *teishoku.Filter2[TransformComponent, ShapeComponent]
+	initialized bool
 }
 
 // NewShapeRenderSystem creates a new ShapeRenderSystem.
@@ -19,7 +20,12 @@ func NewShapeRenderSystem() *ShapeRenderSystem {
 }
 
 func (self *ShapeRenderSystem) Initialize(w *teishoku.World) {
+	if self.initialized {
+		return
+	}
+
 	self.filter = self.filter.New(w)
+	self.initialized = true
 }
 
 // Draw renders all shape components in the world.

@@ -8,11 +8,11 @@ import (
 )
 
 type SpriteSystem struct {
-	transform         *Transform
-	filter            *teishoku.Filter2[TransformComponent, SpriteComponent]
-	lastFrameEntities map[teishoku.Entity]struct{}
-	entities          []teishoku.Entity
-	zSortNeeded       bool
+	transform                *Transform
+	filter                   *teishoku.Filter2[TransformComponent, SpriteComponent]
+	lastFrameEntities        map[teishoku.Entity]struct{}
+	entities                 []teishoku.Entity
+	zSortNeeded, initialized bool
 }
 
 func NewSpriteSystem() *SpriteSystem {
@@ -23,7 +23,12 @@ func NewSpriteSystem() *SpriteSystem {
 	}
 }
 func (self *SpriteSystem) Initialize(w *teishoku.World) {
+	if self.initialized {
+		return
+	}
+
 	self.filter = self.filter.New(w)
+	self.initialized = true
 }
 func (self *SpriteSystem) Update(w *teishoku.World, dt float64) {
 	currentEntities := make([]teishoku.Entity, 0)

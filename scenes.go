@@ -127,6 +127,8 @@ func (self *SceneManager) SwitchTo(name string) {
 		self.engine.ShaderManager(),
 		self,
 	)
+	w, h := self.engine.HiResSize()
+	updateHiResDisplayResource(self.current.World(), w, h)
 	if self.current.OnEnter != nil {
 		self.current.OnEnter(self.engine)
 	}
@@ -136,6 +138,5 @@ func (self *SceneManager) SwitchTo(name string) {
 	for _, ds := range self.current.DrawSystems {
 		ds.Initialize(self.current.World())
 	}
-	w, h := self.engine.HiResSize()
 	self.current.OnLayoutChanged(w, h)
 }

@@ -25,6 +25,7 @@ type TextSystem struct {
 	transform   *Transform
 	fontFaceMap map[teishoku.Entity]*text.GoTextFace
 	entities    []teishoku.Entity
+	initialized bool
 }
 
 func NewTextSystem() *TextSystem {
@@ -34,8 +35,13 @@ func NewTextSystem() *TextSystem {
 	}
 }
 func (self *TextSystem) Initialize(w *teishoku.World) {
+	if self.initialized {
+		return
+	}
+
 	self.filter = self.filter.New(w)
 	self.fm = GetFontManager(w)
+	self.initialized = true
 }
 func (self *TextSystem) Update(w *teishoku.World, dt float64) {
 	self.entities = make([]teishoku.Entity, 0)

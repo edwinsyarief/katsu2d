@@ -8,10 +8,11 @@ import (
 )
 
 type FadeOverlaySystem struct {
-	filter   *teishoku.Filter2[FadeOverlayComponent, TweenComponent]
-	indices  Indices
-	vertices Vertices
-	toRemove []teishoku.Entity
+	filter      *teishoku.Filter2[FadeOverlayComponent, TweenComponent]
+	indices     Indices
+	vertices    Vertices
+	toRemove    []teishoku.Entity
+	initialized bool
 }
 
 func NewFadeOverlaySystem() *FadeOverlaySystem {
@@ -23,7 +24,12 @@ func NewFadeOverlaySystem() *FadeOverlaySystem {
 }
 
 func (self *FadeOverlaySystem) Initialize(w *teishoku.World) {
+	if self.initialized {
+		return
+	}
+
 	self.filter = self.filter.New(w)
+	self.initialized = true
 }
 
 func (self *FadeOverlaySystem) Update(w *teishoku.World, dt float64) {

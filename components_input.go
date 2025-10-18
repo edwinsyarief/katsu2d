@@ -19,22 +19,16 @@ type InputCode struct {
 	Code int
 }
 
-// Binding holds a primary input and optional modifiers for an action.
-type Binding struct {
-	Primary   InputCode
-	Modifiers []InputCode
-}
-
 // KeyConfig is a helper struct for defining bindings in a more readable way.
 type KeyConfig struct {
-	Primary   any
-	Modifiers []any
+	Primary   InputCode
+	Modifiers []InputCode
 }
 
 // InputComponent stores all input bindings and their current state.
 type InputComponent struct {
 	ID           int
-	Bindings     map[Action][]Binding
+	Bindings     map[Action][]KeyConfig
 	JustPressed  map[Action]bool
 	Pressed      map[Action]bool
 	JustReleased map[Action]bool

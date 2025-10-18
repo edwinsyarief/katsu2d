@@ -39,12 +39,12 @@ func PixelPerfect(pixelPerfect bool) LayerOption {
 // LayerSytem manages the rendering of multiple drawing systems
 // onto a single buffer layer. It handles scaling and positioning of the final output.
 type LayerSytem struct {
-	batchRenderer           *BatchRenderer // Handles batch rendering operations
-	buffer                  *ebiten.Image  // Off-screen buffer for compositing
-	canvas                  *canvas
-	drawSystems             []DrawSystem   // Collection of drawing systems to be executed
-	updateSystems           []UpdateSystem // Collection of update systems to be executed
-	stretched, pixelPerfect bool
+	batchRenderer                        *BatchRenderer // Handles batch rendering operations
+	buffer                               *ebiten.Image  // Off-screen buffer for compositing
+	canvas                               *canvas
+	drawSystems                          []DrawSystem   // Collection of drawing systems to be executed
+	updateSystems                        []UpdateSystem // Collection of update systems to be executed
+	stretched, pixelPerfect, initialized bool
 }
 
 // NewLayerSystem creates a new layer renderer with specified dimensions
@@ -68,6 +68,10 @@ func NewLayerSystem(width, height int, opts ...LayerOption) *LayerSytem {
 }
 
 func (self *LayerSytem) Initialize(w *teishoku.World) {
+	if self.initialized {
+		return
+	}
+
 	for _, us := range self.updateSystems {
 		us.Initialize(w)
 	}
@@ -76,6 +80,8 @@ func (self *LayerSytem) Initialize(w *teishoku.World) {
 	}
 
 	Subscribe(w, self.onEngineLayoutChanged)
+
+	self.initialized = true
 }
 
 func (self *LayerSytem) onEngineLayoutChanged(data EngineLayoutChangedEvent) {

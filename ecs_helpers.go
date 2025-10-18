@@ -40,6 +40,11 @@ func initializeAssetManagers(w *teishoku.World,
 	}
 }
 
+func GetHiResDisplayInfo(w *teishoku.World) *HiResDisplaySize {
+	res, _ := teishoku.GetResource[HiResDisplaySize](w.Resources())
+	return res
+}
+
 func GetTextureManager(w *teishoku.World) *TextureManager {
 	res, _ := teishoku.GetResource[TextureManager](w.Resources())
 	return res
@@ -153,13 +158,13 @@ func GenerateMesh(m *MeshComponent, s *SpriteComponent) {
 }
 
 // Bind adds a new binding for a specific action.
-func Bind(input *InputComponent, action Action, primary any, modifiers ...any) {
+func Bind(input *InputComponent, action Action, primary InputCode, modifiers ...InputCode) {
 	primaryCode := toInputCode(primary)
 	mods := make([]InputCode, len(modifiers))
 	for i, m := range modifiers {
 		mods[i] = toInputCode(m)
 	}
-	binding := Binding{
+	binding := KeyConfig{
 		Primary:   primaryCode,
 		Modifiers: mods,
 	}
@@ -169,12 +174,27 @@ func Bind(input *InputComponent, action Action, primary any, modifiers ...any) {
 // BatchBind replaces all existing bindings with a new set.
 // This is useful for loading a saved or preset control scheme.
 func BatchBind(input *InputComponent, bindings map[Action][]KeyConfig) {
-	input.Bindings = make(map[Action][]Binding) // Clear all existing bindings
+	input.Bindings = make(map[Action][]KeyConfig) // Clear all existing bindings
 	for a, b := range bindings {
 		for _, k := range b {
 			Bind(input, a, k.Primary, k.Modifiers...)
 		}
 	}
+}
+
+func NewKeyConfig(key any, modifiers ...any) KeyConfig {
+	res := KeyConfig{
+		Primary:   toInputCode(key),
+		Modifiers: make([]InputCode, 0),
+	}
+
+	if len(modifiers) > 0 {
+		for _, m := range modifiers {
+			res.Modifiers = append(res.Modifiers, toInputCode(m))
+		}
+	}
+
+	return res
 }
 
 // toInputCode converts a generic Ebitengine input type to a standardized InputCode.
