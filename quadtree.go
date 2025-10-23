@@ -32,10 +32,12 @@ type Quadtree struct {
 // NewQuadtree creates a new Quadtree instance, initializing it with a root node
 // that covers the specified world bounds.
 func NewQuadtree(world *teishoku.World, bounds Rectangle) *Quadtree {
-	return &Quadtree{
+	res := &Quadtree{
 		world: world,
 		root:  newQuadtreeNode(world, bounds, 0),
 	}
+	res.root.builder = res.root.builder.New(world)
+	return res
 }
 
 // Insert adds an entity to the quadtree. The entity is placed in the appropriate node
@@ -72,6 +74,8 @@ type quadtreeNode struct {
 	children [4]*quadtreeNode
 	// world is a reference to the game world.
 	world *teishoku.World
+	// builder is used to access TransformComponent of entities.
+	builder *teishoku.Builder[TransformComponent]
 	// objects is a slice of entities contained directly within this node.
 	objects []teishoku.Entity
 	// bounds is the rectangular area covered by this node.
@@ -111,7 +115,7 @@ func (self *quadtreeNode) release() {
 // it subdivides and redistributes its entities into the new children nodes.
 func (self *quadtreeNode) insert(e teishoku.Entity) {
 	// Get the TransformComponent to find the entity's position.
-	t := teishoku.GetComponent[TransformComponent](self.world, e)
+	t := self.builder.Get(e)
 	if t == nil {
 		panic("Entity doesn't have TransformComponent")
 	}
@@ -140,7 +144,7 @@ func (self *quadtreeNode) insert(e teishoku.Entity) {
 		self.subdivide()
 		// Move existing entities from the current node to the new children.
 		for _, existingEntity := range self.objects {
-			existingT := teishoku.GetComponent[TransformComponent](self.world, existingEntity)
+			existingT := self.builder.Get(existingEntity)
 			if existingT == nil {
 				panic("Entity doesn't have TransformComponent")
 			}
@@ -164,12 +168,16 @@ func (self *quadtreeNode) subdivide() {
 	// Create the four children nodes with their respective bounds.
 	// Top-left child
 	self.children[0] = newQuadtreeNode(self.world, Rectangle{Min: self.bounds.Min, Max: Vector{X: midX, Y: midY}}, self.depth+1)
+	self.children[0].builder = self.builder
 	// Top-right child
 	self.children[1] = newQuadtreeNode(self.world, Rectangle{Min: Vector{X: midX, Y: self.bounds.Min.Y}, Max: Vector{X: self.bounds.Max.X, Y: midY}}, self.depth+1)
+	self.children[1].builder = self.builder
 	// Bottom-left child
 	self.children[2] = newQuadtreeNode(self.world, Rectangle{Min: Vector{X: self.bounds.Min.X, Y: midY}, Max: Vector{X: midX, Y: self.bounds.Max.Y}}, self.depth+1)
+	self.children[2].builder = self.builder
 	// Bottom-right child
 	self.children[3] = newQuadtreeNode(self.world, Rectangle{Min: Vector{X: midX, Y: midY}, Max: self.bounds.Max}, self.depth+1)
+	self.children[3].builder = self.builder
 }
 
 // query recursively finds and returns entities within a given rectangular query area.
@@ -183,7 +191,7 @@ func (self *quadtreeNode) query(bounds Rectangle) []teishoku.Entity {
 	// If the node has no children, it's a leaf node. Check its objects.
 	if self.children[0] == nil {
 		for _, e := range self.objects {
-			t := teishoku.GetComponent[TransformComponent](self.world, e)
+			t := self.builder.Get(e)
 			// Check if the entity's position is within the query bounds.
 			if bounds.Contains(Vector(t.Position)) {
 				result = append(result, e)
@@ -208,7 +216,7 @@ func (self *quadtreeNode) queryCircle(center Vector, radius float64) []teishoku.
 	// If the node has no children, it's a leaf node. Check its objects.
 	if self.children[0] == nil {
 		for _, e := range self.objects {
-			t := teishoku.GetComponent[TransformComponent](self.world, e)
+			t := self.builder.Get(e)
 			// Check if the entity's position is within the query circle.
 			if center.DistanceTo(Vector(t.Position)) <= radius {
 				result = append(result, e)
