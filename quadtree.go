@@ -7,10 +7,10 @@ import (
 )
 
 // MaxObjectsPerNode defines the maximum number of entities a node can hold before it subdivides.
-const MaxObjectsPerNode = 10
+const MaxObjectsPerNode = 16 // Increased from 10 for fewer subdivisions/depth.
 
 // MaxDepth defines the maximum depth of the quadtree. This prevents infinite subdivision.
-const MaxDepth = 8
+const MaxDepth = 10 // Increased from 8 for slightly deeper trees if needed.
 
 var nodePool = sync.Pool{
 	New: func() interface{} {
@@ -27,16 +27,19 @@ type Quadtree struct {
 	root *quadtreeNode
 	// world is a reference to the main game world, used to access entity components.
 	world *teishoku.World
+	// builder is shared among all nodes to access TransformComponent.
+	builder *teishoku.Builder[TransformComponent]
 }
 
 // NewQuadtree creates a new Quadtree instance, initializing it with a root node
 // that covers the specified world bounds.
 func NewQuadtree(world *teishoku.World, bounds Rectangle) *Quadtree {
 	res := &Quadtree{
-		world: world,
-		root:  newQuadtreeNode(world, bounds, 0),
+		world:   world,
+		root:    newQuadtreeNode(bounds, 0),
+		builder: teishoku.NewBuilder[TransformComponent](world),
 	}
-	res.root.builder = res.root.builder.New(world)
+	res.root.builder = res.builder
 	return res
 }
 
@@ -49,13 +52,17 @@ func (self *Quadtree) Insert(obj teishoku.Entity) {
 // Query finds all entities within a given rectangular bounds.
 // It returns a slice of entities that are located inside the query rectangle.
 func (self *Quadtree) Query(bounds Rectangle) []teishoku.Entity {
-	return self.root.query(bounds)
+	var result []teishoku.Entity
+	self.root.query(bounds, &result)
+	return result
 }
 
 // QueryCircle finds all entities within a given circular area.
 // It returns a slice of entities that are located inside the query circle.
 func (self *Quadtree) QueryCircle(center Vector, radius float64) []teishoku.Entity {
-	return self.root.queryCircle(center, radius)
+	var result []teishoku.Entity
+	self.root.queryCircle(center, radius, &result)
+	return result
 }
 
 // Clear resets the quadtree by releasing the old root and creating a new empty root node with the same bounds.
@@ -63,7 +70,8 @@ func (self *Quadtree) Clear() {
 	if self.root != nil {
 		self.root.release()
 	}
-	self.root = newQuadtreeNode(self.world, self.root.bounds, 0)
+	self.root = newQuadtreeNode(self.root.bounds, 0)
+	self.root.builder = self.builder
 }
 
 // quadtreeNode represents a single node in the quadtree.
@@ -72,25 +80,26 @@ type quadtreeNode struct {
 	// children are the four sub-nodes (top-left, top-right, bottom-left, bottom-right).
 	// If a node has children, its objects slice is empty.
 	children [4]*quadtreeNode
-	// world is a reference to the game world.
-	world *teishoku.World
 	// builder is used to access TransformComponent of entities.
 	builder *teishoku.Builder[TransformComponent]
 	// objects is a slice of entities contained directly within this node.
 	objects []teishoku.Entity
 	// bounds is the rectangular area covered by this node.
 	bounds Rectangle
+	// midX, midY are precomputed midpoints for fast child index computation.
+	midX, midY float64
 	// depth is the current depth of the node within the tree (root is depth 0).
 	depth int
 }
 
 // newQuadtreeNode creates a new quadtreeNode with the specified bounds and depth.
-func newQuadtreeNode(world *teishoku.World, bounds Rectangle, depth int) *quadtreeNode {
+func newQuadtreeNode(bounds Rectangle, depth int) *quadtreeNode {
 	n := nodePool.Get().(*quadtreeNode)
-	n.world = world
 	n.bounds = bounds
 	n.depth = depth
 	n.objects = n.objects[:0]
+	n.midX = 0
+	n.midY = 0
 	for i := range n.children {
 		n.children[i] = nil
 	}
@@ -124,16 +133,16 @@ func (self *quadtreeNode) insert(e teishoku.Entity) {
 	if !self.bounds.Contains(pos) {
 		return
 	}
-	// If the node has children, pass the entity down to the correct child.
+	// If the node has children, pass the entity down to the correct child using computed index.
 	if self.children[0] != nil {
-		for _, child := range self.children {
-			if child.bounds.Contains(pos) {
-				child.insert(e)
-				return
-			}
+		childIdx := 0
+		if pos.X >= self.midX {
+			childIdx |= 1
 		}
-		// If the entity is within the parent's bounds but not any of the children's,
-		// it must be a boundary case. For this simple implementation, we just return.
+		if pos.Y >= self.midY {
+			childIdx |= 2
+		}
+		self.children[childIdx].insert(e)
 		return
 	}
 	// Add the entity to the current node's object list.
@@ -142,18 +151,21 @@ func (self *quadtreeNode) insert(e teishoku.Entity) {
 	if len(self.objects) > MaxObjectsPerNode && self.depth < MaxDepth {
 		// Subdivide the current node into four children.
 		self.subdivide()
-		// Move existing entities from the current node to the new children.
+		// Move existing entities from the current node to the new children using computed index.
 		for _, existingEntity := range self.objects {
 			existingT := self.builder.Get(existingEntity)
 			if existingT == nil {
 				panic("Entity doesn't have TransformComponent")
 			}
-			for _, child := range self.children {
-				if child.bounds.Contains(Vector(t.Position)) {
-					child.insert(existingEntity)
-					break
-				}
+			existingPos := existingT.Position
+			childIdx := 0
+			if existingPos.X >= self.midX {
+				childIdx |= 1
 			}
+			if existingPos.Y >= self.midY {
+				childIdx |= 2
+			}
+			self.children[childIdx].insert(existingEntity)
 		}
 		// Clear the objects slice of the current node, as they have been moved to children.
 		self.objects = self.objects[:0]
@@ -163,30 +175,31 @@ func (self *quadtreeNode) insert(e teishoku.Entity) {
 // subdivide splits the current node into four smaller child nodes.
 func (self *quadtreeNode) subdivide() {
 	// Calculate the midpoint of the current node's bounds.
-	midX := (self.bounds.Min.X + self.bounds.Max.X) / 2
-	midY := (self.bounds.Min.Y + self.bounds.Max.Y) / 2
+	self.midX = (self.bounds.Min.X + self.bounds.Max.X) / 2
+	self.midY = (self.bounds.Min.Y + self.bounds.Max.Y) / 2
+	halfW := (self.bounds.Max.X - self.bounds.Min.X) / 2
+	halfH := (self.bounds.Max.Y - self.bounds.Min.Y) / 2
 	// Create the four children nodes with their respective bounds.
-	// Top-left child
-	self.children[0] = newQuadtreeNode(self.world, Rectangle{Min: self.bounds.Min, Max: Vector{X: midX, Y: midY}}, self.depth+1)
+	// Top-left child (index 0: X < midX, Y < midY)
+	self.children[0] = newQuadtreeNode(Rectangle{Min: self.bounds.Min, Max: Vector{X: self.midX, Y: self.midY}}, self.depth+1)
 	self.children[0].builder = self.builder
-	// Top-right child
-	self.children[1] = newQuadtreeNode(self.world, Rectangle{Min: Vector{X: midX, Y: self.bounds.Min.Y}, Max: Vector{X: self.bounds.Max.X, Y: midY}}, self.depth+1)
+	// Top-right child (index 1: X >= midX, Y < midY)
+	self.children[1] = newQuadtreeNode(Rectangle{Min: Vector{X: self.midX, Y: self.bounds.Min.Y}, Max: Vector{X: self.midX + halfW, Y: self.midY}}, self.depth+1)
 	self.children[1].builder = self.builder
-	// Bottom-left child
-	self.children[2] = newQuadtreeNode(self.world, Rectangle{Min: Vector{X: self.bounds.Min.X, Y: midY}, Max: Vector{X: midX, Y: self.bounds.Max.Y}}, self.depth+1)
+	// Bottom-left child (index 2: X < midX, Y >= midY)
+	self.children[2] = newQuadtreeNode(Rectangle{Min: Vector{X: self.bounds.Min.X, Y: self.midY}, Max: Vector{X: self.midX, Y: self.midY + halfH}}, self.depth+1)
 	self.children[2].builder = self.builder
-	// Bottom-right child
-	self.children[3] = newQuadtreeNode(self.world, Rectangle{Min: Vector{X: midX, Y: midY}, Max: self.bounds.Max}, self.depth+1)
+	// Bottom-right child (index 3: X >= midX, Y >= midY)
+	self.children[3] = newQuadtreeNode(Rectangle{Min: Vector{X: self.midX, Y: self.midY}, Max: self.bounds.Max}, self.depth+1)
 	self.children[3].builder = self.builder
 }
 
-// query recursively finds and returns entities within a given rectangular query area.
-func (self *quadtreeNode) query(bounds Rectangle) []teishoku.Entity {
-	var result []teishoku.Entity
+// query recursively finds and appends entities within a given rectangular query area to the result slice.
+func (self *quadtreeNode) query(bounds Rectangle, result *[]teishoku.Entity) {
 	// If the query rectangle does not intersect the current node's bounds,
 	// no entities within this node or its children can be in the query area.
 	if !self.bounds.Intersects(bounds) {
-		return result
+		return
 	}
 	// If the node has no children, it's a leaf node. Check its objects.
 	if self.children[0] == nil {
@@ -194,24 +207,22 @@ func (self *quadtreeNode) query(bounds Rectangle) []teishoku.Entity {
 			t := self.builder.Get(e)
 			// Check if the entity's position is within the query bounds.
 			if bounds.Contains(Vector(t.Position)) {
-				result = append(result, e)
+				*result = append(*result, e)
 			}
 		}
 	} else {
-		// If the node has children, recursively query each child that intersects the bounds.
+		// If the node has children, recursively query each child (no pruning for uniform data benchmarks).
 		for _, child := range self.children {
-			result = append(result, child.query(bounds)...)
+			child.query(bounds, result)
 		}
 	}
-	return result
 }
 
-// queryCircle recursively finds and returns entities within a given circular query area.
-func (self *quadtreeNode) queryCircle(center Vector, radius float64) []teishoku.Entity {
-	var result []teishoku.Entity
-	// If the query circle does not intersect the current node's bounds, return an empty slice.
+// queryCircle recursively finds and appends entities within a given circular query area to the result slice.
+func (self *quadtreeNode) queryCircle(center Vector, radius float64, result *[]teishoku.Entity) {
+	// If the query circle does not intersect the current node's bounds, return.
 	if !intersectsCircle(self.bounds, center, radius) {
-		return result
+		return
 	}
 	// If the node has no children, it's a leaf node. Check its objects.
 	if self.children[0] == nil {
@@ -219,16 +230,15 @@ func (self *quadtreeNode) queryCircle(center Vector, radius float64) []teishoku.
 			t := self.builder.Get(e)
 			// Check if the entity's position is within the query circle.
 			if center.DistanceTo(Vector(t.Position)) <= radius {
-				result = append(result, e)
+				*result = append(*result, e)
 			}
 		}
 	} else {
-		// If the node has children, recursively query each child.
+		// If the node has children, recursively query each child (no pruning for uniform data benchmarks).
 		for _, child := range self.children {
-			result = append(result, child.queryCircle(center, radius)...)
+			child.queryCircle(center, radius, result)
 		}
 	}
-	return result
 }
 
 // intersectsCircle checks if a rectangle and a circle overlap.
