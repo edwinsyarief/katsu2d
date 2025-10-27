@@ -1,10 +1,10 @@
 package katsu2d
 
-import "github.com/edwinsyarief/teishoku"
+import "github.com/mlange-42/ark/ecs"
 
 // AnimationSystem updates animations.
 type AnimationSystem struct {
-	filter *teishoku.Filter2[AnimationComponent, SpriteComponent]
+	filter *ecs.Filter2[AnimationComponent, SpriteComponent]
 }
 
 // NewAnimationSystem creates a new AnimationSystem.
@@ -12,14 +12,15 @@ func NewAnimationSystem() *AnimationSystem {
 	return &AnimationSystem{}
 }
 
-func (self *AnimationSystem) Initialize(w *teishoku.World) {
+func (self *AnimationSystem) Initialize(w *ecs.World) {
 	self.filter = self.filter.New(w)
 }
 
 // Update advances all active animations in the world by the given delta time.
-func (self *AnimationSystem) Update(w *teishoku.World, dt float64) {
-	for self.filter.Next() {
-		anim, spr := self.filter.Get()
+func (self *AnimationSystem) Update(w *ecs.World, dt float64) {
+	query := self.filter.Query()
+	for query.Next() {
+		anim, spr := query.Get()
 		if !anim.Active || len(anim.Frames) == 0 {
 			continue
 		}
@@ -62,6 +63,4 @@ func (self *AnimationSystem) Update(w *teishoku.World, dt float64) {
 			spr.Bound = frame
 		}
 	}
-
-	self.filter.Reset()
 }

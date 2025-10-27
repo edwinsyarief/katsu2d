@@ -1,29 +1,29 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/mlange-42/ark/ecs"
 )
 
 type InputSystem struct {
-	filter *teishoku.Filter[InputComponent]
+	filter *ecs.Filter1[InputComponent]
 }
 
 func NewInputSystem() *InputSystem {
 	return &InputSystem{}
 }
 
-func (self *InputSystem) Initialize(w *teishoku.World) {
+func (self *InputSystem) Initialize(w *ecs.World) {
 	self.filter = self.filter.New(w)
 }
 
-func (self *InputSystem) Update(w *teishoku.World, dt float64) {
+func (self *InputSystem) Update(w *ecs.World, dt float64) {
 	// Get mouse wheel deltas once per frame
 	wx, wy := ebiten.Wheel()
 
-	self.filter.Reset()
-	for self.filter.Next() {
-		inp := self.filter.Get()
+	query := self.filter.Query()
+	for query.Next() {
+		inp := query.Get()
 
 		// Reset states for the current frame
 		for action := range inp.Bindings {

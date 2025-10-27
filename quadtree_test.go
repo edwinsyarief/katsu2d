@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/edwinsyarief/teishoku"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // Test constants
@@ -16,8 +16,8 @@ const (
 )
 
 // Helper function to create a test world and quadtree.
-func setupTestQuadtree() (*teishoku.World, *Quadtree, Rectangle) {
-	world := teishoku.NewWorld(testInitialCap)
+func setupTestQuadtree() (*ecs.World, *Quadtree, Rectangle) {
+	world := ecs.NewWorld(testInitialCap)
 	bounds := Rectangle{
 		Min: Vector{X: 0, Y: 0},
 		Max: Vector{X: testWorldSize, Y: testWorldSize},
@@ -53,15 +53,13 @@ func TestNewQuadtree(t *testing.T) {
 // TestInsertBasic tests inserting entities within bounds.
 func TestInsertBasic(t *testing.T) {
 	world, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](world)
+	builder := ecs.NewMap1[TransformComponent](world)
 
 	// Create and insert entities
 	numEntities := MaxObjectsPerNode - 1 // Less than max to avoid subdivision
-	entities := make([]teishoku.Entity, numEntities)
+	entities := make([]ecs.Entity, numEntities)
 	for i := 0; i < numEntities; i++ {
-		ent := builder.NewEntity()
-		pos := &TransformComponent{Position: Point{X: 100 + float64(i), Y: 100 + float64(i)}}
-		teishoku.SetComponent(world, ent, *pos)
+		ent := builder.NewEntity(&TransformComponent{Position: Point{X: 100 + float64(i), Y: 100 + float64(i)}})
 		qt.Insert(ent)
 		entities[i] = ent
 	}
@@ -90,11 +88,9 @@ func TestInsertBasic(t *testing.T) {
 // TestInsertOutsideBounds tests inserting an entity outside the quadtree bounds.
 func TestInsertOutsideBounds(t *testing.T) {
 	_, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](qt.world)
+	builder := ecs.NewMap1[TransformComponent](qt.world)
 
-	ent := builder.NewEntity()
-	pos := &TransformComponent{Position: Point{X: -100, Y: -100}} // Outside
-	teishoku.SetComponent(qt.world, ent, *pos)
+	ent := builder.NewEntity(&TransformComponent{Position: Point{X: -100, Y: -100}})
 	qt.Insert(ent)
 
 	if len(qt.root.objects) != 0 {
@@ -105,15 +101,13 @@ func TestInsertOutsideBounds(t *testing.T) {
 // TestSubdivision tests that the quadtree subdivides when exceeding max objects.
 func TestSubdivision(t *testing.T) {
 	world, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](world)
+	builder := ecs.NewMap1[TransformComponent](world)
 
 	// Insert MaxObjectsPerNode + 1 entities in the same quadrant (top-left)
 	numEntities := MaxObjectsPerNode + 1
-	entities := make([]teishoku.Entity, numEntities)
+	entities := make([]ecs.Entity, numEntities)
 	for i := 0; i < numEntities; i++ {
-		ent := builder.NewEntity()
-		pos := &TransformComponent{Position: Point{X: 100 + float64(i), Y: 100 + float64(i)}}
-		teishoku.SetComponent(world, ent, *pos)
+		ent := builder.NewEntity(&TransformComponent{Position: Point{X: 100 + float64(i), Y: 100 + float64(i)}})
 		qt.Insert(ent)
 		entities[i] = ent
 	}
@@ -136,17 +130,15 @@ func TestSubdivision(t *testing.T) {
 // TestQueryRectangle tests querying entities within a rectangle.
 func TestQueryRectangle(t *testing.T) {
 	world, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](world)
+	builder := ecs.NewMap1[TransformComponent](world)
 
 	// Insert entities
-	entities := make([]teishoku.Entity, 5)
+	entities := make([]ecs.Entity, 5)
 	positions := []Point{
 		{100, 100}, {200, 200}, {300, 300}, {900, 900}, {950, 950},
 	}
 	for i := range entities {
-		ent := builder.NewEntity()
-		pos := &TransformComponent{Position: positions[i]}
-		teishoku.SetComponent(world, ent, *pos)
+		ent := builder.NewEntity(&TransformComponent{Position: positions[i]})
 		qt.Insert(ent)
 		entities[i] = ent
 	}
@@ -163,17 +155,15 @@ func TestQueryRectangle(t *testing.T) {
 // TestQueryCircle tests querying entities within a circle.
 func TestQueryCircle(t *testing.T) {
 	world, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](world)
+	builder := ecs.NewMap1[TransformComponent](world)
 
 	// Insert entities
-	entities := make([]teishoku.Entity, 5)
+	entities := make([]ecs.Entity, 5)
 	positions := []Point{
 		{100, 100}, {150, 150}, {200, 200}, {500, 500}, {550, 550},
 	}
 	for i := range entities {
-		ent := builder.NewEntity()
-		pos := &TransformComponent{Position: positions[i]}
-		teishoku.SetComponent(world, ent, *pos)
+		ent := builder.NewEntity(&TransformComponent{Position: positions[i]})
 		qt.Insert(ent)
 		entities[i] = ent
 	}
@@ -191,13 +181,11 @@ func TestQueryCircle(t *testing.T) {
 // TestClear tests clearing the quadtree.
 func TestClear(t *testing.T) {
 	_, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](qt.world)
+	builder := ecs.NewMap1[TransformComponent](qt.world)
 
 	// Insert some entities
 	for i := 0; i < 5; i++ {
-		ent := builder.NewEntity()
-		pos := &TransformComponent{Position: Point{X: 100 + float64(i), Y: 100 + float64(i)}}
-		teishoku.SetComponent(qt.world, ent, *pos)
+		ent := builder.NewEntity(&TransformComponent{Position: Point{X: 100 + float64(i), Y: 100 + float64(i)}})
 		qt.Insert(ent)
 	}
 
@@ -220,14 +208,12 @@ func TestClear(t *testing.T) {
 // TestMaxDepth prevents infinite subdivision.
 func TestMaxDepth(t *testing.T) {
 	world, qt, _ := setupTestQuadtree()
-	builder := teishoku.NewBuilder[TransformComponent](world)
+	builder := ecs.NewMap1[TransformComponent](world)
 
 	// Insert many entities in a small area to force deep subdivision
 	numEntities := MaxObjectsPerNode * (MaxDepth + 1)
 	for i := 0; i < numEntities; i++ {
-		ent := builder.NewEntity()
-		pos := &TransformComponent{Position: Point{X: 1, Y: 1}}
-		teishoku.SetComponent(world, ent, *pos)
+		ent := builder.NewEntity(&TransformComponent{Position: Point{X: 1, Y: 1}})
 		qt.Insert(ent)
 	}
 
@@ -254,20 +240,19 @@ var benchSizes = []int{1000, 10000, 100000}
 func BenchmarkInsert(b *testing.B) {
 	for _, size := range benchSizes {
 		b.Run(formatSize(size), func(b *testing.B) {
-			world := teishoku.NewWorld(size)
+			world := ecs.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
 			qt := NewQuadtree(&world, bounds)
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			builder := ecs.NewMap1[TransformComponent](&world)
 
 			// Pre-create entities with random positions
-			entities := make([]teishoku.Entity, size)
+			entities := make([]ecs.Entity, size)
 			for i := 0; i < size; i++ {
-				ent := builder.NewEntity()
-				pos := &TransformComponent{Position: Point{
+				ent := builder.NewEntity(&TransformComponent{Position: Point{
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
-				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				}})
+
 				entities[i] = ent
 			}
 
@@ -289,19 +274,17 @@ func BenchmarkInsert(b *testing.B) {
 func BenchmarkQueryRectangle(b *testing.B) {
 	for _, size := range benchSizes {
 		b.Run(formatSize(size), func(b *testing.B) {
-			world := teishoku.NewWorld(size)
+			world := ecs.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
 			qt := NewQuadtree(&world, bounds)
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			builder := ecs.NewMap1[TransformComponent](&world)
 
 			// Insert entities with random positions
 			for i := 0; i < size; i++ {
-				ent := builder.NewEntity()
-				pos := &TransformComponent{Position: Point{
+				ent := builder.NewEntity(&TransformComponent{Position: Point{
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
-				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				}})
 				qt.Insert(ent)
 			}
 
@@ -324,19 +307,17 @@ func BenchmarkQueryRectangle(b *testing.B) {
 func BenchmarkQueryCircle(b *testing.B) {
 	for _, size := range benchSizes {
 		b.Run(formatSize(size), func(b *testing.B) {
-			world := teishoku.NewWorld(size)
+			world := ecs.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
 			qt := NewQuadtree(&world, bounds)
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			builder := ecs.NewMap1[TransformComponent](&world)
 
 			// Insert entities with random positions
 			for i := 0; i < size; i++ {
-				ent := builder.NewEntity()
-				pos := &TransformComponent{Position: Point{
+				ent := builder.NewEntity(&TransformComponent{Position: Point{
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
-				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				}})
 				qt.Insert(ent)
 			}
 
@@ -357,19 +338,15 @@ func BenchmarkQueryCircle(b *testing.B) {
 func BenchmarkClear(b *testing.B) {
 	for _, size := range benchSizes {
 		b.Run(formatSize(size), func(b *testing.B) {
-			world := teishoku.NewWorld(size)
+			world := ecs.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			builder := ecs.NewMap1[TransformComponent](&world)
 
 			// Pre-insert entities
-			for i := 0; i < size; i++ {
-				ent := builder.NewEntity()
-				pos := &TransformComponent{Position: Point{
-					X: rand.Float64() * testWorldSize,
-					Y: rand.Float64() * testWorldSize,
-				}}
-				teishoku.SetComponent(&world, ent, *pos)
-			}
+			builder.NewBatch(size, &TransformComponent{Position: Point{
+				X: rand.Float64() * testWorldSize,
+				Y: rand.Float64() * testWorldSize,
+			}})
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -377,9 +354,10 @@ func BenchmarkClear(b *testing.B) {
 				b.StopTimer()
 				qt := NewQuadtree(&world, bounds)
 				// Insert all for each clear
-				filter := teishoku.NewFilter[TransformComponent](&world)
-				for filter.Next() {
-					qt.Insert(filter.Entity())
+				filter := ecs.NewFilter1[TransformComponent](&world)
+				query := filter.Query()
+				for query.Next() {
+					qt.Insert(query.Entity())
 				}
 				b.StartTimer()
 				qt.Clear()

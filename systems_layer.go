@@ -3,8 +3,8 @@ package katsu2d
 import (
 	"image/color"
 
-	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // LayerOption is a function type for configuring LayerRendererSystem
@@ -67,7 +67,7 @@ func NewLayerSystem(width, height int, opts ...LayerOption) *LayerSytem {
 	return ls
 }
 
-func (self *LayerSytem) Initialize(w *teishoku.World) {
+func (self *LayerSytem) Initialize(w *ecs.World) {
 	if self.initialized {
 		return
 	}
@@ -88,7 +88,7 @@ func (self *LayerSytem) onEngineLayoutChanged(data EngineLayoutChangedEvent) {
 	self.canvas.Resize(data.Width, data.Height)
 }
 
-func (self *LayerSytem) Update(w *teishoku.World, dt float64) {
+func (self *LayerSytem) Update(w *ecs.World, dt float64) {
 	for _, us := range self.updateSystems {
 		us.Update(w, dt)
 	}
@@ -96,7 +96,7 @@ func (self *LayerSytem) Update(w *teishoku.World, dt float64) {
 
 // Draw executes all registered render systems and handles scaling of the final output.
 // It maintains aspect ratio while scaling and centers the result on the screen.
-func (self *LayerSytem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+func (self *LayerSytem) Draw(w *ecs.World, rdr *BatchRenderer) {
 	// Clear the buffer with transparency
 	self.buffer.Fill(color.Transparent)
 

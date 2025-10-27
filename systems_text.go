@@ -1,8 +1,8 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/mlange-42/ark/ecs"
 	"golang.org/x/text/language"
 )
 
@@ -20,11 +20,10 @@ var AlignmentOffsets = map[TextAlignment]func(w, h float64) (float64, float64){
 
 type TextSystem struct {
 	fm          *FontManager
-	filter      *teishoku.Filter2[TransformComponent, TextComponent]
+	filter      *ecs.Filter2[TransformComponent, TextComponent]
 	drawOpts    *text.DrawOptions
 	transform   *Transform
-	fontFaceMap map[teishoku.Entity]*text.GoTextFace
-	entities    []teishoku.Entity
+	fontFaceMap map[ecs.Entity]*text.GoTextFace
 	initialized bool
 }
 
@@ -34,7 +33,7 @@ func NewTextSystem() *TextSystem {
 		transform: T(),
 	}
 }
-func (self *TextSystem) Initialize(w *teishoku.World) {
+func (self *TextSystem) Initialize(w *ecs.World) {
 	if self.initialized {
 		return
 	}
@@ -43,21 +42,20 @@ func (self *TextSystem) Initialize(w *teishoku.World) {
 	self.fm = GetFontManager(w)
 	self.initialized = true
 }
-func (self *TextSystem) Update(w *teishoku.World, dt float64) {
-	self.entities = make([]teishoku.Entity, 0)
-	self.fontFaceMap = make(map[teishoku.Entity]*text.GoTextFace)
-	self.filter.Reset()
-	for self.filter.Next() {
-		self.entities = append(self.entities, self.filter.Entity())
-		_, txt := self.filter.Get()
-		f := self.getFontFace(txt.FontID, txt.Size)
+func (self *TextSystem) Update(w *ecs.World, dt float64) {
+	self.fontFaceMap = make(map[ecs.Entity]*text.GoTextFace)
+	query := self.filter.Query()
+	for query.Next() {
+		_, txt := query.Get()
+		f := self.getFontFace(query, txt.FontID, txt.Size)
 		self.updateCache(txt, f)
 	}
 }
-func (self *TextSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+func (self *TextSystem) Draw(w *ecs.World, rdr *BatchRenderer) {
 	rdr.Flush()
-	for _, e := range self.entities {
-		t, txt := teishoku.GetComponent2[TransformComponent, TextComponent](w, e)
+	query := self.filter.Query()
+	for query.Next() {
+		t, txt := query.Get()
 		self.drawOpts.LineSpacing = txt.LineSpacing
 		switch txt.Alignment {
 		case TextAlignmentTopRight, TextAlignmentMiddleRight, TextAlignmentBottomRight:
@@ -72,7 +70,7 @@ func (self *TextSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 		self.transform.SetFromComponent(t)
 		self.drawOpts.GeoM = self.transform.Matrix()
 		self.drawOpts.ColorScale = RGBAToColorScale(txt.Color)
-		text.Draw(rdr.screen, txt.Caption, self.fontFaceMap[e], self.drawOpts)
+		text.Draw(rdr.screen, txt.Caption, self.fontFaceMap[query.Entity()], self.drawOpts)
 	}
 }
 func (self *TextSystem) updateCache(txt *TextComponent, fontFace *text.GoTextFace) {
@@ -81,8 +79,8 @@ func (self *TextSystem) updateCache(txt *TextComponent, fontFace *text.GoTextFac
 		txt.CachedText = txt.Caption
 	}
 }
-func (self *TextSystem) getFontFace(fontID int, size float64) *text.GoTextFace {
-	fontFace, ok := self.fontFaceMap[self.filter.Entity()]
+func (self *TextSystem) getFontFace(query ecs.Query2[TransformComponent, TextComponent], fontID int, size float64) *text.GoTextFace {
+	fontFace, ok := self.fontFaceMap[query.Entity()]
 	if !ok {
 		source := self.fm.Get(fontID)
 		fontFace = &text.GoTextFace{
@@ -91,7 +89,7 @@ func (self *TextSystem) getFontFace(fontID int, size float64) *text.GoTextFace {
 			Size:      size,
 			Language:  language.English,
 		}
-		self.fontFaceMap[self.filter.Entity()] = fontFace
+		self.fontFaceMap[query.Entity()] = fontFace
 	}
 	return fontFace
 }

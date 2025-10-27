@@ -3,38 +3,44 @@ package katsu2d
 import (
 	"sort"
 
-	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/mlange-42/ark/ecs"
 )
 
 type OrderedSpriteSystem struct {
 	transform                *Transform
-	filter                   *teishoku.Filter3[TransformComponent, SpriteComponent, OrderableComponent]
-	lastFrameEntities        map[teishoku.Entity]struct{}
-	entities                 []teishoku.Entity
+	filter                   *ecs.Filter3[TransformComponent, SpriteComponent, OrderableComponent]
+	mapTransformOrderable    *ecs.Map2[TransformComponent, OrderableComponent]
+	mapTransformSprite       *ecs.Map2[TransformComponent, SpriteComponent]
+	mapMesh                  *ecs.Map1[MeshComponent]
+	lastFrameEntities        map[ecs.Entity]struct{}
+	entities                 []ecs.Entity
 	zSortNeeded, initialized bool
 }
 
 func NewOrderedSpriteSystem() *OrderedSpriteSystem {
 	return &OrderedSpriteSystem{
 		transform:         T(),
-		lastFrameEntities: make(map[teishoku.Entity]struct{}),
-		entities:          make([]teishoku.Entity, 0),
+		lastFrameEntities: make(map[ecs.Entity]struct{}),
+		entities:          make([]ecs.Entity, 0),
 	}
 }
-func (self *OrderedSpriteSystem) Initialize(w *teishoku.World) {
+func (self *OrderedSpriteSystem) Initialize(w *ecs.World) {
 	if self.initialized {
 		return
 	}
 
 	self.filter = self.filter.New(w)
+	self.mapTransformOrderable = self.mapTransformOrderable.New(w)
+	self.mapTransformSprite = self.mapTransformSprite.New(w)
+	self.mapMesh = self.mapMesh.New(w)
 	self.initialized = true
 }
-func (self *OrderedSpriteSystem) Update(w *teishoku.World, dt float64) {
-	currentEntities := make([]teishoku.Entity, 0)
-	self.filter.Reset()
-	for self.filter.Next() {
-		currentEntities = append(currentEntities, self.filter.Entity())
+func (self *OrderedSpriteSystem) Update(w *ecs.World, dt float64) {
+	currentEntities := make([]ecs.Entity, 0)
+	query := self.filter.Query()
+	for query.Next() {
+		currentEntities = append(currentEntities, query.Entity())
 	}
 
 	zSortNeeded := self.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
@@ -50,34 +56,32 @@ func (self *OrderedSpriteSystem) Update(w *teishoku.World, dt float64) {
 	if zSortNeeded {
 		self.entities = currentEntities
 		sort.SliceStable(self.entities, func(i, j int) bool {
-			t1 := teishoku.GetComponent[TransformComponent](w, self.entities[i])
-			t2 := teishoku.GetComponent[TransformComponent](w, self.entities[j])
+			t1, o1 := self.mapTransformOrderable.Get(self.entities[i])
+			t2, o2 := self.mapTransformOrderable.Get(self.entities[j])
 			if t1.Z != t2.Z {
 				return t1.Z < t2.Z
 			}
 
-			o1 := teishoku.GetComponent[OrderableComponent](w, self.entities[i])
-			o2 := teishoku.GetComponent[OrderableComponent](w, self.entities[j])
 			index1 := o1.Index
 			index2 := o2.Index
 			if index1 != index2 {
 				return index1 < index2
 			}
 
-			return self.entities[i].ID < self.entities[j].ID
+			return self.entities[i].ID() < self.entities[j].ID()
 		})
 		self.zSortNeeded = false
 	}
 
-	self.lastFrameEntities = make(map[teishoku.Entity]struct{}, len(currentEntities))
+	self.lastFrameEntities = make(map[ecs.Entity]struct{}, len(currentEntities))
 	for _, entity := range currentEntities {
 		self.lastFrameEntities[entity] = struct{}{}
 	}
 }
-func (self *OrderedSpriteSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+func (self *OrderedSpriteSystem) Draw(w *ecs.World, rdr *BatchRenderer) {
 	tm := GetTextureManager(w)
 	for _, e := range self.entities {
-		t, s := teishoku.GetComponent2[TransformComponent, SpriteComponent](w, e)
+		t, s := self.mapTransformSprite.Get(e)
 		self.transform.SetFromComponent(t)
 		img := tm.Get(s.TextureID)
 		if img == nil {
@@ -91,7 +95,7 @@ func (self *OrderedSpriteSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 			}
 		}
 
-		if m := teishoku.GetComponent[MeshComponent](w, e); m != nil {
+		if m := self.mapMesh.Get(e); m != nil {
 			GenerateMesh(m, s)
 
 			worldVertices := make([]ebiten.Vertex, len(m.Vertices))

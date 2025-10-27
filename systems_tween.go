@@ -1,25 +1,23 @@
 package katsu2d
 
-import (
-	"github.com/edwinsyarief/teishoku"
-)
+import "github.com/mlange-42/ark/ecs"
 
 type TweenSystem struct {
-	filter *teishoku.Filter[TweenComponent]
+	filter *ecs.Filter1[TweenComponent]
 }
 
 func NewTweenSystem() *TweenSystem {
 	return &TweenSystem{}
 }
 
-func (self *TweenSystem) Initialize(w *teishoku.World) {
+func (self *TweenSystem) Initialize(w *ecs.World) {
 	self.filter = self.filter.New(w)
 }
 
-func (self *TweenSystem) Update(w *teishoku.World, dt float64) {
-	self.filter.Reset()
-	for self.filter.Next() {
-		tw := self.filter.Get()
+func (self *TweenSystem) Update(w *ecs.World, dt float64) {
+	query := self.filter.Query()
+	for query.Next() {
+		tw := query.Get()
 		if tw.Finished {
 			continue
 		}
@@ -36,7 +34,7 @@ func (self *TweenSystem) Update(w *teishoku.World, dt float64) {
 			tw.Finished = true
 
 			Publish(w, TweenFinishedEvent{
-				Entity: self.filter.Entity(),
+				Entity: query.Entity(),
 				ID:     tw.ID,
 			})
 

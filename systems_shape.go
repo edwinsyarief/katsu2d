@@ -1,14 +1,14 @@
 package katsu2d
 
 import (
-	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // ShapeRenderSystem renders shape components.
 type ShapeRenderSystem struct {
 	transform   *Transform
-	filter      *teishoku.Filter2[TransformComponent, ShapeComponent]
+	filter      *ecs.Filter2[TransformComponent, ShapeComponent]
 	initialized bool
 }
 
@@ -19,7 +19,7 @@ func NewShapeRenderSystem() *ShapeRenderSystem {
 	}
 }
 
-func (self *ShapeRenderSystem) Initialize(w *teishoku.World) {
+func (self *ShapeRenderSystem) Initialize(w *ecs.World) {
 	if self.initialized {
 		return
 	}
@@ -29,10 +29,11 @@ func (self *ShapeRenderSystem) Initialize(w *teishoku.World) {
 }
 
 // Draw renders all shape components in the world.
-func (self *ShapeRenderSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+func (self *ShapeRenderSystem) Draw(w *ecs.World, rdr *BatchRenderer) {
 	tm := GetTextureManager(w)
-	for self.filter.Next() {
-		transform, shape := self.filter.Get()
+	query := self.filter.Query()
+	for query.Next() {
+		transform, shape := query.Get()
 		shape.Shape.Rebuild()
 		vertices := shape.Shape.GetVertices()
 		indices := shape.Shape.GetIndices()
@@ -56,5 +57,4 @@ func (self *ShapeRenderSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 		img := tm.Get(0)
 		rdr.AddCustomMeshes(worldVertices, indices, img)
 	}
-	self.filter.Reset()
 }

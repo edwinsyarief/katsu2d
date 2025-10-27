@@ -3,15 +3,15 @@ package katsu2d
 import (
 	"image/color"
 
-	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/mlange-42/ark/ecs"
 )
 
 type FadeOverlaySystem struct {
-	filter      *teishoku.Filter2[FadeOverlayComponent, TweenComponent]
+	filter      *ecs.Filter2[FadeOverlayComponent, TweenComponent]
 	indices     Indices
 	vertices    Vertices
-	toRemove    []teishoku.Entity
+	toRemove    []ecs.Entity
 	initialized bool
 }
 
@@ -19,11 +19,11 @@ func NewFadeOverlaySystem() *FadeOverlaySystem {
 	return &FadeOverlaySystem{
 		indices:  Indices{0, 1, 2, 0, 2, 3},
 		vertices: make(Vertices, 4),
-		toRemove: make([]teishoku.Entity, 0),
+		toRemove: make([]ecs.Entity, 0),
 	}
 }
 
-func (self *FadeOverlaySystem) Initialize(w *teishoku.World) {
+func (self *FadeOverlaySystem) Initialize(w *ecs.World) {
 	if self.initialized {
 		return
 	}
@@ -32,15 +32,15 @@ func (self *FadeOverlaySystem) Initialize(w *teishoku.World) {
 	self.initialized = true
 }
 
-func (self *FadeOverlaySystem) Update(w *teishoku.World, dt float64) {
+func (self *FadeOverlaySystem) Update(w *ecs.World, dt float64) {
 	self.toRemove = self.toRemove[:0]
-	self.filter.Reset()
-	for self.filter.Next() {
-		fade, tween := self.filter.Get()
+	query := self.filter.Query()
+	for query.Next() {
+		fade, tween := query.Get()
 		fade.CurrentFade = tween.Start
 
 		if fade.FadeType == FadeTypeIn && fade.Finished {
-			self.toRemove = append(self.toRemove, self.filter.Entity())
+			self.toRemove = append(self.toRemove, query.Entity())
 			continue
 		}
 
@@ -51,13 +51,13 @@ func (self *FadeOverlaySystem) Update(w *teishoku.World, dt float64) {
 	}
 }
 
-func (self *FadeOverlaySystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+func (self *FadeOverlaySystem) Draw(w *ecs.World, rdr *BatchRenderer) {
 	rdr.Flush()
 	tm := GetTextureManager(w)
 	width, height := rdr.screen.Bounds().Dx(), rdr.screen.Bounds().Dy()
-	self.filter.Reset()
-	for self.filter.Next() {
-		fade, _ := self.filter.Get()
+	query := self.filter.Query()
+	for query.Next() {
+		fade, _ := query.Get()
 
 		if fade.FadeType == FadeTypeIn && fade.Finished {
 			continue
@@ -84,7 +84,7 @@ func updateOverlayVertices(vertices Vertices, width, height int, col color.RGBA)
 }
 
 type CinematicOverlaySystem struct {
-	filter *teishoku.Filter3[CinematicOverlayComponent, TweenComponent, TimerComponent]
+	filter *ecs.Filter3[CinematicOverlayComponent, TweenComponent, TimerComponent]
 	// Pre-allocated buffers for performance
 	indices      []uint16
 	vertices     []ebiten.Vertex
@@ -110,7 +110,7 @@ func NewCinematicOverlaySystem() *CinematicOverlaySystem {
 	return res
 }
 
-func (self *CinematicOverlaySystem) Initialize(w *teishoku.World) {
+func (self *CinematicOverlaySystem) Initialize(w *ecs.World) {
 	self.filter = self.filter.New(w)
 
 	Subscribe(w, self.onEngineLayoutChanged)
@@ -130,10 +130,10 @@ func (self *CinematicOverlaySystem) onTweenFinished(obj TweenFinishedEvent) {
 
 }
 
-func (self *CinematicOverlaySystem) Update(w *teishoku.World, dt float64) {
+func (self *CinematicOverlaySystem) Update(w *ecs.World, dt float64) {
 
 }
 
-func (self *CinematicOverlaySystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+func (self *CinematicOverlaySystem) Draw(w *ecs.World, rdr *BatchRenderer) {
 
 }

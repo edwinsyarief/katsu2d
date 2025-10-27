@@ -1,17 +1,19 @@
 package katsu2d
 
-import "github.com/edwinsyarief/teishoku"
+import (
+	"github.com/mlange-42/ark/ecs"
+)
 
 type EngineLayoutChangedEvent struct {
 	Width, Height int
 }
 
 type TweenFinishedEvent struct {
-	Entity teishoku.Entity
+	Entity ecs.Entity
 	ID     string
 }
 
 type TimerFinishedEvent struct {
-	Entity teishoku.Entity
+	Entity ecs.Entity
 	ID     string
 }

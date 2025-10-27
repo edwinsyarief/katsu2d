@@ -3,7 +3,7 @@ package katsu2d
 import (
 	"sync"
 
-	"github.com/edwinsyarief/teishoku"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // MaxObjectsPerNode defines the maximum number of entities a node can hold before it subdivides.
@@ -15,7 +15,7 @@ const MaxDepth = 10 // Increased from 8 for slightly deeper trees if needed.
 var nodePool = sync.Pool{
 	New: func() interface{} {
 		return &quadtreeNode{
-			objects: make([]teishoku.Entity, 0, MaxObjectsPerNode+1),
+			objects: make([]ecs.Entity, 0, MaxObjectsPerNode+1),
 		}
 	},
 }
@@ -26,18 +26,18 @@ type Quadtree struct {
 	// root is the top-level node of the quadtree.
 	root *quadtreeNode
 	// world is a reference to the main game world, used to access entity components.
-	world *teishoku.World
+	world *ecs.World
 	// builder is shared among all nodes to access TransformComponent.
-	builder *teishoku.Builder[TransformComponent]
+	builder *ecs.Map1[TransformComponent]
 }
 
 // NewQuadtree creates a new Quadtree instance, initializing it with a root node
 // that covers the specified world bounds.
-func NewQuadtree(world *teishoku.World, bounds Rectangle) *Quadtree {
+func NewQuadtree(world *ecs.World, bounds Rectangle) *Quadtree {
 	res := &Quadtree{
 		world:   world,
 		root:    newQuadtreeNode(bounds, 0),
-		builder: teishoku.NewBuilder[TransformComponent](world),
+		builder: ecs.NewMap1[TransformComponent](world),
 	}
 	res.root.builder = res.builder
 	return res
@@ -45,22 +45,22 @@ func NewQuadtree(world *teishoku.World, bounds Rectangle) *Quadtree {
 
 // Insert adds an entity to the quadtree. The entity is placed in the appropriate node
 // based on its position.
-func (self *Quadtree) Insert(obj teishoku.Entity) {
+func (self *Quadtree) Insert(obj ecs.Entity) {
 	self.root.insert(obj)
 }
 
 // Query finds all entities within a given rectangular bounds.
 // It returns a slice of entities that are located inside the query rectangle.
-func (self *Quadtree) Query(bounds Rectangle) []teishoku.Entity {
-	var result []teishoku.Entity
+func (self *Quadtree) Query(bounds Rectangle) []ecs.Entity {
+	var result []ecs.Entity
 	self.root.query(bounds, &result)
 	return result
 }
 
 // QueryCircle finds all entities within a given circular area.
 // It returns a slice of entities that are located inside the query circle.
-func (self *Quadtree) QueryCircle(center Vector, radius float64) []teishoku.Entity {
-	var result []teishoku.Entity
+func (self *Quadtree) QueryCircle(center Vector, radius float64) []ecs.Entity {
+	var result []ecs.Entity
 	self.root.queryCircle(center, radius, &result)
 	return result
 }
@@ -81,9 +81,9 @@ type quadtreeNode struct {
 	// If a node has children, its objects slice is empty.
 	children [4]*quadtreeNode
 	// builder is used to access TransformComponent of entities.
-	builder *teishoku.Builder[TransformComponent]
+	builder *ecs.Map1[TransformComponent]
 	// objects is a slice of entities contained directly within this node.
-	objects []teishoku.Entity
+	objects []ecs.Entity
 	// bounds is the rectangular area covered by this node.
 	bounds Rectangle
 	// midX, midY are precomputed midpoints for fast child index computation.
@@ -122,7 +122,7 @@ func (self *quadtreeNode) release() {
 
 // insert adds an entity to the current node. If the node exceeds the object limit and max depth,
 // it subdivides and redistributes its entities into the new children nodes.
-func (self *quadtreeNode) insert(e teishoku.Entity) {
+func (self *quadtreeNode) insert(e ecs.Entity) {
 	// Get the TransformComponent to find the entity's position.
 	t := self.builder.Get(e)
 	if t == nil {
@@ -195,7 +195,7 @@ func (self *quadtreeNode) subdivide() {
 }
 
 // query recursively finds and appends entities within a given rectangular query area to the result slice.
-func (self *quadtreeNode) query(bounds Rectangle, result *[]teishoku.Entity) {
+func (self *quadtreeNode) query(bounds Rectangle, result *[]ecs.Entity) {
 	// If the query rectangle does not intersect the current node's bounds,
 	// no entities within this node or its children can be in the query area.
 	if !self.bounds.Intersects(bounds) {
@@ -219,7 +219,7 @@ func (self *quadtreeNode) query(bounds Rectangle, result *[]teishoku.Entity) {
 }
 
 // queryCircle recursively finds and appends entities within a given circular query area to the result slice.
-func (self *quadtreeNode) queryCircle(center Vector, radius float64, result *[]teishoku.Entity) {
+func (self *quadtreeNode) queryCircle(center Vector, radius float64, result *[]ecs.Entity) {
 	// If the query circle does not intersect the current node's bounds, return.
 	if !intersectsCircle(self.bounds, center, radius) {
 		return

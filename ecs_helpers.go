@@ -3,89 +3,83 @@ package katsu2d
 import (
 	"image"
 
-	"github.com/edwinsyarief/teishoku"
+	"github.com/edwinsyarief/katsu2d/event"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/mlange-42/ark/ecs"
 )
 
-func updateHiResDisplayResource(w *teishoku.World, width, height int) {
-	if ok, _ := teishoku.HasResource[HiResDisplaySize](w.Resources()); !ok {
-		w.Resources().Add(&HiResDisplaySize{
+func updateHiResDisplayResource(w *ecs.World, width, height int) {
+	display := ecs.GetResource[HiResDisplaySize](w)
+	if display == nil {
+		ecs.AddResource(w, &HiResDisplaySize{
 			Width:  width,
 			Height: height,
 		})
 	} else {
-		layout, _ := teishoku.GetResource[HiResDisplaySize](w.Resources())
-		layout.Width = width
-		layout.Height = height
+		display.Width = width
+		display.Height = height
 	}
 }
 
-func initializeAssetManagers(w *teishoku.World,
+func initializeAssetManagers(w *ecs.World,
 	tm *TextureManager, fm *FontManager, am *AudioManager, shm *ShaderManager, scm *SceneManager) {
-	if ok, _ := teishoku.HasResource[TextureManager](w.Resources()); !ok {
-		w.Resources().Add(tm)
+	if tmr := ecs.GetResource[TextureManager](w); tmr == nil {
+		ecs.AddResource(w, tm)
 	}
-	if ok, _ := teishoku.HasResource[FontManager](w.Resources()); !ok {
-		w.Resources().Add(fm)
+	if fmr := ecs.GetResource[FontManager](w); fmr == nil {
+		ecs.AddResource(w, fm)
 	}
-	if ok, _ := teishoku.HasResource[AudioManager](w.Resources()); !ok {
-		w.Resources().Add(am)
+	if amr := ecs.GetResource[AudioManager](w); amr == nil {
+		ecs.AddResource(w, am)
 	}
-	if ok, _ := teishoku.HasResource[ShaderManager](w.Resources()); !ok {
-		w.Resources().Add(shm)
+	if shrm := ecs.GetResource[ShaderManager](w); shrm == nil {
+		ecs.AddResource(w, shm)
 	}
-	if ok, _ := teishoku.HasResource[SceneManager](w.Resources()); !ok {
-		w.Resources().Add(scm)
+	if scmr := ecs.GetResource[SceneManager](w); scmr == nil {
+		ecs.AddResource(w, scm)
 	}
 }
 
-func GetHiResDisplayInfo(w *teishoku.World) *HiResDisplaySize {
-	res, _ := teishoku.GetResource[HiResDisplaySize](w.Resources())
-	return res
+func GetHiResDisplayInfo(w *ecs.World) *HiResDisplaySize {
+	return ecs.GetResource[HiResDisplaySize](w)
 }
 
-func GetTextureManager(w *teishoku.World) *TextureManager {
-	res, _ := teishoku.GetResource[TextureManager](w.Resources())
-	return res
+func GetTextureManager(w *ecs.World) *TextureManager {
+	return ecs.GetResource[TextureManager](w)
 }
 
-func GetFontManager(w *teishoku.World) *FontManager {
-	res, _ := teishoku.GetResource[FontManager](w.Resources())
-	return res
+func GetFontManager(w *ecs.World) *FontManager {
+	return ecs.GetResource[FontManager](w)
 }
 
-func GetAudioManager(w *teishoku.World) *AudioManager {
-	res, _ := teishoku.GetResource[AudioManager](w.Resources())
-	return res
+func GetAudioManager(w *ecs.World) *AudioManager {
+	return ecs.GetResource[AudioManager](w)
 }
 
-func GetShaderManager(w *teishoku.World) *ShaderManager {
-	res, _ := teishoku.GetResource[ShaderManager](w.Resources())
-	return res
+func GetShaderManager(w *ecs.World) *ShaderManager {
+	return ecs.GetResource[ShaderManager](w)
 }
 
-func GetSceneManager(w *teishoku.World) *SceneManager {
-	res, _ := teishoku.GetResource[SceneManager](w.Resources())
-	return res
+func GetSceneManager(w *ecs.World) *SceneManager {
+	return ecs.GetResource[SceneManager](w)
 }
 
-func getEventBus(w *teishoku.World) *teishoku.EventBus {
-	if ok, _ := teishoku.HasResource[teishoku.EventBus](w.Resources()); !ok {
-		w.Resources().Add(&teishoku.EventBus{})
+func getEventBus(w *ecs.World) *event.EventBus {
+	if eb := ecs.GetResource[event.EventBus](w); eb == nil {
+		ecs.AddResource(w, &event.EventBus{})
 	}
-	eb, _ := teishoku.GetResource[teishoku.EventBus](w.Resources())
-	return eb
+	return ecs.GetResource[event.EventBus](w)
 }
 
-func Subscribe[T any](w *teishoku.World, fn func(T)) {
+func Subscribe[T any](w *ecs.World, fn func(T)) {
 	eb := getEventBus(w)
-	teishoku.Subscribe(eb, fn)
+	event.Subscribe(eb, fn)
 }
 
-func Publish[T any](w *teishoku.World, o T) {
+func Publish[T any](w *ecs.World, o T) {
 	eb := getEventBus(w)
-	teishoku.Publish(eb, o)
+	event.Publish(eb, o)
 }
 
 func (self *Transform) SetFromComponent(comp *TransformComponent) {
