@@ -2,7 +2,6 @@ package katsu2d
 
 import (
 	"image/color"
-	"maps"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -13,13 +12,10 @@ const (
 
 // BatchRenderer batches draw calls for performance.
 type BatchRenderer struct {
-	screen        *ebiten.Image
-	currentImage  *ebiten.Image
-	currentShader *ebiten.Shader
-	dOpt          *ebiten.DrawTrianglesOptions
-	dsOpt         *ebiten.DrawTrianglesShaderOptions
-	vertices      []ebiten.Vertex
-	indices       []uint16
+	screen       *ebiten.Image
+	currentImage *ebiten.Image
+	vertices     []ebiten.Vertex
+	indices      []uint16
 }
 
 // NewBatchRenderer creates a new batch renderer.
@@ -36,139 +32,11 @@ func (self *BatchRenderer) GetScreen() *ebiten.Image {
 }
 
 // Begin prepares the renderer for a new frame.
-func (self *BatchRenderer) Begin(screen *ebiten.Image, shader *ebiten.Shader) {
+func (self *BatchRenderer) Begin(screen *ebiten.Image) {
 	self.screen = screen
-	self.currentShader = shader
-	self.dsOpt = nil
-	self.dOpt = nil
 	self.vertices = self.vertices[:0]
 	self.indices = self.indices[:0]
 	self.currentImage = nil
-}
-
-type DrawOptions func(*ebiten.DrawTrianglesOptions)
-
-func WithRenderBlendMode(mode ebiten.Blend) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.Blend = mode
-	}
-}
-func WithRenderColorScaleMode(mode ebiten.ColorScaleMode) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.ColorScaleMode = mode
-	}
-}
-func WithRenderFilterMode(mode ebiten.Filter) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.Filter = mode
-	}
-}
-func WithRenderAddressMode(mode ebiten.Address) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.Address = mode
-	}
-}
-func WithRenderFillRule(rule ebiten.FillRule) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.FillRule = rule
-	}
-}
-func WithRenderAntiAlias(aa bool) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.AntiAlias = aa
-	}
-}
-func WithRenderDisableMipmaps(disable bool) DrawOptions {
-	return func(opt *ebiten.DrawTrianglesOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesOptions{}
-		}
-		opt.DisableMipmaps = disable
-	}
-}
-
-// SetDrawOptions sets the draw options for the batch renderer.
-func (self *BatchRenderer) SetDrawOptions(opts ...DrawOptions) {
-	for _, opt := range opts {
-		opt(self.dOpt)
-	}
-}
-
-type DrawShaderOptions func(*ebiten.DrawTrianglesShaderOptions)
-
-func WithShaderRenderBlendMode(mode ebiten.Blend) DrawShaderOptions {
-	return func(opt *ebiten.DrawTrianglesShaderOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesShaderOptions{}
-		}
-		opt.Blend = mode
-	}
-}
-func WithShaderRenderFillRule(rule ebiten.FillRule) DrawShaderOptions {
-	return func(opt *ebiten.DrawTrianglesShaderOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesShaderOptions{}
-		}
-		opt.FillRule = rule
-	}
-}
-func WithShaderRenderAntiAlias(aa bool) DrawShaderOptions {
-	return func(opt *ebiten.DrawTrianglesShaderOptions) {
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesShaderOptions{}
-		}
-		opt.AntiAlias = aa
-	}
-}
-func WithShaderRenderImages(images ...*ebiten.Image) DrawShaderOptions {
-	return func(opt *ebiten.DrawTrianglesShaderOptions) {
-		if len(images) == 0 {
-			return
-		}
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesShaderOptions{}
-		}
-		copy(opt.Images[:], images)
-	}
-}
-func WithShaderRenderUniforms(uniforms map[string]interface{}) DrawShaderOptions {
-	return func(opt *ebiten.DrawTrianglesShaderOptions) {
-		if uniforms == nil {
-			return
-		}
-		if opt == nil {
-			opt = &ebiten.DrawTrianglesShaderOptions{}
-		}
-		maps.Copy(opt.Uniforms, uniforms)
-	}
-}
-
-// SetDrawShaderOptions sets the shader options for the batch renderer.
-func (self *BatchRenderer) SetDrawShaderOptions(opt ...DrawShaderOptions) {
-	if self.currentShader == nil {
-		panic("Set a shader using Begin before setting shader options")
-	}
-	for _, o := range opt {
-		o(self.dsOpt)
-	}
 }
 
 // Flush draws the current batch.
@@ -176,22 +44,10 @@ func (self *BatchRenderer) Flush() {
 	if len(self.vertices) == 0 {
 		return
 	}
-	if self.currentShader != nil {
-		if self.dsOpt == nil {
-			panic("SetDrawShaderOptions must be called before Flush when using a shader")
-		}
-		self.screen.DrawTrianglesShader(self.vertices, self.indices, self.currentShader, self.dsOpt)
-		self.vertices = self.vertices[:0]
-		self.indices = self.indices[:0]
-		self.dsOpt = nil
-		self.currentImage = nil
-	} else {
-		self.screen.DrawTriangles(self.vertices, self.indices, self.currentImage, self.dOpt)
-		self.vertices = self.vertices[:0]
-		self.indices = self.indices[:0]
-		self.dOpt = nil
-		self.currentImage = nil
-	}
+	self.screen.DrawTriangles(self.vertices, self.indices, self.currentImage, nil)
+	self.vertices = self.vertices[:0]
+	self.indices = self.indices[:0]
+	self.currentImage = nil
 }
 
 // AddCustomMeshes adds custom vertices and indices to the batch.

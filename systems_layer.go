@@ -101,7 +101,7 @@ func (self *LayerSytem) Draw(w *teishoku.World, rdr *BatchRenderer) {
 	self.buffer.Fill(color.Transparent)
 
 	// Begin batch rendering to the buffer
-	self.batchRenderer.Begin(self.buffer, nil)
+	self.batchRenderer.Begin(self.buffer)
 
 	// Execute all registered drawing systems
 	for _, ds := range self.drawSystems {
