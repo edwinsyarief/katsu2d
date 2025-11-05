@@ -6,6 +6,7 @@ require (
 	github.com/edwinsyarief/assetpacker v1.0.0
 	github.com/edwinsyarief/teishoku v1.7.0
 	github.com/hajimehoshi/ebiten/v2 v2.9.3
+	github.com/silbinarywolf/preferdiscretegpu v1.0.0
 	golang.org/x/text v0.30.0
 )
 

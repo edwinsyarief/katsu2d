@@ -92,6 +92,7 @@ type CinematicOverlaySystem struct {
 	spotlightI   []uint16
 	spotlightSeg int
 	target       *ebiten.Image
+	initialized  bool
 }
 
 func NewCinematicOverlaySystem() *CinematicOverlaySystem {
@@ -111,11 +112,17 @@ func NewCinematicOverlaySystem() *CinematicOverlaySystem {
 }
 
 func (self *CinematicOverlaySystem) Initialize(w *teishoku.World) {
+	if self.initialized {
+		return
+	}
+
 	self.filter = self.filter.New(w)
 
 	Subscribe(w, self.onEngineLayoutChanged)
 	Subscribe(w, self.onTimerFinished)
 	Subscribe(w, self.onTweenFinished)
+
+	self.initialized = true
 }
 
 func (self *CinematicOverlaySystem) onEngineLayoutChanged(data EngineLayoutChangedEvent) {

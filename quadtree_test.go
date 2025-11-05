@@ -22,8 +22,8 @@ func setupTestQuadtree() (*teishoku.World, *Quadtree, Rectangle) {
 		Min: Vector{X: 0, Y: 0},
 		Max: Vector{X: testWorldSize, Y: testWorldSize},
 	}
-	qt := NewQuadtree(&world, bounds)
-	return &world, qt, bounds
+	qt := NewQuadtree(world, bounds)
+	return world, qt, bounds
 }
 
 // TestNewQuadtree verifies that a new quadtree is properly initialized.
@@ -256,8 +256,8 @@ func BenchmarkInsert(b *testing.B) {
 		b.Run(formatSize(size), func(b *testing.B) {
 			world := teishoku.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
-			qt := NewQuadtree(&world, bounds)
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			qt := NewQuadtree(world, bounds)
+			builder := teishoku.NewBuilder[TransformComponent](world)
 
 			// Pre-create entities with random positions
 			entities := make([]teishoku.Entity, size)
@@ -267,7 +267,7 @@ func BenchmarkInsert(b *testing.B) {
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
 				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				teishoku.SetComponent(world, ent, *pos)
 				entities[i] = ent
 			}
 
@@ -291,8 +291,8 @@ func BenchmarkQueryRectangle(b *testing.B) {
 		b.Run(formatSize(size), func(b *testing.B) {
 			world := teishoku.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
-			qt := NewQuadtree(&world, bounds)
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			qt := NewQuadtree(world, bounds)
+			builder := teishoku.NewBuilder[TransformComponent](world)
 
 			// Insert entities with random positions
 			for i := 0; i < size; i++ {
@@ -301,7 +301,7 @@ func BenchmarkQueryRectangle(b *testing.B) {
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
 				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				teishoku.SetComponent(world, ent, *pos)
 				qt.Insert(ent)
 			}
 
@@ -326,8 +326,8 @@ func BenchmarkQueryCircle(b *testing.B) {
 		b.Run(formatSize(size), func(b *testing.B) {
 			world := teishoku.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
-			qt := NewQuadtree(&world, bounds)
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			qt := NewQuadtree(world, bounds)
+			builder := teishoku.NewBuilder[TransformComponent](world)
 
 			// Insert entities with random positions
 			for i := 0; i < size; i++ {
@@ -336,7 +336,7 @@ func BenchmarkQueryCircle(b *testing.B) {
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
 				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				teishoku.SetComponent(world, ent, *pos)
 				qt.Insert(ent)
 			}
 
@@ -359,7 +359,7 @@ func BenchmarkClear(b *testing.B) {
 		b.Run(formatSize(size), func(b *testing.B) {
 			world := teishoku.NewWorld(size)
 			bounds := Rectangle{Min: Vector{0, 0}, Max: Vector{testWorldSize, testWorldSize}}
-			builder := teishoku.NewBuilder[TransformComponent](&world)
+			builder := teishoku.NewBuilder[TransformComponent](world)
 
 			// Pre-insert entities
 			for i := 0; i < size; i++ {
@@ -368,16 +368,16 @@ func BenchmarkClear(b *testing.B) {
 					X: rand.Float64() * testWorldSize,
 					Y: rand.Float64() * testWorldSize,
 				}}
-				teishoku.SetComponent(&world, ent, *pos)
+				teishoku.SetComponent(world, ent, *pos)
 			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				qt := NewQuadtree(&world, bounds)
+				qt := NewQuadtree(world, bounds)
 				// Insert all for each clear
-				filter := teishoku.NewFilter[TransformComponent](&world)
+				filter := teishoku.NewFilter[TransformComponent](world)
 				for filter.Next() {
 					qt.Insert(filter.Entity())
 				}

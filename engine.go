@@ -5,6 +5,8 @@ import (
 	"image/color"
 	"math"
 
+	_ "github.com/silbinarywolf/preferdiscretegpu"
+
 	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -12,7 +14,7 @@ import (
 type Engine struct {
 	clearColor color.Color
 	// Managers
-	world       teishoku.World
+	world       *teishoku.World
 	tm          *TextureManager
 	fm          *FontManager
 	am          *AudioManager
@@ -199,7 +201,7 @@ func (self *Engine) InitAssetReader(path string, key []byte) {
 
 // World returns the engine's global ECS world.
 func (self *Engine) World() *teishoku.World {
-	return &self.world
+	return self.world
 }
 
 // TextureManager returns the engine's texture manager.

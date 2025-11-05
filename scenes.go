@@ -8,7 +8,7 @@ import (
 // Scene represents a game scene. It is a self-contained unit
 // with its own World, systems, and lifecycle hooks.
 type Scene struct {
-	world         teishoku.World
+	world         *teishoku.World
 	OnEnter       func(*Engine)
 	OnExit        func(*Engine)
 	OnUpdate      func(float64)
@@ -31,7 +31,7 @@ func NewSceneWithInitialCapacity(cap int) *Scene {
 }
 
 func (self *Scene) World() *teishoku.World {
-	return &self.world
+	return self.world
 }
 
 // AddSystem adds an update and/or draw system to the scene.
