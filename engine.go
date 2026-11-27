@@ -3,6 +3,7 @@ package katsu2d
 import (
 	"embed"
 	"image/color"
+	"io/fs"
 	"math"
 
 	_ "github.com/silbinarywolf/preferdiscretegpu"
@@ -204,13 +205,35 @@ func NewEngineWithInitialCapacity(capacity int, opts ...Option) *Engine {
 }
 
 // InitFS initializes the embedded asset filesystem.
-func (e *Engine) InitFS(fs embed.FS) {
-	initFS(fs)
+func (e *Engine) InitFS(fsys embed.FS) {
+	initFS(fsys)
+}
+
+// SetFS sets the asset filesystem used for embedded asset lookups.
+// It accepts any io/fs.FS implementation (such as os.DirFS, embed.FS, or an asset bundle reader).
+func (e *Engine) SetFS(fsys fs.FS) {
+	setFS(fsys)
 }
 
 // InitAssetReader initializes the encrypted asset bundle reader.
 func (e *Engine) InitAssetReader(path string, key []byte) error {
 	return initAssetReader(path, key)
+}
+
+// InitAssetReaderFromBytes initializes the encrypted asset bundle reader directly
+// from in-memory packed asset bytes.
+func (e *Engine) InitAssetReaderFromBytes(data, key []byte) error {
+	return initAssetReaderFromBytes(data, key)
+}
+
+// ReadBundledFile reads raw bytes of a file from the active bundled asset reader.
+func (e *Engine) ReadBundledFile(path string) ([]byte, error) {
+	return openBundledFileErr(path)
+}
+
+// CloseAssetReader closes and clears the active bundled asset reader.
+func (e *Engine) CloseAssetReader() error {
+	return closeAssetReader()
 }
 
 // World returns the engine's global ECS world.
