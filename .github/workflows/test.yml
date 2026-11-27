@@ -1,0 +1,61 @@
+name: Tests and Benchmarks
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request: {}
+  workflow_dispatch: {}
+
+env:
+  GOWORK: "off"
+
+jobs:
+  test-and-benchmark:
+    name: Run tests and benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Build (WASM)
+        run: GOOS=js GOARCH=wasm go build ./...
+
+      - name: Test
+        run: go test -v -count=1 ./...
+
+      - name: Run benchmarks
+        run: go test -benchmem -run=^$ -bench=. ./...
+
+  windows-build-test:
+    name: Windows build and test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test -count=1 ./...

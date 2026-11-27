@@ -1,6 +1,8 @@
 # Katsu2D (カツ2D)
 
 [![Go Version](https://img.shields.io/badge/Go-1.26+-blue?logo=go&style=flat&logoColor=white)](https://go.dev/)
+[![Go Reference](https://pkg.go.dev/badge/github.com/edwinsyarief/katsu2d.svg)](https://pkg.go.dev/github.com/edwinsyarief/katsu2d)
+[![Tests and Benchmarks](https://img.shields.io/github/actions/workflow/status/edwinsyarief/katsu2d/test.yml?style=flat&label=CI)](https://github.com/edwinsyarief/katsu2d/actions/workflows/test.yml)
 [![Ebitengine](https://img.shields.io/badge/Ebitengine-v2.10.6-db5620?style=flat)](https://ebitengine.org/)
 [![Teishoku ECS](https://img.shields.io/badge/Teishoku-v1.8.0-brightgreen?style=flat)](https://github.com/edwinsyarief/teishoku)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
