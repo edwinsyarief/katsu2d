@@ -6,8 +6,8 @@ github.com/ebitengine/oto/v3 v3.5.0 h1:8ZDhKP3Hhslyb9NL3g4HWvhRQqwI+hKOHAXAqD6GP
 github.com/ebitengine/oto/v3 v3.5.0/go.mod h1:Elkm7yzTRns3w2efvibzVOoQ65YOwmec9a76dCiK10o=
 github.com/ebitengine/purego v0.11.3 h1:OB+JLpdm7ioymhyA+6s5kbb/uOuYycAgL8NNTFc5MLg=
 github.com/ebitengine/purego v0.11.3/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
-github.com/edwinsyarief/assetpacker v1.0.0 h1:V4z0MZRfDQGRafo4jvXyGsYKfUw61B7bRCYQoIRlcV8=
-github.com/edwinsyarief/assetpacker v1.0.0/go.mod h1:Cv5V5pP0S33109CQJkip4fHCVDJVi44o4kVsHEGzeEw=
+github.com/edwinsyarief/assetpacker v1.1.0 h1:nzwuHsLAFY/phefqXv1KU/bchIn8dREilEuDhOqUNSQ=
+github.com/edwinsyarief/assetpacker v1.1.0/go.mod h1:8b3I110sFqSvCWHhKs6yNw+5sbNesKqsJikaO3frCgI=
 github.com/edwinsyarief/teishoku v1.8.0 h1:KS5e6dh0krtQMaJZcV44jR2ShLz8qTwW8/vdiinDGBs=
 github.com/edwinsyarief/teishoku v1.8.0/go.mod h1:KL2eGBjMTeeg7CPUa4yegtlE1LBMAlFGItk3tnNTIJ4=
 github.com/go-text/typesetting v0.3.5 h1:XZPUooClHY0Vf/rFyUyuPRNEkawARaFzLMQcXLSEyPk=

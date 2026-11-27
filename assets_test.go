@@ -48,9 +48,8 @@ func packTestAssets(t *testing.T, items []assetpacker.Asset, key []byte) string 
 }
 
 func TestAssetReaderInitAndReadBundledFile(t *testing.T) {
-	t.Cleanup(func() { _ = closeAssetReader() })
-
 	e := &Engine{}
+	defer func() { _ = e.CloseAssetReader() }()
 	if err := e.CloseAssetReader(); err != nil {
 		t.Fatalf("CloseAssetReader failed: %v", err)
 	}
@@ -95,9 +94,8 @@ func TestAssetReaderInitAndReadBundledFile(t *testing.T) {
 }
 
 func TestAssetReaderFromBytes(t *testing.T) {
-	t.Cleanup(func() { _ = closeAssetReader() })
-
 	e := &Engine{}
+	defer func() { _ = e.CloseAssetReader() }()
 	key := testAssetKey()
 	want := []byte("hello from in-memory bundle")
 
@@ -137,9 +135,8 @@ func TestAssetReaderFromBytes(t *testing.T) {
 }
 
 func TestAssetReaderReinitAndClose(t *testing.T) {
-	t.Cleanup(func() { _ = closeAssetReader() })
-
 	e := &Engine{}
+	defer func() { _ = e.CloseAssetReader() }()
 	key := testAssetKey()
 
 	pak1 := packTestAssets(t, []assetpacker.Asset{
@@ -189,9 +186,8 @@ func TestAssetReaderReinitAndClose(t *testing.T) {
 }
 
 func TestAssetReaderConcurrentReads(t *testing.T) {
-	t.Cleanup(func() { _ = closeAssetReader() })
-
 	e := &Engine{}
+	defer func() { _ = e.CloseAssetReader() }()
 	key := testAssetKey()
 	files := map[string][]byte{
 		"a.txt": []byte("alpha-payload"),

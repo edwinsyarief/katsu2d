@@ -3,7 +3,7 @@ module github.com/edwinsyarief/katsu2d
 go 1.26.0
 
 require (
-	github.com/edwinsyarief/assetpacker v1.0.0
+	github.com/edwinsyarief/assetpacker v1.1.0
 	github.com/edwinsyarief/teishoku v1.8.0
 	github.com/hajimehoshi/ebiten/v2 v2.10.6
 	github.com/silbinarywolf/preferdiscretegpu v1.0.0
