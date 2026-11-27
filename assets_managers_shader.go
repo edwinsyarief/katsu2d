@@ -1,67 +1,70 @@
 package katsu2d
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// ShaderManager manages loading and retrieving shaders.
+// ShaderManager manages loading, compiling, and retrieving Kage shaders by ID.
 type ShaderManager struct {
 	shaders []*ebiten.Shader
 }
 
-// NewShaderManager creates a manager with an empty shader list.
+// NewShaderManager creates an empty ShaderManager.
 func NewShaderManager() *ShaderManager {
-	sm := &ShaderManager{
+	return &ShaderManager{
 		shaders: make([]*ebiten.Shader, 0),
 	}
-	return sm
 }
 
-// Load loads a shader from file and returns its ID.
-func (self *ShaderManager) Load(path string) (int, error) {
-	b := readFile(path)
-	id := self.fromByte(b)
-	if id == -1 {
-		return -1, errors.New("failed to load shader from file: " + path)
+// Load compiles a Kage shader from disk and returns its ID.
+func (sm *ShaderManager) Load(path string) (int, error) {
+	b, err := readFileErr(path)
+	if err != nil {
+		return -1, fmt.Errorf("failed to read shader %q: %w", path, err)
 	}
-
-	return id, nil
+	return sm.LoadBytes(b)
 }
 
-// LoadEmbedded loads an shader from embedded file and returns its ID.
-func (self *ShaderManager) LoadEmbedded(path string) int {
-	b := openEmbeddedFile(path)
-	return self.fromByte(b)
-}
-
-func (self *ShaderManager) LoadFromAssetPacker(path string) int {
-	b := openBundledFile(path)
-	return self.fromByte(b)
-}
-
-func (self *ShaderManager) fromByte(content []byte) int {
-	shader, err := ebiten.NewShader(content)
+// LoadEmbedded compiles a Kage shader from the embedded filesystem and returns its ID.
+func (sm *ShaderManager) LoadEmbedded(path string) int {
+	id, err := sm.LoadBytes(openEmbeddedFile(path))
 	if err != nil {
 		return -1
 	}
-	id := len(self.shaders)
-	self.shaders = append(self.shaders, shader)
 	return id
 }
 
-// Get retrieves a shader by ID
-func (self *ShaderManager) Get(id int) *ebiten.Shader {
-	if id < 0 || id >= len(self.shaders) {
-		return nil
+// LoadFromAssetPacker compiles a Kage shader from the asset bundle and returns its ID.
+func (sm *ShaderManager) LoadFromAssetPacker(path string) int {
+	id, err := sm.LoadBytes(openBundledFile(path))
+	if err != nil {
+		return -1
 	}
-	return self.shaders[id]
+	return id
 }
 
-// Add adds a pre-existing *ebiten.Shader to the manager and returns its new ID.
-func (self *ShaderManager) Add(shader *ebiten.Shader) int {
-	id := len(self.shaders)
-	self.shaders = append(self.shaders, shader)
+// LoadBytes compiles a Kage shader from raw source bytes and returns its ID.
+func (sm *ShaderManager) LoadBytes(content []byte) (int, error) {
+	shader, err := ebiten.NewShader(content)
+	if err != nil {
+		return -1, fmt.Errorf("failed to compile shader: %w", err)
+	}
+	return sm.Add(shader), nil
+}
+
+// Get retrieves a shader by ID, or nil if out of range.
+func (sm *ShaderManager) Get(id int) *ebiten.Shader {
+	if id < 0 || id >= len(sm.shaders) {
+		return nil
+	}
+	return sm.shaders[id]
+}
+
+// Add registers a pre-compiled *ebiten.Shader and returns its ID.
+func (sm *ShaderManager) Add(shader *ebiten.Shader) int {
+	id := len(sm.shaders)
+	sm.shaders = append(sm.shaders, shader)
 	return id
 }

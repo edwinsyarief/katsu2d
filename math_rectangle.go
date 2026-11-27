@@ -2,6 +2,7 @@ package katsu2d
 
 import "math"
 
+// Rectangle represents a 2D axis-aligned or rotated rectangle defined by Min, Max, and Angle.
 type Rectangle struct {
 	Min   Vector
 	Max   Vector
@@ -17,81 +18,81 @@ func NewRectangle(x1, y1, x2, y2 float64) Rectangle {
 }
 
 // SetAngle updates the rotation angle of the rectangle.
-func (self *Rectangle) SetAngle(angle float64) {
-	self.Angle = angle
+func (r *Rectangle) SetAngle(angle float64) {
+	r.Angle = angle
 }
 
 // Width returns the width of the rectangle.
-func (self Rectangle) Width() float64 {
-	return self.Max.X - self.Min.X
+func (r Rectangle) Width() float64 {
+	return r.Max.X - r.Min.X
 }
 
 // Height returns the height of the rectangle.
-func (self Rectangle) Height() float64 {
-	return self.Max.Y - self.Min.Y
+func (r Rectangle) Height() float64 {
+	return r.Max.Y - r.Min.Y
 }
 
 // Center calculates and returns the center point of the rectangle.
-func (self Rectangle) Center() Vector {
-	return V((self.Min.X+self.Max.X)/2, (self.Min.Y+self.Max.Y)/2)
+func (r Rectangle) Center() Vector {
+	return V((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
 }
 
 // X1 returns the min X coordinate.
-func (self Rectangle) X1() float64 { return self.Min.X }
+func (r Rectangle) X1() float64 { return r.Min.X }
 
 // Y1 returns the min Y coordinate.
-func (self Rectangle) Y1() float64 { return self.Min.Y }
+func (r Rectangle) Y1() float64 { return r.Min.Y }
 
 // X2 returns the max X coordinate.
-func (self Rectangle) X2() float64 { return self.Max.X }
+func (r Rectangle) X2() float64 { return r.Max.X }
 
 // Y2 returns the max Y coordinate.
-func (self Rectangle) Y2() float64 { return self.Max.Y }
+func (r Rectangle) Y2() float64 { return r.Max.Y }
 
 // IsEmpty checks if the rectangle has no area.
-func (self Rectangle) IsEmpty() bool {
-	return self.Min.X >= self.Max.X || self.Min.Y >= self.Max.Y
+func (r Rectangle) IsEmpty() bool {
+	return r.Min.X >= r.Max.X || r.Min.Y >= r.Max.Y
 }
 
 // Equals checks if two rectangles are equal.
-func (self Rectangle) Equals(other Rectangle) bool {
-	return self.Min.Equals(other.Min) && self.Max.Equals(other.Max)
+func (r Rectangle) Equals(other Rectangle) bool {
+	return r.Min.Equals(other.Min) && r.Max.Equals(other.Max)
 }
 
 // Contains checks if a point is within the rectangle.
-func (self Rectangle) Contains(p Vector) bool {
-	return self.Min.X <= p.X && p.X < self.Max.X &&
-		self.Min.Y <= p.Y && p.Y < self.Max.Y
+func (r Rectangle) Contains(p Vector) bool {
+	return r.Min.X <= p.X && p.X < r.Max.X &&
+		r.Min.Y <= p.Y && p.Y < r.Max.Y
 }
 
 // ContainsRect checks if one rectangle is completely inside another.
-func (self Rectangle) ContainsRect(other Rectangle) bool {
-	return self.X1() <= other.X1() &&
-		self.Y1() <= other.Y1() &&
-		self.X2() >= other.X2() &&
-		self.Y2() >= other.Y2()
+func (r Rectangle) ContainsRect(other Rectangle) bool {
+	return r.X1() <= other.X1() &&
+		r.Y1() <= other.Y1() &&
+		r.X2() >= other.X2() &&
+		r.Y2() >= other.Y2()
 }
 
 // Intersects checks if two rectangles intersect using the Separating Axis Theorem.
 // This handles rotated rectangles.
-func (self Rectangle) Intersects(other Rectangle) bool {
+func (r Rectangle) Intersects(other Rectangle) bool {
 	// Optimization for axis-aligned rectangles.
-	if self.Angle == 0 && other.Angle == 0 {
-		return !self.IsEmpty() && !other.IsEmpty() &&
-			self.Min.X < other.Max.X && other.Min.X < self.Max.X &&
-			self.Min.Y < other.Max.Y && other.Min.Y < self.Max.Y
+	if r.Angle == 0 && other.Angle == 0 {
+		return !r.IsEmpty() && !other.IsEmpty() &&
+			r.Min.X < other.Max.X && other.Min.X < r.Max.X &&
+			r.Min.Y < other.Max.Y && other.Min.Y < r.Max.Y
 	}
 
 	// Get the four axes to check for separation.
 	// The axes are the normalized perpendicular vectors to the sides of each rectangle.
-	axes := []Vector{
-		self.GetAxis(self.Angle, 0), self.GetAxis(self.Angle, 1),
+	axes := [4]Vector{
+		r.GetAxis(r.Angle, 0), r.GetAxis(r.Angle, 1),
 		other.GetAxis(other.Angle, 0), other.GetAxis(other.Angle, 1),
 	}
 
 	// If a separating axis is found, there is no intersection.
 	for _, axis := range axes {
-		if !self.OverlapOnAxis(other, axis) {
+		if !r.OverlapOnAxis(other, axis) {
 			return false
 		}
 	}
@@ -99,16 +100,16 @@ func (self Rectangle) Intersects(other Rectangle) bool {
 }
 
 // IntersectsCircle checks if the rectangle intersects with a circle.
-func (self Rectangle) IntersectsCircle(center Vector, radius float64) bool {
-	closestX := math.Max(self.Min.X, math.Min(center.X, self.Max.X))
-	closestY := math.Max(self.Min.Y, math.Min(center.Y, self.Max.Y))
+func (r Rectangle) IntersectsCircle(center Vector, radius float64) bool {
+	closestX := math.Max(r.Min.X, math.Min(center.X, r.Max.X))
+	closestY := math.Max(r.Min.Y, math.Min(center.Y, r.Max.Y))
 	dx := center.X - closestX
 	dy := center.Y - closestY
 	return dx*dx+dy*dy <= radius*radius
 }
 
 // GetAxis returns one of the two axes of the rectangle based on its angle.
-func (self Rectangle) GetAxis(angle float64, index int) Vector {
+func (r Rectangle) GetAxis(angle float64, index int) Vector {
 	if index == 0 {
 		return Vector{math.Cos(angle), math.Sin(angle)}
 	}
@@ -116,11 +117,11 @@ func (self Rectangle) GetAxis(angle float64, index int) Vector {
 }
 
 // GetCorners returns the four corners of the rectangle, considering rotation.
-func (self Rectangle) GetCorners() [4]Vector {
-	center := self.Center()
-	halfWidth := self.Width() / 2
-	halfHeight := self.Height() / 2
-	cos, sin := math.Cos(self.Angle), math.Sin(self.Angle)
+func (r Rectangle) GetCorners() [4]Vector {
+	center := r.Center()
+	halfWidth := r.Width() / 2
+	halfHeight := r.Height() / 2
+	cos, sin := math.Cos(r.Angle), math.Sin(r.Angle)
 
 	return [4]Vector{
 		{center.X + halfWidth*cos - halfHeight*sin, center.Y + halfWidth*sin + halfHeight*cos},
@@ -131,15 +132,15 @@ func (self Rectangle) GetCorners() [4]Vector {
 }
 
 // OverlapOnAxis checks if there's overlap along a specific axis.
-func (self Rectangle) OverlapOnAxis(other Rectangle, axis Vector) bool {
-	proj1 := self.ProjectOntoAxis(axis)
+func (r Rectangle) OverlapOnAxis(other Rectangle, axis Vector) bool {
+	proj1 := r.ProjectOntoAxis(axis)
 	proj2 := other.ProjectOntoAxis(axis)
 	return proj1.Min <= proj2.Max && proj2.Min <= proj1.Max
 }
 
 // ProjectOntoAxis projects the rectangle onto an axis, returning the min and max values.
-func (self Rectangle) ProjectOntoAxis(axis Vector) struct{ Min, Max float64 } {
-	corners := self.GetCorners()
+func (r Rectangle) ProjectOntoAxis(axis Vector) struct{ Min, Max float64 } {
+	corners := r.GetCorners()
 	min := corners[0].Dot(axis)
 	max := min
 

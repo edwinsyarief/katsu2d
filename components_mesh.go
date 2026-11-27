@@ -1,5 +1,7 @@
 package katsu2d
 
+import "image"
+
 type MeshType int
 
 const (
@@ -28,4 +30,15 @@ type MeshComponent struct {
 	MeshType               MeshType
 	TexMode                MeshTextureMode
 	IsDirty                bool
+	cachedSrcRect          image.Rectangle
+}
+
+// NewGridMeshComponent creates a dirty grid MeshComponent with the given row and column counts.
+func NewGridMeshComponent(rows, cols int) MeshComponent {
+	return MeshComponent{
+		Rows:     rows,
+		Cols:     cols,
+		MeshType: MeshTypeGrid,
+		IsDirty:  true,
+	}
 }

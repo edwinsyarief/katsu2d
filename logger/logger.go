@@ -1,26 +1,33 @@
 package logger
 
+import "sync/atomic"
+
+// Logger provides leveled logging across desktop and WebAssembly targets.
 type Logger struct {
-	isDebug bool
+	isDebug atomic.Bool
+	platformLogger
 }
 
-// Common methods for both environments
-func (self *Logger) SetDebugMode(debug bool) {
-	self.isDebug = debug
+// SetDebugMode enables or disables INFO and DEBUG log output.
+func (l *Logger) SetDebugMode(debug bool) {
+	l.isDebug.Store(debug)
 }
 
-func (self *Logger) Error(format string, v ...any) {
-	self.log("ERROR", format, v...)
+// Error logs a formatted error message.
+func (l *Logger) Error(format string, v ...any) {
+	l.log("ERROR", format, v...)
 }
 
-func (self *Logger) Info(format string, v ...any) {
-	if self.isDebug {
-		self.log("INFO", format, v...)
+// Info logs a formatted informational message when debug mode is enabled.
+func (l *Logger) Info(format string, v ...any) {
+	if l.isDebug.Load() {
+		l.log("INFO", format, v...)
 	}
 }
 
-func (self *Logger) Debug(format string, v ...any) {
-	if self.isDebug {
-		self.log("DEBUG", format, v...)
+// Debug logs a formatted debug message when debug mode is enabled.
+func (l *Logger) Debug(format string, v ...any) {
+	if l.isDebug.Load() {
+		l.log("DEBUG", format, v...)
 	}
 }

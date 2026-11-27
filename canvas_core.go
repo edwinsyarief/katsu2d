@@ -1,87 +1,109 @@
 package katsu2d
 
 import (
+	"math"
+
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type canvas struct {
-	buffer                  *ebiten.Image
-	renderers               []func(*ebiten.Image)
 	topLeft, scale          Vector
 	width, height           int
 	stretched, pixelPerfect bool
-	filter                  scalingFilter
+	filter                  ScalingFilter
 }
 
 func newCanvas(width, height int, stretched, pixelPerfect bool) *canvas {
-	result := &canvas{
-		width:        width,
-		height:       height,
+	c := &canvas{
+		width:        max(1, width),
+		height:       max(1, height),
+		scale:        V2(1),
 		stretched:    stretched,
 		pixelPerfect: pixelPerfect,
-		buffer:       ebiten.NewImage(width, height),
-		renderers:    make([]func(*ebiten.Image), 0),
 	}
-	result.SetFilter(_AASamplingSoft)
-	return result
+	c.SetFilter(SF_AASamplingSoft)
+	return c
 }
-func (self *canvas) SetFilter(filter scalingFilter) {
-	self.filter = filter
+
+func (c *canvas) SetFilter(filter ScalingFilter) {
+	c.filter = filter
 	if shaders[filter] == nil {
 		compileShader(filter)
 	}
 }
-func (self *canvas) AddRenderer(renderer func(*ebiten.Image)) {
-	self.renderers = append(self.renderers, renderer)
+
+func (c *canvas) GetTopLeft() Vector {
+	return c.topLeft
 }
-func (self *canvas) GetTopLeft() Vector {
-	return self.topLeft
+
+func (c *canvas) GetScale() Vector {
+	return c.scale
 }
-func (self *canvas) GetScale() Vector {
-	return self.scale
-}
-func (self *canvas) Resize(width, height int) {
+
+func (c *canvas) Resize(width, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
 	scale := V(
-		float64(width)/float64(self.width),
-		float64(height)/float64(self.height),
+		float64(width)/float64(c.width),
+		float64(height)/float64(c.height),
 	)
-	if scale.X < scale.Y {
-		scale.Y = scale.X
+	if !c.stretched {
+		if scale.X < scale.Y {
+			scale.Y = scale.X
+		} else {
+			scale.X = scale.Y
+		}
+	}
+	if c.pixelPerfect {
+		scale.X = math.Max(1, math.Floor(scale.X))
+		scale.Y = math.Max(1, math.Floor(scale.Y))
+	}
+	c.scale = scale
+	if c.stretched {
+		c.topLeft = V2(0)
 	} else {
-		scale.X = scale.Y
-	}
-	if self.pixelPerfect {
-		scale = scale.Floor()
-	}
-	self.scale = scale
-	self.topLeft = V2(0)
-	if !self.stretched {
-		self.topLeft = V(
-			(float64(width)-float64(self.width)*self.scale.X)/2,
-			(float64(height)-float64(self.height)*self.scale.Y)/2,
+		c.topLeft = V(
+			(float64(width)-float64(c.width)*c.scale.X)/2,
+			(float64(height)-float64(c.height)*c.scale.Y)/2,
 		)
 	}
 }
-func (self *canvas) ScaleCursorPosition() Vector {
-	x, y := ebiten.CursorPosition()
+
+func (c *canvas) ScreenToCanvas(x, y float64) Vector {
+	if c.scale.X == 0 || c.scale.Y == 0 {
+		return V(x, y)
+	}
 	return V(
-		(float64(x)-self.topLeft.X)/self.scale.X,
-		(float64(y)-self.topLeft.Y)/self.scale.Y,
+		(x-c.topLeft.X)/c.scale.X,
+		(y-c.topLeft.Y)/c.scale.Y,
 	)
 }
-func (self *canvas) Draw(source, destination *ebiten.Image) {
-	p0 := self.topLeft
-	p1 := p0.Add(V(self.scale.X*float64(self.width), 0))
-	p2 := p0.Add(V(self.scale.X*float64(self.width), self.scale.Y*float64(self.height)))
-	p3 := p0.Add(V(0, self.scale.Y*float64(self.height)))
+
+func (c *canvas) ScaleCursorPosition() Vector {
+	x, y := ebiten.CursorPosition()
+	return c.ScreenToCanvas(float64(x), float64(y))
+}
+
+func (c *canvas) Draw(source, destination *ebiten.Image) {
+	dstW := destination.Bounds().Dx()
+	dstH := destination.Bounds().Dy()
+	if dstW <= 0 || dstH <= 0 {
+		return
+	}
+
+	p0 := c.topLeft
+	w := c.scale.X * float64(c.width)
+	h := c.scale.Y * float64(c.height)
 	shaderVertices[0].DstX = float32(p0.X)
 	shaderVertices[0].DstY = float32(p0.Y)
-	shaderVertices[1].DstX = float32(p1.X)
-	shaderVertices[1].DstY = float32(p1.Y)
-	shaderVertices[2].DstX = float32(p2.X)
-	shaderVertices[2].DstY = float32(p2.Y)
-	shaderVertices[3].DstX = float32(p3.X)
-	shaderVertices[3].DstY = float32(p3.Y)
+	shaderVertices[1].DstX = float32(p0.X + w)
+	shaderVertices[1].DstY = float32(p0.Y)
+	shaderVertices[2].DstX = float32(p0.X + w)
+	shaderVertices[2].DstY = float32(p0.Y + h)
+	shaderVertices[3].DstX = float32(p0.X)
+	shaderVertices[3].DstY = float32(p0.Y + h)
+
 	sourceBounds := source.Bounds()
 	shaderVertices[0].SrcX = float32(sourceBounds.Min.X)
 	shaderVertices[0].SrcY = float32(sourceBounds.Min.Y)
@@ -91,12 +113,20 @@ func (self *canvas) Draw(source, destination *ebiten.Image) {
 	shaderVertices[2].SrcY = float32(sourceBounds.Max.Y)
 	shaderVertices[3].SrcX = shaderVertices[0].SrcX
 	shaderVertices[3].SrcY = shaderVertices[2].SrcY
+
 	shaderOpts.Images[0] = source
-	shaderOpts.Uniforms["SourceRelativeTextureUnitX"] = float32(float64(self.width) / float64(destination.Bounds().Dx()))
-	shaderOpts.Uniforms["SourceRelativeTextureUnitY"] = float32(float64(self.height) / float64(destination.Bounds().Dy()))
+	switch c.filter {
+	case SF_CrtLottes:
+		tw, th := sourceBounds.Dx(), sourceBounds.Dy()
+		shaderOpts.Uniforms["ScreenSize"] = []float32{float32(dstW), float32(dstH)}
+		shaderOpts.Uniforms["TextureSize"] = []float32{float32(tw), float32(th)}
+	default:
+		shaderOpts.Uniforms["SourceRelativeTextureUnitX"] = float32(float64(c.width) / float64(dstW))
+		shaderOpts.Uniforms["SourceRelativeTextureUnitY"] = float32(float64(c.height) / float64(dstH))
+	}
 	destination.DrawTrianglesShader(
 		shaderVertices, shaderVertIndices,
-		shaders[self.filter], &shaderOpts,
+		shaders[c.filter], &shaderOpts,
 	)
 	shaderOpts.Images[0] = nil
 }

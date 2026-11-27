@@ -64,29 +64,35 @@ func New(width, height int, opts *NewAtlasOptions) *Atlas {
 
 // Image returns the underlying *ebiten.Image for the entire atlas.
 // This is the image that should be used as the source for drawing operations.
-func (self *Atlas) Image() *ebiten.Image {
-	return self.native
+func (a *Atlas) Image() *ebiten.Image {
+	return a.native
 }
 
 // Bounds returns the dimensions of the entire atlas as an image.Rectangle.
-func (self *Atlas) Bounds() image.Rectangle {
-	return self.native.Bounds()
+func (a *Atlas) Bounds() image.Rectangle {
+	if a.native == nil {
+		return image.Rectangle{}
+	}
+	return a.native.Bounds()
 }
 
 // NewImage finds and allocates a new rectangular area on the atlas for an
 // image of the given width and height.
 // It returns a new *Image representing the allocated region.
 // If there is not enough free space on the atlas, it returns nil.
-func (self *Atlas) NewImage(width, height int) *Image {
+func (a *Atlas) NewImage(width, height int) *Image {
+	if width <= 0 || height <= 0 || a.native == nil {
+		return nil
+	}
 	// Define the rectangle for the new image.
 	r := image.Rect(0, 0, width, height)
 	img := &Image{
-		atlas:  self,
+		atlas:  a,
 		bounds: &r,
 	}
 
 	// Try to insert the image's bounds into the allocation set.
-	if !self.set.Insert(img.bounds) {
+	if !a.set.Insert(img.bounds) {
 		// If insertion fails, it means there's no space.
 		return nil
 	}
@@ -99,9 +105,9 @@ func (self *Atlas) NewImage(width, height int) *Image {
 // This method does not perform any new allocation. It's useful when the atlas
 // is created from an existing spritesheet where the locations of sub-images
 // are already known.
-func (self *Atlas) SubImage(bounds image.Rectangle) *Image {
+func (a *Atlas) SubImage(bounds image.Rectangle) *Image {
 	return &Image{
-		atlas:  self,
+		atlas:  a,
 		bounds: &bounds,
 	}
 }
@@ -109,9 +115,24 @@ func (self *Atlas) SubImage(bounds image.Rectangle) *Image {
 // Free deallocates an image's region on the atlas, making its space
 // available for future allocations. It also clears the pixels in that
 // region to prevent graphical artifacts.
-func (self *Atlas) Free(img *Image) {
+func (a *Atlas) Free(img *Image) {
+	if img == nil || img.bounds == nil {
+		return
+	}
 	// Clear the image data in the specified region to avoid stale graphics.
-	img.Image().Clear()
+	if a.native != nil {
+		if sub := img.Image(); sub != nil {
+			sub.Clear()
+		}
+	}
 	// Mark the region as free in the allocation set.
-	self.set.Free(img.bounds)
+	a.set.Free(img.bounds)
+}
+
+// Dispose releases the underlying GPU image resources for the atlas.
+func (a *Atlas) Dispose() {
+	if a.native != nil {
+		a.native.Deallocate()
+		a.native = nil
+	}
 }

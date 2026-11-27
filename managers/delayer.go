@@ -1,6 +1,7 @@
 package managers
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 )
@@ -8,9 +9,9 @@ import (
 type delayState int
 
 const (
-	delay_task_idle = iota
-	delay_task_active
-	delay_task_done
+	delayTaskIdle delayState = iota
+	delayTaskActive
+	delayTaskDone
 )
 
 type delayTask struct {
@@ -19,59 +20,86 @@ type delayTask struct {
 	time     float64
 	state    delayState
 }
+
+// DelayManager schedules named one-shot delayed callbacks.
 type DelayManager struct {
-	delays []*delayTask
+	delays     []*delayTask
+	pendingCbs []func()
 }
 
+// NewDelayManager creates and returns a new DelayManager.
 func NewDelayManager() *DelayManager {
 	return &DelayManager{
 		delays: []*delayTask{},
 	}
 }
-func (self *DelayManager) Update(delta float64) {
-	for _, t := range self.delays {
-		if t.state == delay_task_active {
+
+// Update advances active delay tasks by delta, removes completed tasks, and invokes their callbacks.
+func (m *DelayManager) Update(delta float64) {
+	m.pendingCbs = m.pendingCbs[:0]
+	n := 0
+	for _, t := range m.delays {
+		if t == nil {
+			continue
+		}
+		if t.state == delayTaskActive {
 			t.time -= delta
 			if t.time <= 0 {
-				t.callback()
-				t.state = delay_task_done
+				t.state = delayTaskDone
+				if t.callback != nil {
+					m.pendingCbs = append(m.pendingCbs, t.callback)
+				}
+				continue
 			}
 		}
+		if t.state != delayTaskDone {
+			m.delays[n] = t
+			n++
+		}
 	}
-	self.delays = slices.DeleteFunc(self.delays, func(t *delayTask) bool {
-		return t.state == delay_task_done
-	})
+	clear(m.delays[n:])
+	m.delays = m.delays[:n]
+
+	for i, cb := range m.pendingCbs {
+		if cb != nil {
+			cb()
+			m.pendingCbs[i] = nil
+		}
+	}
+	m.pendingCbs = m.pendingCbs[:0]
 }
-func (self *DelayManager) Add(id string, time float64, callback func()) {
-	var exist, index = self.HasId(id)
+
+// Add registers or replaces a delayed task in idle state.
+func (m *DelayManager) Add(id string, time float64, callback func()) {
+	exist, index := m.HasId(id)
+	task := &delayTask{id: id, time: time, callback: callback, state: delayTaskIdle}
 	if exist {
-		self.delays[index] = &delayTask{id: id, time: time, callback: callback, state: delay_task_idle}
+		m.delays[index] = task
 	} else {
-		self.delays = append(self.delays, &delayTask{id: id, time: time, callback: callback, state: delay_task_idle})
+		m.delays = append(m.delays, task)
 	}
-	self.sortTasks()
+	m.sortTasks()
 }
-func (self *DelayManager) HasId(id string) (bool, int) {
-	var index = slices.IndexFunc(self.delays, func(t *delayTask) bool {
-		return t.id == id
+
+// HasId reports whether a task with the given id exists and returns its index, or -1 if absent.
+func (m *DelayManager) HasId(id string) (bool, int) {
+	index := slices.IndexFunc(m.delays, func(t *delayTask) bool {
+		return t != nil && t.id == id
 	})
 	return index != -1, index
 }
-func (self *DelayManager) Activate(id string) {
-	var has, index = self.HasId(id)
+
+// Activate marks the task with the given id as active so it counts down during Update.
+func (m *DelayManager) Activate(id string) {
+	has, index := m.HasId(id)
 	if !has {
 		panic(fmt.Sprintf("Delayer with task id: '%s' doesn't exist", id))
 	}
-	self.delays[index].state = delay_task_active
+	m.delays[index].state = delayTaskActive
 }
-func (self *DelayManager) sortTasks() {
-	slices.SortFunc(self.delays, func(t1 *delayTask, t2 *delayTask) int {
-		if t1.time > t2.time {
-			return 1
-		} else if t1.time < t2.time {
-			return -1
-		} else {
-			return 0
-		}
+
+func (m *DelayManager) sortTasks() {
+	slices.SortFunc(m.delays, func(t1, t2 *delayTask) int {
+		return cmp.Compare(t1.time, t2.time)
 	})
 }

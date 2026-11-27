@@ -38,25 +38,29 @@ type StereoPanStream struct {
 }
 
 // Read reads panned audio data into p.
-func (self *StereoPanStream) Read(p []byte) (int, error) {
+func (s *StereoPanStream) Read(p []byte) (int, error) {
 	// If the stream has a buffer that was read in the previous time, use this first.
 	var bufN int
-	if len(self.buf) > 0 {
-		bufN = copy(p, self.buf)
-		self.buf = self.buf[bufN:]
+	if len(s.buf) > 0 {
+		bufN = copy(p, s.buf)
+		rem := len(s.buf) - bufN
+		if rem > 0 {
+			copy(s.buf, s.buf[bufN:])
+		}
+		s.buf = s.buf[:rem]
 	}
-	readN, err := self.ReadSeeker.Read(p[bufN:])
+	readN, err := s.ReadSeeker.Read(p[bufN:])
 	if err != nil && err != io.EOF {
 		return 0, err
 	}
 	// Align the buffer size in multiples of 8 (4 bytes per channel, 2 channels).
 	totalN := bufN + readN
 	extra := totalN % 8
-	self.buf = append(self.buf, p[totalN-extra:totalN]...)
+	s.buf = append(s.buf, p[totalN-extra:totalN]...)
 	alignedN := totalN - extra
 	// Calculate stereo balance using Unity's approach
-	ls := float32(math.Min(self.pan*-1+1, 1))
-	rs := float32(math.Min(self.pan+1, 1))
+	ls := float32(math.Min(s.pan*-1+1, 1))
+	rs := float32(math.Min(s.pan+1, 1))
 	for i := 0; i < alignedN; i += 8 {
 		lc := math.Float32frombits(uint32(p[i])|(uint32(p[i+1])<<8)|(uint32(p[i+2])<<16)|(uint32(p[i+3])<<24)) * ls
 		rc := math.Float32frombits(uint32(p[i+4])|(uint32(p[i+5])<<8)|(uint32(p[i+6])<<16)|(uint32(p[i+7])<<24)) * rs
@@ -75,13 +79,13 @@ func (self *StereoPanStream) Read(p []byte) (int, error) {
 }
 
 // SetPan sets the pan value for the stream, clamped between -1 and 1.
-func (self *StereoPanStream) SetPan(pan float64) {
-	self.pan = math.Min(math.Max(-1, pan), 1)
+func (s *StereoPanStream) SetPan(pan float64) {
+	s.pan = math.Min(math.Max(-1, pan), 1)
 }
 
 // Pan returns the current pan value of the stream.
-func (self *StereoPanStream) Pan() float64 {
-	return self.pan
+func (s *StereoPanStream) Pan() float64 {
+	return s.pan
 }
 
 // NewStereoPanStream returns a new StereoPanStream with a buffered src.
@@ -113,6 +117,8 @@ type AudioSource struct {
 	fadeType      AudioFadeType
 	trackID       TrackID
 }
+
+// TrackData holds the decoded format extension and raw audio bytes for a loaded track.
 type TrackData struct {
 	ext     string
 	content []byte
@@ -124,6 +130,7 @@ type AudioManager struct {
 	trackList      map[TrackID]TrackData
 	players        map[PlaybackID]*AudioSource
 	stackingTracks map[TrackID]*StackingArray
+	finishedIDs    []PlaybackID
 	nextPlaybackID PlaybackID
 }
 
@@ -139,7 +146,7 @@ func NewAudioManager(sampleRate int) *AudioManager {
 }
 
 // fromBytes decodes audio from bytes.
-func (self *AudioManager) fromBytes(content []byte, ext string) (io.ReadSeeker, error) {
+func (am *AudioManager) fromBytes(content []byte, ext string) (io.ReadSeeker, error) {
 	switch ext {
 	case "ogg":
 		return vorbis.DecodeF32(bytes.NewReader(content))
@@ -158,48 +165,63 @@ func (self *AudioManager) fromBytes(content []byte, ext string) (io.ReadSeeker, 
 }
 
 // Load loads an audio file from disk and stores its bytes.
-func (self *AudioManager) Load(path string) (TrackID, error) {
+func (am *AudioManager) Load(path string) (TrackID, error) {
 	if path == "" {
 		return -1, fmt.Errorf("audio file path cannot be empty")
 	}
-	b := readFile(path)
-	if len(b) == 0 {
-		return -1, fmt.Errorf("failed to read audio file: %s", path)
+	b, err := readFileErr(path)
+	if err != nil {
+		return -1, fmt.Errorf("failed to read audio file %s: %w", path, err)
 	}
-	id := TrackID(len(self.trackList))
-	self.trackList[id] = TrackData{content: b, ext: GetFileExtension(path)}
+	if len(b) == 0 {
+		return -1, fmt.Errorf("audio file is empty: %s", path)
+	}
+	id := TrackID(len(am.trackList))
+	am.trackList[id] = TrackData{content: b, ext: GetFileExtension(path)}
 	return id, nil
 }
 
 // LoadEmbedded loads embedded audio data and stores its bytes.
-func (self *AudioManager) LoadEmbedded(path string) (TrackID, error) {
-	b := openEmbeddedFile(path)
-	if len(b) == 0 {
-		return -1, fmt.Errorf("failed to read embedded audio file: %s", path)
+func (am *AudioManager) LoadEmbedded(path string) (TrackID, error) {
+	if path == "" {
+		return -1, fmt.Errorf("embedded audio file path cannot be empty")
 	}
-	id := TrackID(len(self.trackList))
-	self.trackList[id] = TrackData{content: b, ext: GetFileExtension(path)}
+	b, err := openEmbeddedFileErr(path)
+	if err != nil {
+		return -1, fmt.Errorf("failed to read embedded audio file %s: %w", path, err)
+	}
+	if len(b) == 0 {
+		return -1, fmt.Errorf("embedded audio file is empty: %s", path)
+	}
+	id := TrackID(len(am.trackList))
+	am.trackList[id] = TrackData{content: b, ext: GetFileExtension(path)}
 	return id, nil
 }
 
 // LoadFromAssetPacker loads audio from an asset pack and stores its bytes.
-func (self *AudioManager) LoadFromAssetPacker(path string) (TrackID, error) {
-	b := openBundledFile(path)
-	if len(b) == 0 {
-		return -1, fmt.Errorf("failed to read bundled audio file: %s", path)
+func (am *AudioManager) LoadFromAssetPacker(path string) (TrackID, error) {
+	if path == "" {
+		return -1, fmt.Errorf("bundled audio file path cannot be empty")
 	}
-	id := TrackID(len(self.trackList))
-	self.trackList[id] = TrackData{content: b, ext: GetFileExtension(path)}
+	b, err := openBundledFileErr(path)
+	if err != nil {
+		return -1, fmt.Errorf("failed to read bundled audio file %s: %w", path, err)
+	}
+	if len(b) == 0 {
+		return -1, fmt.Errorf("bundled audio file is empty: %s", path)
+	}
+	id := TrackID(len(am.trackList))
+	am.trackList[id] = TrackData{content: b, ext: GetFileExtension(path)}
 	return id, nil
 }
 
 // prepareAudioSource prepares a new audio source from stored bytes.
-func (self *AudioManager) prepareAudioSource(trackID TrackID, pan float64, loop bool) (*AudioSource, error) {
-	if int(trackID) < 0 || int(trackID) >= len(self.trackList) {
+func (am *AudioManager) prepareAudioSource(trackID TrackID, pan float64, loop bool) (*AudioSource, error) {
+	trackData, ok := am.trackList[trackID]
+	if !ok {
 		return nil, fmt.Errorf("invalid track ID: %d", trackID)
 	}
-	trackData := self.trackList[trackID]
-	reader, err := self.fromBytes(trackData.content, trackData.ext)
+	reader, err := am.fromBytes(trackData.content, trackData.ext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode audio from bytes: %w", err)
 	}
@@ -234,7 +256,7 @@ func (self *AudioManager) prepareAudioSource(trackID TrackID, pan float64, loop 
 	if pan != 0 {
 		panStream.SetPan(pan)
 	}
-	player, err := self.audioContext.NewPlayerF32(panStream)
+	player, err := am.audioContext.NewPlayerF32(panStream)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audio player: %w", err)
 	}
@@ -246,8 +268,8 @@ func (self *AudioManager) prepareAudioSource(trackID TrackID, pan float64, loop 
 }
 
 // createAudioSource creates and initializes an audio source, starting playback.
-func (self *AudioManager) createAudioSource(trackID TrackID, pan float64, loop bool, defaultVolume float64, fadeDuration float64, fadeType AudioFadeType) (*AudioSource, error) {
-	source, err := self.prepareAudioSource(trackID, pan, loop)
+func (am *AudioManager) createAudioSource(trackID TrackID, pan float64, loop bool, defaultVolume float64, fadeDuration float64, fadeType AudioFadeType) (*AudioSource, error) {
+	source, err := am.prepareAudioSource(trackID, pan, loop)
 	if err != nil {
 		return nil, err
 	}
@@ -275,104 +297,109 @@ func (self *AudioManager) createAudioSource(trackID TrackID, pan float64, loop b
 }
 
 // internalPlay handles playback logic, including stacking and fading.
-func (self *AudioManager) internalPlay(trackID TrackID, pan float64, loop bool, defaultVolume float64, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
+func (am *AudioManager) internalPlay(trackID TrackID, pan float64, loop bool, defaultVolume float64, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
 	stacking := stackConfig != nil && stackConfig.Enabled && stackConfig.MaxStack > 1
 	if !stacking {
-		self.StopByTrackID(trackID)
+		am.StopByTrackID(trackID)
 	} else {
-		stackArray, ok := self.stackingTracks[trackID]
+		stackArray, ok := am.stackingTracks[trackID]
 		if !ok {
 			stackArray = &StackingArray{}
-			self.stackingTracks[trackID] = stackArray
+			am.stackingTracks[trackID] = stackArray
 		}
-		active := []PlaybackID{}
+		active := stackArray.playbackIDs[:0]
 		for _, id := range stackArray.playbackIDs {
-			if s, ok := self.players[id]; ok && s.player.IsPlaying() {
+			if s, ok := am.players[id]; ok && s.player.IsPlaying() {
 				active = append(active, id)
 			}
 		}
 		stackArray.playbackIDs = active
 		if len(active) >= stackConfig.MaxStack {
 			oldest := active[0]
-			if err := self.Stop(oldest); err != nil {
+			if err := am.Stop(oldest); err != nil {
 				log.Printf("error stopping oldest playback ID %d: %v\n", oldest, err)
 			}
-			stackArray.playbackIDs = active[1:]
 		}
 	}
-	source, err := self.createAudioSource(trackID, pan, loop, defaultVolume, fadeDuration, fadeType)
+	source, err := am.createAudioSource(trackID, pan, loop, defaultVolume, fadeDuration, fadeType)
 	if err != nil {
 		return -1, err
 	}
-	playbackID := self.nextPlaybackID
-	self.players[playbackID] = source
-	self.nextPlaybackID++
+	playbackID := am.nextPlaybackID
+	am.players[playbackID] = source
+	am.nextPlaybackID++
 	if stacking {
-		self.stackingTracks[trackID].playbackIDs = append(self.stackingTracks[trackID].playbackIDs, playbackID)
+		sa, ok := am.stackingTracks[trackID]
+		if !ok {
+			sa = &StackingArray{}
+			am.stackingTracks[trackID] = sa
+		}
+		sa.playbackIDs = append(sa.playbackIDs, playbackID)
 	}
 	return playbackID, nil
 }
 
 // PlaySound plays a one-shot sound effect.
-func (self *AudioManager) PlaySound(trackID TrackID, pan float64, stackConfig *StackingConfig) (PlaybackID, error) {
-	return self.internalPlay(trackID, pan, false, 1.0, 0, AudioFadeIn, stackConfig)
+func (am *AudioManager) PlaySound(trackID TrackID, pan float64, stackConfig *StackingConfig) (PlaybackID, error) {
+	return am.internalPlay(trackID, pan, false, 1.0, 0, AudioFadeIn, stackConfig)
 }
 
 // PlayMusic plays a music track.
-func (self *AudioManager) PlayMusic(trackID TrackID, loop bool) (PlaybackID, error) {
-	return self.internalPlay(trackID, 0, loop, 0.5, 0, AudioFadeIn, nil)
+func (am *AudioManager) PlayMusic(trackID TrackID, loop bool) (PlaybackID, error) {
+	return am.internalPlay(trackID, 0, loop, 0.5, 0, AudioFadeIn, nil)
 }
 
 // FadeSound plays a sound effect with a fade effect.
-func (self *AudioManager) FadeSound(trackID TrackID, pan, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
-	return self.internalPlay(trackID, pan, false, 1.0, fadeDuration, fadeType, stackConfig)
+func (am *AudioManager) FadeSound(trackID TrackID, pan, fadeDuration float64, fadeType AudioFadeType, stackConfig *StackingConfig) (PlaybackID, error) {
+	return am.internalPlay(trackID, pan, false, 1.0, fadeDuration, fadeType, stackConfig)
 }
 
 // FadeMusic plays a music track with a fade effect.
-func (self *AudioManager) FadeMusic(trackID TrackID, loop bool, fadeDuration float64, fadeType AudioFadeType) (PlaybackID, error) {
-	return self.internalPlay(trackID, 0, loop, 1.0, fadeDuration, fadeType, nil)
+func (am *AudioManager) FadeMusic(trackID TrackID, loop bool, fadeDuration float64, fadeType AudioFadeType) (PlaybackID, error) {
+	return am.internalPlay(trackID, 0, loop, 1.0, fadeDuration, fadeType, nil)
 }
 
 // Stop stops and removes a single playing audio source.
-func (self *AudioManager) Stop(id PlaybackID) error {
-	source, ok := self.players[id]
+func (am *AudioManager) Stop(id PlaybackID) error {
+	source, ok := am.players[id]
 	if !ok {
 		return fmt.Errorf("invalid playback ID: %d", id)
 	}
-	if stackArray, exists := self.stackingTracks[source.trackID]; exists {
-		newPlaybackIDs := []PlaybackID{}
+	if stackArray, exists := am.stackingTracks[source.trackID]; exists {
+		n := 0
 		for _, stackedID := range stackArray.playbackIDs {
 			if stackedID != id {
-				newPlaybackIDs = append(newPlaybackIDs, stackedID)
+				stackArray.playbackIDs[n] = stackedID
+				n++
 			}
 		}
-		stackArray.playbackIDs = newPlaybackIDs
+		stackArray.playbackIDs = stackArray.playbackIDs[:n]
 		if len(stackArray.playbackIDs) == 0 {
-			delete(self.stackingTracks, source.trackID)
+			delete(am.stackingTracks, source.trackID)
 		}
 	}
 	source.player.Pause()
 	source.player.Close()
-	delete(self.players, id)
+	delete(am.players, id)
 	return nil
 }
 
 // StopByTrackID stops all playing instances of a specific track.
-func (self *AudioManager) StopByTrackID(trackID TrackID) {
-	var idsToStop []PlaybackID
-	for id, source := range self.players {
+func (am *AudioManager) StopByTrackID(trackID TrackID) {
+	am.finishedIDs = am.finishedIDs[:0]
+	for id, source := range am.players {
 		if source.trackID == trackID {
-			idsToStop = append(idsToStop, id)
+			am.finishedIDs = append(am.finishedIDs, id)
 		}
 	}
-	for _, id := range idsToStop {
-		_ = self.Stop(id)
+	for _, id := range am.finishedIDs {
+		_ = am.Stop(id)
 	}
 }
 
 // Pause pauses a single playing audio source, allowing it to be resumed later.
-func (self *AudioManager) Pause(id PlaybackID) error {
-	source, ok := self.players[id]
+func (am *AudioManager) Pause(id PlaybackID) error {
+	source, ok := am.players[id]
 	if !ok {
 		return fmt.Errorf("invalid playback ID: %d", id)
 	}
@@ -381,8 +408,8 @@ func (self *AudioManager) Pause(id PlaybackID) error {
 }
 
 // Resume resumes a paused audio source.
-func (self *AudioManager) Resume(id PlaybackID) error {
-	source, ok := self.players[id]
+func (am *AudioManager) Resume(id PlaybackID) error {
+	source, ok := am.players[id]
 	if !ok {
 		return fmt.Errorf("invalid playback ID: %d", id)
 	}
@@ -391,8 +418,8 @@ func (self *AudioManager) Resume(id PlaybackID) error {
 }
 
 // IsPlaying checks if a specific playback instance is currently playing.
-func (self *AudioManager) IsPlaying(id PlaybackID) bool {
-	source, ok := self.players[id]
+func (am *AudioManager) IsPlaying(id PlaybackID) bool {
+	source, ok := am.players[id]
 	if !ok {
 		return false
 	}
@@ -400,8 +427,8 @@ func (self *AudioManager) IsPlaying(id PlaybackID) bool {
 }
 
 // IsTrackPlaying checks if any instance of a given track ID is currently playing.
-func (self *AudioManager) IsTrackPlaying(trackID TrackID) bool {
-	for _, source := range self.players {
+func (am *AudioManager) IsTrackPlaying(trackID TrackID) bool {
+	for _, source := range am.players {
 		if source.trackID == trackID && source.player.IsPlaying() {
 			return true
 		}
@@ -410,15 +437,19 @@ func (self *AudioManager) IsTrackPlaying(trackID TrackID) bool {
 }
 
 // StopAll stops all currently playing audio sources.
-func (self *AudioManager) StopAll() {
-	for id := range self.players {
-		_ = self.Stop(id)
+func (am *AudioManager) StopAll() {
+	am.finishedIDs = am.finishedIDs[:0]
+	for id := range am.players {
+		am.finishedIDs = append(am.finishedIDs, id)
+	}
+	for _, id := range am.finishedIDs {
+		_ = am.Stop(id)
 	}
 }
 
 // SetVolume adjusts the volume of a single playing audio source.
-func (self *AudioManager) SetVolume(id PlaybackID, volume float64) error {
-	source, ok := self.players[id]
+func (am *AudioManager) SetVolume(id PlaybackID, volume float64) error {
+	source, ok := am.players[id]
 	if !ok {
 		return fmt.Errorf("invalid playback ID: %d", id)
 	}
@@ -428,8 +459,8 @@ func (self *AudioManager) SetVolume(id PlaybackID, volume float64) error {
 }
 
 // SetPan adjusts the stereo pan of a single playing audio source.
-func (self *AudioManager) SetPan(id PlaybackID, pan float64) error {
-	source, ok := self.players[id]
+func (am *AudioManager) SetPan(id PlaybackID, pan float64) error {
+	source, ok := am.players[id]
 	if !ok {
 		return fmt.Errorf("invalid playback ID: %d", id)
 	}
@@ -438,26 +469,36 @@ func (self *AudioManager) SetPan(id PlaybackID, pan float64) error {
 }
 
 // Update handles audio state updates and cleanup.
-func (self *AudioManager) Update(dt float64) {
-	for id, source := range self.players {
+func (am *AudioManager) Update(dt float64) {
+	am.finishedIDs = am.finishedIDs[:0]
+	for id, source := range am.players {
 		if source.isFading {
-			volumeChange := (1.0 / source.fadeDuration) * dt
-			if source.fadeType == AudioFadeOut {
-				volumeChange = -volumeChange
-			}
-			source.currentVolume += volumeChange
-			fadeComplete := (source.fadeType == AudioFadeIn && source.currentVolume >= source.targetVolume) ||
-				(source.fadeType == AudioFadeOut && source.currentVolume <= source.targetVolume)
-			if fadeComplete {
+			if source.fadeDuration <= 0 {
 				source.currentVolume = source.targetVolume
 				source.isFading = false
+				source.player.SetVolume(source.currentVolume)
+			} else {
+				volumeChange := (1.0 / source.fadeDuration) * dt
+				if source.fadeType == AudioFadeOut {
+					volumeChange = -volumeChange
+				}
+				source.currentVolume += volumeChange
+				fadeComplete := (source.fadeType == AudioFadeIn && source.currentVolume >= source.targetVolume) ||
+					(source.fadeType == AudioFadeOut && source.currentVolume <= source.targetVolume)
+				if fadeComplete {
+					source.currentVolume = source.targetVolume
+					source.isFading = false
+				}
+				source.player.SetVolume(source.currentVolume)
 			}
-			source.player.SetVolume(source.currentVolume)
 		}
 		if !source.player.IsPlaying() && !source.isFading {
-			if err := self.Stop(id); err != nil {
-				log.Printf("error stopping playback ID %d: %v\n", id, err)
-			}
+			am.finishedIDs = append(am.finishedIDs, id)
+		}
+	}
+	for _, id := range am.finishedIDs {
+		if err := am.Stop(id); err != nil {
+			log.Printf("error stopping playback ID %d: %v\n", id, err)
 		}
 	}
 }

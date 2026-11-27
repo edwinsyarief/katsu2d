@@ -2,6 +2,7 @@ package katsu2d
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	_ "image/png"
@@ -11,27 +12,19 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-// TextureManager manages loading and retrieving textures. It can operate in two
-// modes: using a texture atlas for performance, or managing individual textures
-// as a simple list.
+// TextureManager manages loading and retrieving textures either as individual
+// *ebiten.Images or packed inside texture atlases for draw call batching.
+// Texture ID 0 is always a 1x1 solid white pixel.
 type TextureManager struct {
-	// --- Atlas Mode Fields ---
-	// atlases is a slice of texture atlases. A new atlas is created when the
-	// existing ones are full. Only used when useAtlas is true.
-	atlases []*atlas.Atlas
-	// images is a slice of all the sub-images (textures) stored in the atlases.
-	// The index of this slice is used as the texture ID. Only used when useAtlas is true.
-	images []*atlas.Image
-	// --- Non-Atlas Mode Fields ---
-	// textures is a simple slice of images. Only used when useAtlas is false.
+	atlases     []*atlas.Atlas
+	images      []*atlas.Image
 	textures    []*ebiten.Image
 	atlasWidth  int
 	atlasHeight int
-	// --- Configuration ---
-	useAtlas bool
+	useAtlas    bool
 }
 
-// TextureManagerOption is a functional option for configuring a TextureManager.
+// TextureManagerOption configures a TextureManager.
 type TextureManagerOption func(*TextureManager)
 
 // WithAtlas enables or disables the texture atlas system.
@@ -41,8 +34,7 @@ func WithAtlas(enabled bool) TextureManagerOption {
 	}
 }
 
-// WithAtlasSize sets the dimensions for the internal texture atlases.
-// This implicitly enables the atlas system.
+// WithAtlasSize sets atlas dimensions and implicitly enables the atlas system.
 func WithAtlasSize(w, h int) TextureManagerOption {
 	return func(tm *TextureManager) {
 		tm.useAtlas = true
@@ -51,12 +43,9 @@ func WithAtlasSize(w, h int) TextureManagerOption {
 	}
 }
 
-// NewTextureManager creates a manager with a default white texture.
-// By default, the atlas system is disabled. Use WithAtlas(true) or
-// WithAtlasSize(...) to enable it.
+// NewTextureManager creates a TextureManager with a default 1x1 white texture at ID 0.
 func NewTextureManager(opts ...TextureManagerOption) *TextureManager {
 	tm := &TextureManager{
-		// Default values
 		useAtlas:    false,
 		atlasWidth:  2048,
 		atlasHeight: 2048,
@@ -64,25 +53,20 @@ func NewTextureManager(opts ...TextureManagerOption) *TextureManager {
 	for _, opt := range opts {
 		opt(tm)
 	}
-	// Add a 1x1 white texture as the default texture (ID 0).
+
 	white := ebiten.NewImage(1, 1)
 	white.Fill(color.White)
-	// Initialize the appropriate storage and add the white texture.
+
 	if tm.useAtlas {
 		tm.atlases = append(tm.atlases, atlas.New(tm.atlasWidth, tm.atlasHeight, nil))
-		// The Add method will handle adding the white texture to the atlas.
+		tm.Add(white)
 	} else {
 		tm.textures = append(tm.textures, white)
-	}
-	// If using the atlas, we need to call Add to place the white texture.
-	// In non-atlas mode, it's already in the slice.
-	if tm.useAtlas {
-		tm.Add(white)
 	}
 	return tm
 }
 
-// Load loads an image from a file, adds it to an atlas, and returns its ID.
+// Load loads an image from disk and returns its texture ID.
 func (tm *TextureManager) Load(path string) (int, error) {
 	_, img, err := ebitenutil.NewImageFromFile(path)
 	if err != nil {
@@ -91,50 +75,48 @@ func (tm *TextureManager) Load(path string) (int, error) {
 	return tm.Add(ebiten.NewImageFromImage(img)), nil
 }
 
-// LoadEmbedded loads an image from an embedded file, adds it to an atlas, and
-// returns its ID.
+// LoadEmbedded loads an image from the embedded filesystem and returns its ID.
 func (tm *TextureManager) LoadEmbedded(path string) int {
-	b := openEmbeddedFile(path)
-	return tm.fromByte(b)
+	id, err := tm.LoadBytes(openEmbeddedFile(path))
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
-// LoadFromAssetPacker loads an image from a bundled asset file, adds it to an
-// atlas, and returns its ID.
+// LoadFromAssetPacker loads an image from the asset bundle and returns its ID.
 func (tm *TextureManager) LoadFromAssetPacker(path string) int {
-	b := openBundledFile(path)
-	return tm.fromByte(b)
+	id, err := tm.LoadBytes(openBundledFile(path))
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
-// fromByte decodes an image from a byte slice, adds it to an atlas, and returns
-// its ID.
-func (tm *TextureManager) fromByte(content []byte) int {
-	img := ebiten.NewImageFromImage(*tm.decodeImage(&content))
-	return tm.Add(img)
+// LoadBytes decodes an image from raw bytes, registers it, and returns its ID.
+func (tm *TextureManager) LoadBytes(content []byte) (int, error) {
+	img, _, err := image.Decode(bytes.NewReader(content))
+	if err != nil {
+		return 0, fmt.Errorf("katsu2d: failed to decode image: %w", err)
+	}
+	return tm.Add(ebiten.NewImageFromImage(img)), nil
 }
 
-// decodeImage decodes a byte slice into an image.Image.
-func (tm *TextureManager) decodeImage(rawImage *[]byte) *image.Image {
-	img, _, _ := image.Decode(bytes.NewReader(*rawImage))
-	return &img
-}
-
-// Get retrieves a texture by its ID. If the ID is invalid, it returns the
-// default white texture.
+// Get retrieves a texture by ID, falling back to the 1x1 white texture (ID 0) if out of range.
 func (tm *TextureManager) Get(id int) *ebiten.Image {
 	if tm.useAtlas {
 		if id < 0 || id >= len(tm.images) {
-			return tm.images[0].Image() // Fallback to white texture (ID 0)
+			return tm.images[0].Image()
 		}
 		return tm.images[id].Image()
 	}
 	if id < 0 || id >= len(tm.textures) {
-		return tm.textures[0] // Fallback to white texture (ID 0)
+		return tm.textures[0]
 	}
 	return tm.textures[id]
 }
 
-// AtlasSize returns the default dimensions of the atlases created by the manager.
-// Returns 0, 0 if the atlas system is not in use.
+// AtlasSize returns the configured atlas dimensions, or (0, 0) when atlas mode is disabled.
 func (tm *TextureManager) AtlasSize() (int, int) {
 	if !tm.useAtlas {
 		return 0, 0
@@ -142,46 +124,40 @@ func (tm *TextureManager) AtlasSize() (int, int) {
 	return tm.atlasWidth, tm.atlasHeight
 }
 
-// Add adds a pre-existing *ebiten.Image to the manager and returns its new ID.
-// The behavior depends on whether the atlas system is enabled.
+// Add registers a pre-existing *ebiten.Image and returns its assigned texture ID.
 func (tm *TextureManager) Add(img *ebiten.Image) int {
 	if !tm.useAtlas {
 		id := len(tm.textures)
 		tm.textures = append(tm.textures, img)
 		return id
 	}
+
 	imgWidth := img.Bounds().Dx()
 	imgHeight := img.Bounds().Dy()
 	var atlasImg *atlas.Image
-	// Handle images that are larger than the standard atlas size.
+
 	if imgWidth > tm.atlasWidth || imgHeight > tm.atlasHeight {
-		// Create a new atlas specifically for this large image.
 		newAtlas := atlas.New(imgWidth, imgHeight, nil)
 		tm.atlases = append(tm.atlases, newAtlas)
 		atlasImg = newAtlas.NewImage(imgWidth, imgHeight)
 	} else {
-		// For regular-sized images, try to fit them into an existing atlas.
 		for _, a := range tm.atlases {
-			atlasImg = a.NewImage(imgWidth, imgHeight)
-			if atlasImg != nil {
-				break // Found a spot
+			if atlasImg = a.NewImage(imgWidth, imgHeight); atlasImg != nil {
+				break
 			}
 		}
-		// If no space was found, create a new atlas with the default size.
 		if atlasImg == nil {
 			newAtlas := atlas.New(tm.atlasWidth, tm.atlasHeight, nil)
 			tm.atlases = append(tm.atlases, newAtlas)
 			atlasImg = newAtlas.NewImage(imgWidth, imgHeight)
 		}
 	}
-	// If atlasImg is still nil, it means we couldn't allocate space even in a
-	// new atlas, which indicates a problem.
+
 	if atlasImg == nil {
 		panic("katsu2d: failed to allocate image on atlas")
 	}
-	// Draw the image onto the atlas.
+
 	atlasImg.DrawImage(img, nil)
-	// Add the new atlas image to the list and return its ID.
 	id := len(tm.images)
 	tm.images = append(tm.images, atlasImg)
 	return id

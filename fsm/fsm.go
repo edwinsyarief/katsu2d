@@ -42,19 +42,19 @@ func NewStateMachineConfig[S comparable, E comparable](initialState S) *StateMac
 }
 
 // AddTransition adds a transition with an optional guard.
-func (self *StateMachineConfig[S, E]) AddTransition(from S, event E, to S, guard GuardFunc[S, E]) {
+func (c *StateMachineConfig[S, E]) AddTransition(from S, event E, to S, guard GuardFunc[S, E]) {
 	key := StateEventKey[S, E]{state: from, event: event}
-	self.transitions[key] = Transition[S, E]{nextState: to, guard: guard}
+	c.transitions[key] = Transition[S, E]{nextState: to, guard: guard}
 }
 
 // OnEnter registers a function to be called when entering a state.
-func (self *StateMachineConfig[S, E]) OnEnter(state S, f EnterFunc[S]) {
-	self.enterFuncs[state] = f
+func (c *StateMachineConfig[S, E]) OnEnter(state S, f EnterFunc[S]) {
+	c.enterFuncs[state] = f
 }
 
 // OnExit registers a function to be called when exiting a state.
-func (self *StateMachineConfig[S, E]) OnExit(state S, f ExitFunc[S]) {
-	self.exitFuncs[state] = f
+func (c *StateMachineConfig[S, E]) OnExit(state S, f ExitFunc[S]) {
+	c.exitFuncs[state] = f
 }
 
 // StateMachine is a finite state machine using the shared configuration.
@@ -72,32 +72,32 @@ func NewStateMachine[S comparable, E comparable](config *StateMachineConfig[S, E
 }
 
 // Trigger processes an event, potentially transitioning to a new state.
-func (self *StateMachine[S, E]) Trigger(event E) error {
-	key := StateEventKey[S, E]{state: self.currentState, event: event}
-	transition, ok := self.config.transitions[key]
+func (sm *StateMachine[S, E]) Trigger(event E) error {
+	key := StateEventKey[S, E]{state: sm.currentState, event: event}
+	transition, ok := sm.config.transitions[key]
 	if !ok {
-		return fmt.Errorf("no transition for state %v and event %v", self.currentState, event)
+		return fmt.Errorf("no transition for state %v and event %v", sm.currentState, event)
 	}
-	if transition.guard != nil && !transition.guard(self.currentState, event) {
-		return fmt.Errorf("guard condition not met for transition from %v on event %v", self.currentState, event)
+	if transition.guard != nil && !transition.guard(sm.currentState, event) {
+		return fmt.Errorf("guard condition not met for transition from %v on event %v", sm.currentState, event)
 	}
 	// Perform transition
-	if exitFunc, ok := self.config.exitFuncs[self.currentState]; ok {
-		exitFunc(self.currentState)
+	if exitFunc, ok := sm.config.exitFuncs[sm.currentState]; ok && exitFunc != nil {
+		exitFunc(sm.currentState)
 	}
-	self.currentState = transition.nextState
-	if enterFunc, ok := self.config.enterFuncs[self.currentState]; ok {
-		enterFunc(self.currentState)
+	sm.currentState = transition.nextState
+	if enterFunc, ok := sm.config.enterFuncs[sm.currentState]; ok && enterFunc != nil {
+		enterFunc(sm.currentState)
 	}
 	return nil
 }
 
 // CurrentState returns the current state.
-func (self *StateMachine[S, E]) CurrentState() S {
-	return self.currentState
+func (sm *StateMachine[S, E]) CurrentState() S {
+	return sm.currentState
 }
 
 // Reset sets the state machine back to its initial state.
-func (self *StateMachine[S, E]) Reset() {
-	self.currentState = self.config.initialState
+func (sm *StateMachine[S, E]) Reset() {
+	sm.currentState = sm.config.initialState
 }

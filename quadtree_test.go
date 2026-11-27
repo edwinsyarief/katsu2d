@@ -378,8 +378,9 @@ func BenchmarkClear(b *testing.B) {
 				qt := NewQuadtree(world, bounds)
 				// Insert all for each clear
 				filter := teishoku.NewFilter[TransformComponent](world)
-				for filter.Next() {
-					qt.Insert(filter.Entity())
+				q := filter.Query()
+				for q.Next() {
+					qt.Insert(q.Entity())
 				}
 				b.StartTimer()
 				qt.Clear()

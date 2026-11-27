@@ -5,10 +5,11 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Scene represents a game scene. It is a self-contained unit
-// with its own World, systems, and lifecycle hooks.
+// Scene represents a self-contained game scene with its own ECS World,
+// systems, and lifecycle hooks.
 type Scene struct {
 	world         *teishoku.World
+	layoutEventCh teishoku.EventChannel[EngineLayoutChangedEvent]
 	OnEnter       func(*Engine)
 	OnExit        func(*Engine)
 	OnUpdate      func(float64)
@@ -19,124 +20,218 @@ type Scene struct {
 	Width, Height int
 }
 
-// NewScene creates a new scene with its own dedicated World.
+// NewScene creates a new Scene with the default initial entity capacity.
 func NewScene() *Scene {
 	return NewSceneWithInitialCapacity(defaultCapacity)
 }
-func NewSceneWithInitialCapacity(cap int) *Scene {
-	scn := &Scene{
-		world: teishoku.NewWorld(cap),
+
+// NewSceneWithInitialCapacity creates a new Scene with a dedicated World of the given capacity.
+func NewSceneWithInitialCapacity(capacity int) *Scene {
+	w := teishoku.NewWorld(capacity)
+	return &Scene{
+		world:         w,
+		layoutEventCh: teishoku.NewEventChannel[EngineLayoutChangedEvent](getEventBus(w)),
 	}
-	return scn
 }
 
-func (self *Scene) World() *teishoku.World {
-	return self.world
+// World returns the scene's dedicated ECS world.
+func (s *Scene) World() *teishoku.World {
+	return s.world
 }
 
-// AddSystem adds an update and/or draw system to the scene.
-func (self *Scene) AddSystem(sys any) {
+// AddSystem adds an UpdateSystem and/or DrawSystem to the scene.
+func (s *Scene) AddSystem(sys any) {
+	if sys == nil {
+		return
+	}
 	if us, ok := sys.(UpdateSystem); ok {
-		self.AddUpdateSystem(us)
+		s.AddUpdateSystem(us)
 	}
 	if ds, ok := sys.(DrawSystem); ok {
-		self.AddDrawSystem(ds)
+		s.AddDrawSystem(ds)
 	}
 }
-func (self *Scene) AddUpdateSystem(us UpdateSystem) {
-	self.UpdateSystems = append(self.UpdateSystems, us)
+
+// AddUpdateSystem appends an UpdateSystem to the scene.
+func (s *Scene) AddUpdateSystem(us UpdateSystem) {
+	if us == nil {
+		return
+	}
+	s.UpdateSystems = append(s.UpdateSystems, us)
 }
-func (self *Scene) AddDrawSystem(ds DrawSystem) {
-	self.DrawSystems = append(self.DrawSystems, ds)
+
+// AddDrawSystem appends a DrawSystem to the scene.
+func (s *Scene) AddDrawSystem(ds DrawSystem) {
+	if ds == nil {
+		return
+	}
+	s.DrawSystems = append(s.DrawSystems, ds)
 }
-func (self *Scene) ClearSystems() {
-	self.UpdateSystems = self.UpdateSystems[:0]
-	self.DrawSystems = self.DrawSystems[:0]
+
+// ClearSystems removes all registered update and draw systems from the scene.
+func (s *Scene) ClearSystems() {
+	s.UpdateSystems = s.UpdateSystems[:0]
+	s.DrawSystems = s.DrawSystems[:0]
 }
 
 // Update runs all the scene's update systems.
-func (self *Scene) Update(dt float64) {
-	// Then, run the scene's own update systems.
-	for _, us := range self.UpdateSystems {
-		us.Update(self.World(), dt)
+func (s *Scene) Update(dt float64) {
+	for _, us := range s.UpdateSystems {
+		us.Update(s.world, dt)
 	}
 }
 
-// OnLayoutChanged publishes an engine layout change event
-func (self *Scene) OnLayoutChanged(width, height int) {
-	self.Width = width
-	self.Height = height
-	Publish(self.World(), EngineLayoutChangedEvent{
+// OnLayoutChanged updates the scene dimensions and publishes an EngineLayoutChangedEvent.
+func (s *Scene) OnLayoutChanged(width, height int) {
+	s.Width = width
+	s.Height = height
+	s.layoutEventCh.Publish(EngineLayoutChangedEvent{
 		Width:  width,
 		Height: height,
 	})
 }
 
-// Draw runs all the scene's draw systems using the engine's shared renderer.
-func (self *Scene) Draw(world *teishoku.World, renderer *BatchRenderer) {
-	for _, ds := range self.DrawSystems {
+// Draw runs all the scene's draw systems using the shared BatchRenderer.
+func (s *Scene) Draw(world *teishoku.World, renderer *BatchRenderer) {
+	for _, ds := range s.DrawSystems {
 		ds.Draw(world, renderer)
 	}
 }
 
-// SceneManager manages scenes and scene transitions.
+// SceneManager manages named scenes and active scene transitions.
 type SceneManager struct {
-	engine  *Engine
-	scenes  map[string]*Scene
-	current *Scene
+	engine      *Engine
+	scenes      map[string]*Scene
+	current     *Scene
+	transitions *sceneTransitionController
 }
 
-// NewSceneManager creates a new scene manager.
+// NewSceneManager creates a new SceneManager bound to an Engine.
 func NewSceneManager(e *Engine) *SceneManager {
 	return &SceneManager{
-		engine: e,
-		scenes: make(map[string]*Scene),
+		engine:      e,
+		scenes:      make(map[string]*Scene),
+		transitions: newSceneTransitionController(),
 	}
 }
 
-// AddScene adds a scene by name.
-func (self *SceneManager) AddScene(name string, scene *Scene) {
-	self.scenes[name] = scene
+// AddScene registers a scene by name.
+func (sm *SceneManager) AddScene(name string, scene *Scene) {
+	sm.scenes[name] = scene
 }
 
-// GetScene retrieves a scene by name.
-func (self *SceneManager) GetScene(name string) *Scene {
-	return self.scenes[name]
+// GetScene retrieves a registered scene by name.
+func (sm *SceneManager) GetScene(name string) *Scene {
+	return sm.scenes[name]
 }
 
-// CurrentScene returns the currently active scene.
-func (self *SceneManager) CurrentScene() *Scene {
-	return self.current
+// CurrentScene returns the currently active scene, or nil if none is active.
+func (sm *SceneManager) CurrentScene() *Scene {
+	return sm.current
 }
 
-// SwitchTo switches to a new scene, running its OnEnter hook and the old scene's OnExit hook.
-// This is the only place where the active scene is changed.
-func (self *SceneManager) SwitchTo(name string) {
-	newScene, ok := self.scenes[name]
+// SwitchTo transitions immediately to a named scene, cancelling any active transition,
+// invoking OnExit on the previous scene, injecting engine resources, invoking OnEnter,
+// and initializing the new scene's systems.
+func (sm *SceneManager) SwitchTo(name string) {
+	if _, ok := sm.scenes[name]; !ok {
+		return
+	}
+	if sm.transitions != nil && sm.transitions.isTransitioning() {
+		sm.CancelTransition()
+	}
+	sm.switchToInternal(name)
+}
+
+func (sm *SceneManager) switchToInternal(name string) {
+	newScene, ok := sm.scenes[name]
 	if !ok {
 		return
 	}
-	if self.current != nil && self.current.OnExit != nil {
-		self.current.OnExit(self.engine)
+	if sm.current != nil && sm.current.OnExit != nil {
+		sm.current.OnExit(sm.engine)
 	}
-	self.current = newScene
-	initializeAssetManagers(self.current.World(),
-		self.engine.TextureManager(),
-		self.engine.FontManager(),
-		self.engine.AudioManager(),
-		self.engine.ShaderManager(),
-		self,
+	sm.current = newScene
+	initializeAssetManagers(
+		sm.current.World(),
+		sm.engine.TextureManager(),
+		sm.engine.FontManager(),
+		sm.engine.AudioManager(),
+		sm.engine.ShaderManager(),
+		sm,
 	)
-	w, h := self.engine.HiResSize()
-	updateHiResDisplayResource(self.current.World(), w, h)
-	if self.current.OnEnter != nil {
-		self.current.OnEnter(self.engine)
+	w, h := sm.engine.HiResSize()
+	updateHiResDisplayResource(sm.current.World(), w, h)
+	if sm.current.OnEnter != nil {
+		sm.current.OnEnter(sm.engine)
 	}
-	for _, us := range self.current.UpdateSystems {
-		us.Initialize(self.current.World())
+	for _, us := range sm.current.UpdateSystems {
+		us.Initialize(sm.current.World())
 	}
-	for _, ds := range self.current.DrawSystems {
-		ds.Initialize(self.current.World())
+	for _, ds := range sm.current.DrawSystems {
+		ds.Initialize(sm.current.World())
 	}
-	self.current.OnLayoutChanged(w, h)
+	if w > 0 && h > 0 {
+		sm.current.OnLayoutChanged(w, h)
+	}
+}
+
+// TransitionTo starts a configured scene transition to the named scene.
+// Returns false if a transition is already active or the target scene is not registered.
+func (sm *SceneManager) TransitionTo(name string, cfg TransitionConfig) bool {
+	if sm.transitions == nil {
+		sm.transitions = newSceneTransitionController()
+	}
+	started := sm.transitions.start(sm, name, cfg)
+	if started {
+		sm.syncInputBlockState()
+	}
+	return started
+}
+
+// IsTransitioning reports whether a scene transition is currently in progress.
+func (sm *SceneManager) IsTransitioning() bool {
+	return sm.transitions != nil && sm.transitions.isTransitioning()
+}
+
+// CancelTransition aborts any active scene transition without firing completion callbacks
+// and releases any transition input block.
+func (sm *SceneManager) CancelTransition() {
+	if sm.transitions == nil {
+		return
+	}
+	sm.transitions.cancel()
+	sm.syncInputBlockState()
+}
+
+// Dispose releases any offscreen buffers allocated for scene transitions.
+func (sm *SceneManager) Dispose() {
+	if sm.transitions != nil {
+		sm.transitions.dispose()
+	}
+}
+
+func (sm *SceneManager) updateTransition(rawDt, scaledDt float64) {
+	if sm.transitions == nil || !sm.transitions.isTransitioning() {
+		return
+	}
+	dt := scaledDt
+	if sm.transitions.usesUnscaledTime() {
+		dt = rawDt
+	}
+	sm.transitions.update(sm, dt)
+}
+
+func (sm *SceneManager) isTransitionInputBlocked() bool {
+	return sm.transitions != nil && sm.transitions.isInputBlocked()
+}
+
+func (sm *SceneManager) syncInputBlockState() {
+	blocked := sm.isTransitionInputBlocked()
+	if sm.engine != nil {
+		setWorldInputBlocked(sm.engine.world, blocked)
+	}
+	if sm.current != nil {
+		setWorldInputBlocked(sm.current.World(), blocked)
+	}
 }

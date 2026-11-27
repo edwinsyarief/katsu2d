@@ -1,35 +1,47 @@
 package katsu2d
 
-import (
-	"github.com/edwinsyarief/teishoku"
-)
+import "github.com/edwinsyarief/teishoku"
 
+// TimerSystem updates countdown timers and publishes TimerFinishedEvent on completion.
 type TimerSystem struct {
-	filter *teishoku.Filter[TimerComponent]
+	filter      *teishoku.Filter[TimerComponent]
+	finishedCh  teishoku.EventChannel[TimerFinishedEvent]
+	initialized bool
 }
 
+// NewTimerSystem creates a new TimerSystem.
 func NewTimerSystem() *TimerSystem {
 	return &TimerSystem{}
 }
 
-func (self *TimerSystem) Initialize(w *teishoku.World) {
-	self.filter = self.filter.New(w)
+// Initialize prepares the TimerSystem's ECS filter and event channel.
+func (s *TimerSystem) Initialize(w *teishoku.World) {
+	if s.initialized {
+		return
+	}
+	s.filter = teishoku.NewFilter[TimerComponent](w)
+	s.finishedCh = teishoku.NewEventChannel[TimerFinishedEvent](getEventBus(w))
+	s.initialized = true
 }
 
-func (self *TimerSystem) Update(w *teishoku.World, dt float64) {
-	self.filter.Reset()
-	for self.filter.Next() {
-		t := self.filter.Get()
-		if t.State == TimerStateActive {
-			t.Time -= dt
-
-			if t.Time <= 0 {
-				t.Time = 0
-				t.State = TimerStateDone
-				Publish(w, TimerFinishedEvent{
-					Entity: self.filter.Entity(),
-					ID:     t.ID,
-				})
+// Update advances active timers and publishes TimerFinishedEvent when they expire.
+func (s *TimerSystem) Update(w *teishoku.World, dt float64) {
+	chunks := s.filter.Chunks()
+	for chunks.Next() {
+		entities := chunks.Entities()
+		timers := chunks.Get()
+		for i := range timers {
+			t := &timers[i]
+			if t.State == TimerStateActive {
+				t.Time -= dt
+				if t.Time <= 0 {
+					t.Time = 0
+					t.State = TimerStateDone
+					s.finishedCh.Publish(TimerFinishedEvent{
+						Entity: entities[i],
+						ID:     t.ID,
+					})
+				}
 			}
 		}
 	}

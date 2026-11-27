@@ -37,3 +37,34 @@ type InputComponent struct {
 	MouseWheelX float64
 	MouseWheelY float64
 }
+
+// NewInputComponent creates an InputComponent with initialized state maps and a copy of bindings.
+func NewInputComponent(bindings map[Action][]KeyConfig) InputComponent {
+	copied := make(map[Action][]KeyConfig, len(bindings))
+	for action, configs := range bindings {
+		cfgs := make([]KeyConfig, len(configs))
+		copy(cfgs, configs)
+		copied[action] = cfgs
+	}
+	return InputComponent{
+		Bindings:     copied,
+		JustPressed:  make(map[Action]bool, len(bindings)),
+		Pressed:      make(map[Action]bool, len(bindings)),
+		JustReleased: make(map[Action]bool, len(bindings)),
+	}
+}
+
+// IsPressed reports whether action a is currently held down.
+func (ic InputComponent) IsPressed(a Action) bool {
+	return ic.Pressed[a]
+}
+
+// IsJustPressed reports whether action a was pressed on the current frame.
+func (ic InputComponent) IsJustPressed(a Action) bool {
+	return ic.JustPressed[a]
+}
+
+// IsJustReleased reports whether action a was released on the current frame.
+func (ic InputComponent) IsJustReleased(a Action) bool {
+	return ic.JustReleased[a]
+}

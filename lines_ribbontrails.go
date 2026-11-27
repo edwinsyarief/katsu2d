@@ -17,13 +17,17 @@ type trailPoint struct {
 type RibbonTrails struct {
 	texture       *ebiten.Image
 	whiteDot      *ebiten.Image
-	points        []*trailPoint
+	points        []trailPoint
 	segmentWidths []float64
 	segmentColors []color.RGBA
-	debugPoints   []*trailPoint
-	// vertices and indices store the mesh data for drawing.
-	vertices          []ebiten.Vertex
-	indices           []uint16
+	debugPoints   []trailPoint
+	splineBuf     []trailPoint
+	resampleBuf   []trailPoint
+	vertices      []ebiten.Vertex
+	indices       []uint16
+	debugVerts    []ebiten.Vertex
+	debugIndices  []uint16
+
 	segmentLifetime   float64
 	totalSegmentLimit int
 	currentTime       float64
@@ -33,19 +37,17 @@ type RibbonTrails struct {
 	jointMode       LineJointMode
 	roundPrecision  int
 	sharpLimit      float64
-	// catmullRom enables Catmull-Rom spline interpolation for smoothing the trail.
-	catmullRom bool
-	// debugDraw enables rendering of debug points and lines.
-	debugDraw bool
+	textureMode     LineTextureMode
+	tileAspect      float64
+	textureScale    float64
+	textureOffset   float64
+	catmullRom      bool
+	debugDraw       bool
 }
 
 // NewRibbonTrails creates and initializes a new RibbonTrails object with default settings.
 func NewRibbonTrails() *RibbonTrails {
-	// Create a 1x1 white image to use as a default texture.
-	whiteDotImg := ebiten.NewImage(1, 1)
-	whiteDotImg.Fill(color.White)
 	return &RibbonTrails{
-		points:            make([]*trailPoint, 0),
 		segmentLifetime:   math.MaxFloat64,
 		segmentWidths:     []float64{10.0},
 		segmentColors:     []color.RGBA{{R: 255, G: 255, B: 255, A: 255}},
@@ -56,141 +58,265 @@ func NewRibbonTrails() *RibbonTrails {
 		jointMode:         LineJointBevel,
 		roundPrecision:    8,
 		sharpLimit:        2.0,
-		whiteDot:          whiteDotImg,
+		tileAspect:        1.0,
+		textureScale:      1.0,
+		whiteDot:          defaultWhiteImage(),
 	}
 }
 
-// SetLifetime sets the maximum time a trail segment can exist before it's removed.
-func (self *RibbonTrails) SetLifetime(lifetime float64) *RibbonTrails {
+// SetLifetime sets the maximum time a trail segment can exist before it is removed.
+func (rt *RibbonTrails) SetLifetime(lifetime float64) *RibbonTrails {
 	if lifetime <= 0 {
-		self.segmentLifetime = math.MaxFloat64 // No lifetime limit
+		rt.segmentLifetime = math.MaxFloat64
 	} else {
-		self.segmentLifetime = lifetime
+		rt.segmentLifetime = lifetime
 	}
-	return self
+	return rt
 }
 
 // SetWidths defines the widths to interpolate across the trail's length.
-func (self *RibbonTrails) SetWidths(widths ...float64) *RibbonTrails {
-	self.segmentWidths = widths
-	return self
+func (rt *RibbonTrails) SetWidths(widths ...float64) *RibbonTrails {
+	rt.segmentWidths = widths
+	return rt
 }
 
 // SetColors defines the colors to interpolate across the trail's length.
-func (self *RibbonTrails) SetColors(colors ...color.RGBA) *RibbonTrails {
-	self.segmentColors = colors
-	return self
+func (rt *RibbonTrails) SetColors(colors ...color.RGBA) *RibbonTrails {
+	rt.segmentColors = colors
+	return rt
 }
 
 // SetLimit sets the maximum number of points in the trail.
 // A value of 0 means there is no limit.
-func (self *RibbonTrails) SetLimit(limit int) *RibbonTrails {
-	self.totalSegmentLimit = limit
-	return self
+func (rt *RibbonTrails) SetLimit(limit int) *RibbonTrails {
+	if limit < 0 {
+		limit = 0
+	}
+	rt.totalSegmentLimit = limit
+	if rt.totalSegmentLimit > 0 && len(rt.points) > rt.totalSegmentLimit {
+		excess := len(rt.points) - rt.totalSegmentLimit
+		copy(rt.points, rt.points[excess:])
+		rt.points = rt.points[:rt.totalSegmentLimit]
+	}
+	return rt
 }
 
 // SetJointMode sets the style of the line joints (bevel, round, or sharp).
-func (self *RibbonTrails) SetJointMode(mode LineJointMode) *RibbonTrails {
-	self.jointMode = mode
-	return self
+func (rt *RibbonTrails) SetJointMode(mode LineJointMode) *RibbonTrails {
+	rt.jointMode = mode
+	return rt
+}
+
+// SetTexture assigns a texture to the ribbon trail and updates the tile aspect ratio.
+// Passing nil disables texturing and falls back to the solid white image.
+func (rt *RibbonTrails) SetTexture(img *ebiten.Image) *RibbonTrails {
+	rt.texture = img
+	if img != nil {
+		bounds := img.Bounds()
+		if dy := bounds.Dy(); dy > 0 {
+			rt.tileAspect = float64(bounds.Dx()) / float64(dy)
+		}
+	}
+	return rt
+}
+
+// SetTextureMode defines how textures are applied along the trail.
+func (rt *RibbonTrails) SetTextureMode(mode LineTextureMode) *RibbonTrails {
+	rt.textureMode = mode
+	return rt
+}
+
+// SetTextureScale sets the horizontal tiling scale multiplier for textured trails.
+// Values <= 0 are clamped to 1e-4.
+func (rt *RibbonTrails) SetTextureScale(scale float64) *RibbonTrails {
+	if scale <= 0 {
+		scale = 1e-4
+	}
+	rt.textureScale = scale
+	return rt
+}
+
+// SetTextureOffset sets the horizontal UV offset (in normalized texture widths) along the trail.
+func (rt *RibbonTrails) SetTextureOffset(offset float64) *RibbonTrails {
+	rt.textureOffset = offset
+	return rt
 }
 
 // SetStepDistance sets the minimum distance between points after resampling.
 // This is useful for creating a uniform-looking trail.
-func (self *RibbonTrails) SetStepDistance(distance float64) *RibbonTrails {
-	self.StepDistance = distance
-	return self
+func (rt *RibbonTrails) SetStepDistance(distance float64) *RibbonTrails {
+	rt.StepDistance = distance
+	return rt
 }
 
 // SetDebugDraw toggles the drawing of debug points and lines.
-func (self *RibbonTrails) SetDebugDraw(enabled bool) *RibbonTrails {
-	self.debugDraw = enabled
-	return self
+func (rt *RibbonTrails) SetDebugDraw(enabled bool) *RibbonTrails {
+	rt.debugDraw = enabled
+	return rt
 }
 
 // EnableCatmullRom enables or disables Catmull-Rom spline interpolation.
 // The precision parameter controls the smoothness of the spline.
-func (self *RibbonTrails) EnableCatmullRom(enabled bool, precision int) *RibbonTrails {
-	self.catmullRom = enabled
+func (rt *RibbonTrails) EnableCatmullRom(enabled bool, precision int) *RibbonTrails {
+	rt.catmullRom = enabled
 	if precision > 0 {
-		self.splinePrecision = precision
+		rt.splinePrecision = precision
 	}
-	return self
+	return rt
 }
 
 // AddPoint adds a new point to the trail at the current time.
-// It ignores duplicate points and enforces the segment limit.
-func (self *RibbonTrails) AddPoint(pos Vector) {
-	if len(self.points) > 0 && self.points[len(self.points)-1].pos.Equals(pos) {
+// It ignores duplicate points and enforces the segment limit in-place.
+func (rt *RibbonTrails) AddPoint(pos Vector) {
+	if len(rt.points) > 0 && rt.points[len(rt.points)-1].pos.Equals(pos) {
 		return
 	}
-	// If a limit is set, remove the oldest point before adding a new one.
-	if self.totalSegmentLimit > 0 && len(self.points) >= self.totalSegmentLimit {
-		self.points = self.points[1:]
+	if rt.totalSegmentLimit > 0 && len(rt.points) >= rt.totalSegmentLimit {
+		excess := len(rt.points) - rt.totalSegmentLimit + 1
+		copy(rt.points, rt.points[excess:])
+		rt.points = rt.points[:len(rt.points)-excess]
 	}
-	self.points = append(self.points, &trailPoint{pos: pos, creationTime: self.currentTime})
+	rt.points = append(rt.points, trailPoint{pos: pos, creationTime: rt.currentTime})
 }
 
 // Update progresses the trail's simulation, removing old points and generating the mesh.
-func (self *RibbonTrails) Update(deltaTime float64) {
-	self.currentTime += deltaTime
-	// Remove points that have exceeded their lifetime.
-	if self.segmentLifetime != math.MaxFloat64 {
-		alivePoints := self.points[:0]
-		for _, p := range self.points {
-			if self.currentTime-p.creationTime < self.segmentLifetime {
+func (rt *RibbonTrails) Update(deltaTime float64) {
+	rt.currentTime += deltaTime
+	if rt.segmentLifetime != math.MaxFloat64 {
+		alivePoints := rt.points[:0]
+		for _, p := range rt.points {
+			if rt.currentTime-p.creationTime < rt.segmentLifetime {
 				alivePoints = append(alivePoints, p)
 			}
 		}
-		self.points = alivePoints
+		rt.points = alivePoints
 	}
-	pointsToProcess := self.points
-	// Apply Catmull-Rom spline interpolation if enabled and there are enough points.
-	if self.catmullRom && len(self.points) >= 4 {
-		pointsToProcess = self.generateSplinePoints(self.points, self.splinePrecision)
+
+	pointsToProcess := rt.points
+	if rt.catmullRom && len(rt.points) >= 4 {
+		pointsToProcess = rt.generateSplinePoints(rt.points, rt.splinePrecision)
 	}
-	self.debugPoints = pointsToProcess
-	// Resample points to ensure a minimum step distance.
-	if self.StepDistance > 0 && len(pointsToProcess) > 1 {
-		self.debugPoints = self.resamplePoints(pointsToProcess, self.StepDistance)
+	if rt.StepDistance > 0 && len(pointsToProcess) > 1 {
+		pointsToProcess = rt.resamplePoints(pointsToProcess, rt.StepDistance)
 	}
-	// Reset mesh data for regeneration.
-	self.vertices = self.vertices[:0]
-	self.indices = self.indices[:0]
-	if len(self.debugPoints) < 2 {
+	rt.debugPoints = pointsToProcess
+
+	rt.vertices = rt.vertices[:0]
+	rt.indices = rt.indices[:0]
+	if len(rt.debugPoints) < 2 {
 		return
 	}
-	n := len(self.debugPoints)
-	// Iterate through the points to generate the ribbon mesh.
+
+	n := len(rt.debugPoints)
+	roundPrec := rt.roundPrecision
+	if roundPrec <= 0 {
+		roundPrec = 8
+	}
+	angleStep := math.Pi / float64(roundPrec)
+	hasFiniteLifetime := rt.segmentLifetime != math.MaxFloat64
+	invSpan := 1.0 / float64(n-1)
+
+	textured := rt.texture != nil && rt.textureMode != LineTextureNone
+	var texMinX, texW float64
+	var vTop, vBot, vCenter float32
+	if textured {
+		texBounds := rt.texture.Bounds()
+		if texBounds.Empty() {
+			textured = false
+		} else {
+			texMinX = float64(texBounds.Min.X)
+			texW = float64(texBounds.Dx())
+			texMinY := float64(texBounds.Min.Y)
+			texH := float64(texBounds.Dy())
+			if texH <= 1 {
+				vCenter = float32(texMinY + texH*0.5)
+				vTop = vCenter
+				vBot = vCenter
+			} else {
+				vTop = float32(texMinY + 0.5)
+				vBot = float32(float64(texBounds.Max.Y) - 0.5)
+				vCenter = (vTop + vBot) * 0.5
+			}
+		}
+	}
+
+	var totalDist float64
+	if textured && rt.textureMode == LineTextureStretch {
+		for i := 0; i < n-1; i++ {
+			d := rt.debugPoints[i].pos.DistanceTo(rt.debugPoints[i+1].pos)
+			if d >= 1e-6 {
+				totalDist += d
+			}
+		}
+	}
+	var currentDist float64
+	currentU := texMinX + rt.textureOffset*texW
+	texScale := rt.textureScale
+	if texScale <= 0 {
+		texScale = 1.0
+	}
+	tileAspect := rt.tileAspect
+	if tileAspect <= 0 {
+		tileAspect = 1.0
+	}
+
 	for i := 0; i < n-1; i++ {
-		pA := self.debugPoints[i]
-		pB := self.debugPoints[i+1]
-		// Calculate progress for interpolation.
-		progressA := (self.currentTime - pA.creationTime) / self.segmentLifetime
-		progressB := (self.currentTime - pB.creationTime) / self.segmentLifetime
-		// Interpolate colors and widths based on progress.
-		colorA := interpolateRibbonColor(self.segmentColors, progressA)
-		colorB := interpolateRibbonColor(self.segmentColors, progressB)
-		widthA := interpolateRibbonWidth(self.segmentWidths, progressA) / 2.0
-		widthB := interpolateRibbonWidth(self.segmentWidths, progressB) / 2.0
+		pA := rt.debugPoints[i]
+		pB := rt.debugPoints[i+1]
+
+		var progressA, progressB float64
+		if hasFiniteLifetime {
+			progressA = (rt.currentTime - pA.creationTime) / rt.segmentLifetime
+			progressB = (rt.currentTime - pB.creationTime) / rt.segmentLifetime
+		} else {
+			progressA = float64(i) * invSpan
+			progressB = float64(i+1) * invSpan
+		}
+
+		colorA := interpolateRibbonColor(rt.segmentColors, progressA)
+		colorB := interpolateRibbonColor(rt.segmentColors, progressB)
+		widthA := interpolateRibbonWidth(rt.segmentWidths, progressA) / 2.0
+		widthB := interpolateRibbonWidth(rt.segmentWidths, progressB) / 2.0
+
 		dirAB := pB.pos.Sub(pA.pos)
-		if dirAB.Length() < 1e-6 {
+		lenAB := dirAB.Length()
+		if lenAB < 1e-6 {
 			continue
 		}
-		// Calculate the normal vector for line thickness.
+
+		var uA, uB float32
+		if textured {
+			if rt.textureMode == LineTextureStretch {
+				tA := 0.0
+				tB := 0.0
+				if totalDist > 0 {
+					tA = currentDist / totalDist
+					currentDist += lenAB
+					tB = currentDist / totalDist
+				}
+				uA = float32(texMinX + (tA+rt.textureOffset)*texW)
+				uB = float32(texMinX + (tB+rt.textureOffset)*texW)
+			} else {
+				segWidth := widthA + widthB
+				du := (lenAB / math.Max(1e-4, segWidth*tileAspect)) * texW * texScale
+				uA = float32(currentU)
+				currentU += du
+				uB = float32(currentU)
+			}
+		}
+
 		normal := dirAB.Normalize().Orthogonal()
 		vA1 := pA.pos.Add(normal.ScaleF(widthA))
 		vA2 := pA.pos.Sub(normal.ScaleF(widthA))
 		vB1 := pB.pos.Add(normal.ScaleF(widthB))
 		vB2 := pB.pos.Sub(normal.ScaleF(widthB))
-		// Add triangles for the main ribbon segment.
-		self.addTriangle(vA1, vA2, vB1, colorA, colorA, colorB)
-		self.addTriangle(vA2, vB2, vB1, colorA, colorB, colorB)
-		// Handle line joints between segments.
+		rt.addTriangle(vA1, vA2, vB1, colorA, colorA, colorB, uA, vTop, uA, vBot, uB, vTop)
+		rt.addTriangle(vA2, vB2, vB1, colorA, colorB, colorB, uA, vBot, uB, vBot, uB, vTop)
+
 		if i >= n-2 {
 			continue
 		}
-		pC := self.debugPoints[i+2]
+		pC := rt.debugPoints[i+2]
 		dirBC := pC.pos.Sub(pB.pos)
 		if dirBC.Length() < 1e-6 {
 			continue
@@ -200,74 +326,63 @@ func (self *RibbonTrails) Update(deltaTime float64) {
 		if math.Abs(zCross) < 1e-6 {
 			continue
 		}
-		vB1_next := pB.pos.Add(normalB.ScaleF(widthB))
-		vB2_next := pB.pos.Sub(normalB.ScaleF(widthB))
-		switch self.jointMode {
+
+		vB1Next := pB.pos.Add(normalB.ScaleF(widthB))
+		vB2Next := pB.pos.Sub(normalB.ScaleF(widthB))
+		switch rt.jointMode {
 		case LineJointBevel:
 			if zCross < 0 {
-				self.addTriangle(pB.pos, vB1, vB1_next, colorB, colorB, colorB)
+				rt.addTriangle(pB.pos, vB1, vB1Next, colorB, colorB, colorB, uB, vCenter, uB, vTop, uB, vTop)
 			} else {
-				self.addTriangle(pB.pos, vB2, vB2_next, colorB, colorB, colorB)
+				rt.addTriangle(pB.pos, vB2, vB2Next, colorB, colorB, colorB, uB, vCenter, uB, vBot, uB, vBot)
 			}
 		case LineJointRound:
-			var vStart, vEnd Vector
+			vStart, vEnd := vB2, vB2Next
+			vEdge := vBot
 			if zCross < 0 {
-				vStart, vEnd = vB1, vB1_next
-			} else {
-				vStart, vEnd = vB2, vB2_next
+				vStart, vEnd = vB1, vB1Next
+				vEdge = vTop
 			}
 			v1 := vStart.Sub(pB.pos)
 			v2 := vEnd.Sub(pB.pos)
 			angle := math.Atan2(v1.Cross(v2), v1.Dot(v2))
-			angleStep := math.Pi / float64(self.roundPrecision)
 			if math.Abs(angle) < angleStep {
-				if zCross < 0 {
-					self.addTriangle(pB.pos, vB1, vB1_next, colorB, colorB, colorB)
-				} else {
-					self.addTriangle(pB.pos, vB2, vB2_next, colorB, colorB, colorB)
-				}
+				rt.addTriangle(pB.pos, vStart, vEnd, colorB, colorB, colorB, uB, vCenter, uB, vEdge, uB, vEdge)
 			} else {
-				self.addArc(pB.pos, v1, angle, colorB)
+				rt.addArc(pB.pos, v1, angle, colorB, uB, vCenter, vEdge)
 			}
 		case LineJointSharp:
-			var vB_outer, vB_outer_next Vector
+			vBOuter, vBOuterNext := vB2, vB2Next
+			vEdge := vBot
 			if zCross < 0 {
-				vB_outer = vB1
-				vB_outer_next = vB1_next
-			} else {
-				vB_outer = vB2
-				vB_outer_next = vB2_next
+				vBOuter, vBOuterNext = vB1, vB1Next
+				vEdge = vTop
 			}
-			d := vB_outer_next.Sub(vB_outer)
-			u := dirAB
-			v := dirBC
-			denom := u.Cross(v)
+			d := vBOuterNext.Sub(vBOuter)
+			denom := dirAB.Cross(dirBC)
 			if math.Abs(denom) < 1e-6 {
 				continue
 			}
-			t := d.Cross(v) / denom
-			M := vB_outer.Add(u.ScaleF(t))
-			dist := pB.pos.DistanceTo(M)
-			if (dist / widthB) > self.sharpLimit {
-				self.addTriangle(pB.pos, vB_outer, vB_outer_next, colorB, colorB, colorB)
+			t := d.Cross(dirBC) / denom
+			miter := vBOuter.Add(dirAB.ScaleF(t))
+			dist := pB.pos.DistanceTo(miter)
+			if widthB <= 0 || (dist/widthB) > rt.sharpLimit {
+				rt.addTriangle(pB.pos, vBOuter, vBOuterNext, colorB, colorB, colorB, uB, vCenter, uB, vEdge, uB, vEdge)
 			} else {
-				self.addTriangle(pB.pos, vB_outer, M, colorB, colorB, colorB)
-				self.addTriangle(pB.pos, M, vB_outer_next, colorB, colorB, colorB)
+				rt.addTriangle(pB.pos, vBOuter, miter, colorB, colorB, colorB, uB, vCenter, uB, vEdge, uB, vEdge)
+				rt.addTriangle(pB.pos, miter, vBOuterNext, colorB, colorB, colorB, uB, vCenter, uB, vEdge, uB, vEdge)
 			}
 		}
 	}
 }
 
-// generateSplinePoints creates new points along a Catmull-Rom spline.
-func (self *RibbonTrails) generateSplinePoints(points []*trailPoint, precision int) []*trailPoint {
-	if len(points) < 2 {
+func (rt *RibbonTrails) generateSplinePoints(points []trailPoint, precision int) []trailPoint {
+	if len(points) < 2 || precision <= 0 {
 		return points
 	}
-	newPoints := make([]*trailPoint, 0)
-	// Add the first point directly.
-	newPoints = append(newPoints, points[0])
+	rt.splineBuf = rt.splineBuf[:0]
+	rt.splineBuf = append(rt.splineBuf, points[0])
 	for i := 0; i < len(points)-1; i++ {
-		// Define the 4 control points for the spline segment.
 		p0 := points[i]
 		if i > 0 {
 			p0 = points[i-1]
@@ -280,30 +395,25 @@ func (self *RibbonTrails) generateSplinePoints(points []*trailPoint, precision i
 		}
 		for j := 1; j <= precision; j++ {
 			t := float64(j) / float64(precision)
-			// Interpolate position and creation time.
 			newPos := catmullRomPoint(p0.pos, p1.pos, p2.pos, p3.pos, t)
-			time_t0 := p1.creationTime
-			time_t1 := p2.creationTime
-			newTime := time_t0 + (time_t1-time_t0)*t
-			newPoints = append(newPoints, &trailPoint{pos: newPos, creationTime: newTime})
+			newTime := p1.creationTime + (p2.creationTime-p1.creationTime)*t
+			rt.splineBuf = append(rt.splineBuf, trailPoint{pos: newPos, creationTime: newTime})
 		}
 	}
-	return newPoints
+	return rt.splineBuf
 }
 
-// resamplePoints ensures a minimum distance between consecutive points.
-func (self *RibbonTrails) resamplePoints(points []*trailPoint, step float64) []*trailPoint {
+func (rt *RibbonTrails) resamplePoints(points []trailPoint, step float64) []trailPoint {
 	if len(points) < 2 || step <= 0 {
 		return points
 	}
-	newPoints := make([]*trailPoint, 0, len(points))
-	newPoints = append(newPoints, points[0])
+	rt.resampleBuf = rt.resampleBuf[:0]
+	rt.resampleBuf = append(rt.resampleBuf, points[0])
 	distanceNeeded := step
 	for i := 0; i < len(points)-1; i++ {
 		p1 := points[i]
 		p2 := points[i+1]
-		segmentVec := p2.pos.Sub(p1.pos)
-		segmentLen := segmentVec.Length()
+		segmentLen := p2.pos.Sub(p1.pos).Length()
 		if segmentLen < 1e-6 {
 			continue
 		}
@@ -311,116 +421,147 @@ func (self *RibbonTrails) resamplePoints(points []*trailPoint, step float64) []*
 			t := distanceNeeded / segmentLen
 			newPos := p1.pos.Lerp(p2.pos, t)
 			newTime := p1.creationTime + (p2.creationTime-p1.creationTime)*t
-			newPoints = append(newPoints, &trailPoint{pos: newPos, creationTime: newTime})
+			pt := trailPoint{pos: newPos, creationTime: newTime}
+			rt.resampleBuf = append(rt.resampleBuf, pt)
 			segmentLen -= distanceNeeded
-			p1 = newPoints[len(newPoints)-1]
+			p1 = pt
 			distanceNeeded = step
 		}
 		distanceNeeded -= segmentLen
 	}
-	return newPoints
+	return rt.resampleBuf
 }
 
 // Draw renders the trail's mesh to the screen.
 // It also draws debug visualizations if enabled.
-func (self *RibbonTrails) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
-	if len(self.vertices) > 0 {
-		texture := self.texture
-		if texture == nil {
-			texture = self.whiteDot
-		}
-		screen.DrawTriangles(self.vertices, self.indices, texture, op)
+func (rt *RibbonTrails) Draw(screen *ebiten.Image, op *ebiten.DrawTrianglesOptions) {
+	if rt.whiteDot == nil {
+		rt.whiteDot = defaultWhiteImage()
 	}
-	// Draw debug points and lines.
-	if self.debugDraw && len(self.debugPoints) > 0 {
-		debugVerts := make([]ebiten.Vertex, 0)
-		debugIndices := make([]uint16, 0)
+	if len(rt.vertices) > 0 {
+		var drawOp ebiten.DrawTrianglesOptions
+		if op != nil {
+			drawOp = *op
+		}
+		texture := rt.whiteDot
+		if rt.texture != nil && rt.textureMode != LineTextureNone {
+			texture = rt.texture
+			if drawOp.Address == ebiten.AddressUnsafe && rt.textureMode == LineTextureTile {
+				drawOp.Address = ebiten.AddressRepeat
+			}
+		}
+		screen.DrawTriangles(rt.vertices, rt.indices, texture, &drawOp)
+	}
+	if rt.debugDraw && len(rt.debugPoints) > 0 {
+		rt.debugVerts = rt.debugVerts[:0]
+		rt.debugIndices = rt.debugIndices[:0]
 		red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
 		yellow := color.RGBA{R: 255, G: 255, B: 0, A: 255}
-		// Draw small red squares at each debug point.
-		for _, p := range self.debugPoints {
+
+		for _, p := range rt.debugPoints {
 			v1 := p.pos.Add(V(-2, -2))
 			v2 := p.pos.Add(V(2, -2))
 			v3 := p.pos.Add(V(-2, 2))
 			v4 := p.pos.Add(V(2, 2))
-			idx := uint16(len(debugVerts))
-			debugVerts = append(debugVerts,
-				ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
-				ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
-				ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
-				ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: float32(red.R) / 255, ColorG: float32(red.G) / 255, ColorB: float32(red.B) / 255, ColorA: float32(red.A) / 255},
-			)
-			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+			rt.appendDebugQuad(v1, v2, v3, v4, red)
 		}
-		// Draw yellow lines connecting the debug points.
-		for i := 0; i < len(self.debugPoints)-1; i++ {
-			p1 := self.debugPoints[i].pos
-			p2 := self.debugPoints[i+1].pos
+		for i := 0; i < len(rt.debugPoints)-1; i++ {
+			p1 := rt.debugPoints[i].pos
+			p2 := rt.debugPoints[i+1].pos
 			dir := p2.Sub(p1).Normalize()
 			normal := dir.Orthogonal().ScaleF(0.5)
 			v1 := p1.Add(normal)
 			v2 := p1.Sub(normal)
 			v3 := p2.Add(normal)
 			v4 := p2.Sub(normal)
-			idx := uint16(len(debugVerts))
-			debugVerts = append(debugVerts,
-				ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
-				ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
-				ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
-				ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: float32(yellow.R) / 255, ColorG: float32(yellow.G) / 255, ColorB: float32(yellow.B) / 255, ColorA: float32(yellow.A) / 255},
-			)
-			debugIndices = append(debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
+			rt.appendDebugQuad(v1, v2, v3, v4, yellow)
 		}
-		if len(debugVerts) > 0 {
-			screen.DrawTriangles(debugVerts, debugIndices, self.whiteDot, op)
+		if len(rt.debugVerts) > 0 {
+			screen.DrawTriangles(rt.debugVerts, rt.debugIndices, rt.whiteDot, op)
 		}
 	}
 }
 
-// addTriangle adds a single triangle to the vertex and index buffers.
-func (self *RibbonTrails) addTriangle(v1, v2, v3 Vector, c1, c2, c3 color.RGBA) {
-	idx := uint16(len(self.vertices))
-	r1, g1, b1, a1 := c1.R, c1.G, c1.B, c1.A
-	cr1, cg1, cb1, ca1 := float32(r1)/255, float32(g1)/255, float32(b1)/255, float32(a1)/255
-	r2, g2, b2, a2 := c2.R, c2.G, c2.B, c2.A
-	cr2, cg2, cb2, ca2 := float32(r2)/255, float32(g2)/255, float32(b2)/255, float32(a2)/255
-	r3, g3, b3, a3 := c3.R, c3.G, c3.B, c3.A
-	cr3, cg3, cb3, ca3 := float32(r3)/255, float32(g3)/255, float32(b3)/255, float32(a3)/255
-	self.vertices = append(self.vertices,
-		ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: cr1, ColorG: cg1, ColorB: cb1, ColorA: ca1},
-		ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: cr2, ColorG: cg2, ColorB: cb2, ColorA: ca2},
-		ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: cr3, ColorG: cg3, ColorB: cb3, ColorA: ca3},
+func (rt *RibbonTrails) appendDebugQuad(v1, v2, v3, v4 Vector, clr color.RGBA) {
+	const inv255 = float32(1.0 / 255.0)
+	cr := float32(clr.R) * inv255
+	cg := float32(clr.G) * inv255
+	cb := float32(clr.B) * inv255
+	ca := float32(clr.A) * inv255
+	idx := uint16(len(rt.debugVerts))
+	rt.debugVerts = append(rt.debugVerts,
+		ebiten.Vertex{DstX: float32(v1.X), DstY: float32(v1.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+		ebiten.Vertex{DstX: float32(v2.X), DstY: float32(v2.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+		ebiten.Vertex{DstX: float32(v3.X), DstY: float32(v3.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
+		ebiten.Vertex{DstX: float32(v4.X), DstY: float32(v4.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca},
 	)
-	self.indices = append(self.indices, idx, idx+1, idx+2)
+	rt.debugIndices = append(rt.debugIndices, idx, idx+1, idx+2, idx+1, idx+3, idx+2)
 }
 
-// addArc creates a series of triangles to form a rounded arc at a joint.
-func (self *RibbonTrails) addArc(center, vbegin Vector, angleDelta float64, clr color.RGBA) {
+func (rt *RibbonTrails) addTriangle(v1, v2, v3 Vector, c1, c2, c3 color.RGBA, u1, sv1, u2, sv2, u3, sv3 float32) {
+	const inv255 = float32(1.0 / 255.0)
+	idx := uint16(len(rt.vertices))
+	rt.vertices = append(rt.vertices,
+		ebiten.Vertex{
+			DstX: float32(v1.X), DstY: float32(v1.Y),
+			SrcX: u1, SrcY: sv1,
+			ColorR: float32(c1.R) * inv255, ColorG: float32(c1.G) * inv255, ColorB: float32(c1.B) * inv255, ColorA: float32(c1.A) * inv255,
+		},
+		ebiten.Vertex{
+			DstX: float32(v2.X), DstY: float32(v2.Y),
+			SrcX: u2, SrcY: sv2,
+			ColorR: float32(c2.R) * inv255, ColorG: float32(c2.G) * inv255, ColorB: float32(c2.B) * inv255, ColorA: float32(c2.A) * inv255,
+		},
+		ebiten.Vertex{
+			DstX: float32(v3.X), DstY: float32(v3.Y),
+			SrcX: u3, SrcY: sv3,
+			ColorR: float32(c3.R) * inv255, ColorG: float32(c3.G) * inv255, ColorB: float32(c3.B) * inv255, ColorA: float32(c3.A) * inv255,
+		},
+	)
+	rt.indices = append(rt.indices, idx, idx+1, idx+2)
+}
+
+func (rt *RibbonTrails) addArc(center, vbegin Vector, angleDelta float64, clr color.RGBA, u, vCenter, vEdge float32) {
+	const inv255 = float32(1.0 / 255.0)
+	prec := rt.roundPrecision
+	if prec <= 0 {
+		prec = 8
+	}
 	radius := vbegin.Length()
-	angleStep := math.Pi / float64(self.roundPrecision)
+	angleStep := math.Pi / float64(prec)
 	steps := int(math.Abs(angleDelta) / angleStep)
 	if angleDelta < 0 {
 		angleStep = -angleStep
 	}
 	t := vbegin.Angle()
-	r, g, b, a := clr.R, clr.G, clr.B, clr.A
-	cr, cg, cb, ca := float32(r)/255, float32(g)/255, float32(b)/255, float32(a)/255
-	vi := len(self.vertices)
-	self.vertices = append(self.vertices, ebiten.Vertex{DstX: float32(center.X), DstY: float32(center.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
+	cr := float32(clr.R) * inv255
+	cg := float32(clr.G) * inv255
+	cb := float32(clr.B) * inv255
+	ca := float32(clr.A) * inv255
+
+	vi := len(rt.vertices)
+	rt.vertices = append(rt.vertices, ebiten.Vertex{
+		DstX: float32(center.X), DstY: float32(center.Y),
+		SrcX: u, SrcY: vCenter,
+		ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca,
+	})
 	for i := 0; i <= steps; i++ {
 		angle := t + angleStep*float64(i)
 		if i == steps {
 			angle = t + angleDelta
 		}
 		rpos := center.Add(V(math.Cos(angle), math.Sin(angle)).ScaleF(radius))
-		self.vertices = append(self.vertices, ebiten.Vertex{DstX: float32(rpos.X), DstY: float32(rpos.Y), ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca})
+		rt.vertices = append(rt.vertices, ebiten.Vertex{
+			DstX: float32(rpos.X), DstY: float32(rpos.Y),
+			SrcX: u, SrcY: vEdge,
+			ColorR: cr, ColorG: cg, ColorB: cb, ColorA: ca,
+		})
 	}
-	for i := 0; i < steps; i++ {
-		self.indices = append(self.indices, uint16(vi), uint16(vi+i+1), uint16(vi+i+2))
+	for i := range steps {
+		rt.indices = append(rt.indices, uint16(vi), uint16(vi+i+1), uint16(vi+i+2))
 	}
 }
 
-// interpolateRibbonWidth linearly interpolates between widths based on a progress value (0.0 to 1.0).
 func interpolateRibbonWidth(values []float64, progress float64) float64 {
 	if len(values) == 0 {
 		return 0
@@ -428,23 +569,14 @@ func interpolateRibbonWidth(values []float64, progress float64) float64 {
 	if len(values) == 1 {
 		return values[0]
 	}
-	if progress < 0 {
-		progress = 0
-	}
-	if progress > 1 {
-		progress = 1
-	}
+	progress = Clamp(progress, 0.0, 1.0)
 	idx := progress * float64(len(values)-1)
 	i1 := int(idx)
-	i2 := i1 + 1
-	if i2 >= len(values) {
-		i2 = len(values) - 1
-	}
+	i2 := min(i1+1, len(values)-1)
 	t := idx - float64(i1)
 	return values[i1]*(1-t) + values[i2]*t
 }
 
-// interpolateColor linearly interpolates between colors based on a progress value (0.0 to 1.0).
 func interpolateRibbonColor(values []color.RGBA, progress float64) color.RGBA {
 	if len(values) == 0 {
 		return color.RGBA{}
@@ -452,18 +584,10 @@ func interpolateRibbonColor(values []color.RGBA, progress float64) color.RGBA {
 	if len(values) == 1 {
 		return values[0]
 	}
-	if progress < 0 {
-		progress = 0
-	}
-	if progress > 1 {
-		progress = 1
-	}
+	progress = Clamp(progress, 0.0, 1.0)
 	idx := progress * float64(len(values)-1)
 	i1 := int(idx)
-	i2 := i1 + 1
-	if i2 >= len(values) {
-		i2 = len(values) - 1
-	}
+	i2 := min(i1+1, len(values)-1)
 	t := idx - float64(i1)
 	rVal := float64(values[i1].R)*(1-t) + float64(values[i2].R)*t
 	gVal := float64(values[i1].G)*(1-t) + float64(values[i2].G)*t

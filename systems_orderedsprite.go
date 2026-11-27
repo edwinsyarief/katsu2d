@@ -1,123 +1,144 @@
 package katsu2d
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/edwinsyarief/teishoku"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-type OrderedSpriteSystem struct {
-	transform                *Transform
-	filter                   *teishoku.Filter3[TransformComponent, SpriteComponent, OrderableComponent]
-	lastFrameEntities        map[teishoku.Entity]struct{}
-	entities                 []teishoku.Entity
-	zSortNeeded, initialized bool
-}
+// OrderedSpriteSystemOption configures an OrderedSpriteSystem.
+type OrderedSpriteSystemOption func(*OrderedSpriteSystem)
 
-func NewOrderedSpriteSystem() *OrderedSpriteSystem {
-	return &OrderedSpriteSystem{
-		transform:         T(),
-		lastFrameEntities: make(map[teishoku.Entity]struct{}),
-		entities:          make([]teishoku.Entity, 0),
+// WithOrderedSpriteFrustumMargin sets the extra world-space padding around ActiveCamera.ViewBounds
+// used for ordered sprite frustum culling (default 96).
+func WithOrderedSpriteFrustumMargin(margin float64) OrderedSpriteSystemOption {
+	return func(s *OrderedSpriteSystem) {
+		if margin < 0 {
+			margin = 0
+		}
+		s.frustumMargin = margin
 	}
 }
-func (self *OrderedSpriteSystem) Initialize(w *teishoku.World) {
-	if self.initialized {
+
+// OrderedSpriteSystem sorts and renders entities possessing TransformComponent,
+// SpriteComponent, and OrderableComponent, ordered by Z, then OrderableComponent.Index, then Entity.ID.
+type OrderedSpriteSystem struct {
+	transform       *Transform
+	filter          *teishoku.Filter3[TransformComponent, SpriteComponent, OrderableComponent]
+	tsBuilder       *teishoku.Builder2[TransformComponent, SpriteComponent]
+	meshBuilder     *teishoku.Builder[MeshComponent]
+	particleBuilder *teishoku.Builder[ParticleComponent]
+	tmHandle        teishoku.ResourceHandle[TextureManager]
+	camHandle       teishoku.ResourceHandle[ActiveCamera]
+	frustumMargin   float64
+	entries         []spriteRenderEntry
+	worldVertices   []ebiten.Vertex
+	initialized     bool
+}
+
+// NewOrderedSpriteSystem creates a new OrderedSpriteSystem.
+func NewOrderedSpriteSystem(opts ...OrderedSpriteSystemOption) *OrderedSpriteSystem {
+	s := &OrderedSpriteSystem{
+		transform:     T(),
+		frustumMargin: defaultSpriteFrustumMargin,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(s)
+		}
+	}
+	return s
+}
+
+// Initialize prepares the OrderedSpriteSystem's ECS filter, builders, and resource handles.
+func (s *OrderedSpriteSystem) Initialize(w *teishoku.World) {
+	if s.initialized || w == nil {
 		return
 	}
-
-	self.filter = self.filter.New(w)
-	self.initialized = true
+	s.filter = teishoku.NewFilter3[TransformComponent, SpriteComponent, OrderableComponent](w)
+	s.tsBuilder = teishoku.NewBuilder2[TransformComponent, SpriteComponent](w)
+	s.meshBuilder = teishoku.NewBuilder[MeshComponent](w)
+	s.particleBuilder = teishoku.NewBuilder[ParticleComponent](w)
+	s.tmHandle = teishoku.UseResource[TextureManager](w.Resources())
+	s.camHandle = teishoku.UseResource[ActiveCamera](w.Resources())
+	s.initialized = true
 }
-func (self *OrderedSpriteSystem) Update(w *teishoku.World, dt float64) {
-	currentEntities := make([]teishoku.Entity, 0)
-	self.filter.Reset()
-	for self.filter.Next() {
-		currentEntities = append(currentEntities, self.filter.Entity())
+
+// Update collects visible orderable sprite entities, updates Y-sorted indices, and sorts when out of order.
+func (s *OrderedSpriteSystem) Update(w *teishoku.World, dt float64) {
+	if !s.initialized {
+		s.Initialize(w)
+	}
+	cam := s.camHandle.Get()
+	if cam == nil {
+		if c := GetActiveCamera(w); c != nil {
+			s.camHandle = teishoku.UseResource[ActiveCamera](w.Resources())
+			cam = c
+		}
+	}
+	useCull := cam != nil && cam.HasCamera
+
+	s.entries = s.entries[:0]
+	chunks := s.filter.Chunks()
+	for chunks.Next() {
+		entities := chunks.Entities()
+		transforms, sprites, orderables := chunks.Get()
+		for i := range entities {
+			o := &orderables[i]
+			if o.AutoSortY {
+				o.Index = transforms[i].Position.Y + o.YOffset
+			}
+			if useCull && !cam.IsVisible(spriteWorldBounds(&transforms[i], &sprites[i], s.frustumMargin)) {
+				continue
+			}
+			s.entries = append(s.entries, spriteRenderEntry{
+				entity: entities[i],
+				z:      transforms[i].Z,
+				order:  o.Index,
+			})
+		}
 	}
 
-	zSortNeeded := self.zSortNeeded || len(currentEntities) != len(self.lastFrameEntities)
-	if !zSortNeeded && len(currentEntities) > 0 {
-		for _, entity := range currentEntities {
-			if _, ok := self.lastFrameEntities[entity]; !ok {
-				zSortNeeded = true
+	sorted := true
+	for i := 1; i < len(s.entries); i++ {
+		prev := s.entries[i-1]
+		curr := s.entries[i]
+		if curr.z < prev.z {
+			sorted = false
+			break
+		}
+		if curr.z == prev.z {
+			if curr.order < prev.order || (curr.order == prev.order && curr.entity.ID < prev.entity.ID) {
+				sorted = false
 				break
 			}
 		}
 	}
-
-	if zSortNeeded {
-		self.entities = currentEntities
-		sort.SliceStable(self.entities, func(i, j int) bool {
-			t1 := teishoku.GetComponent[TransformComponent](w, self.entities[i])
-			t2 := teishoku.GetComponent[TransformComponent](w, self.entities[j])
-			if t1.Z != t2.Z {
-				return t1.Z < t2.Z
+	if !sorted {
+		slices.SortFunc(s.entries, func(a, b spriteRenderEntry) int {
+			if c := cmp.Compare(a.z, b.z); c != 0 {
+				return c
 			}
-
-			o1 := teishoku.GetComponent[OrderableComponent](w, self.entities[i])
-			o2 := teishoku.GetComponent[OrderableComponent](w, self.entities[j])
-			index1 := o1.Index
-			index2 := o2.Index
-			if index1 != index2 {
-				return index1 < index2
+			if c := cmp.Compare(a.order, b.order); c != 0 {
+				return c
 			}
-
-			return self.entities[i].ID < self.entities[j].ID
+			return cmp.Compare(a.entity.ID, b.entity.ID)
 		})
-		self.zSortNeeded = false
-	}
-
-	self.lastFrameEntities = make(map[teishoku.Entity]struct{}, len(currentEntities))
-	for _, entity := range currentEntities {
-		self.lastFrameEntities[entity] = struct{}{}
 	}
 }
-func (self *OrderedSpriteSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
-	tm := GetTextureManager(w)
-	for _, e := range self.entities {
-		t, s := teishoku.GetComponent2[TransformComponent, SpriteComponent](w, e)
-		self.transform.SetFromComponent(t)
-		img := tm.Get(s.TextureID)
-		if img == nil {
-			continue
-		}
 
-		if IsBoundEmpty(s.Bound) {
-			s.Bound = Bound{
-				Min: Point{X: 0, Y: 0},
-				Max: Point{X: float64(s.Width), Y: float64(s.Height)},
-			}
-		}
-
-		if m := teishoku.GetComponent[MeshComponent](w, e); m != nil {
-			GenerateMesh(m, s)
-
-			worldVertices := make([]ebiten.Vertex, len(m.Vertices))
-			matrix := self.transform.Matrix()
-			for i, v := range m.Vertices {
-				v.ColorR = float32(s.Color.R) / 255
-				v.ColorG = float32(s.Color.G) / 255
-				v.ColorB = float32(s.Color.B) / 255
-				v.ColorA = (float32(s.Color.A) / 255) * float32(s.Opacity)
-				vx, vy := (&matrix).Apply(float64(v.DstX), float64(v.DstY))
-				v.DstX = float32(vx)
-				v.DstY = float32(vy)
-				worldVertices[i] = v
-			}
-			rdr.AddCustomMeshes(worldVertices, m.Indices, img)
-		} else {
-			col := s.Color
-			col.A = uint8((float64(col.A) / 255.0) * s.Opacity)
-			rdr.AddQuad(self.transform.Position(),
-				self.transform.Offset(),
-				self.transform.Origin(),
-				self.transform.Scale(), self.transform.Rotation(),
-				img, col,
-				float32(s.Bound.Min.X), float32(s.Bound.Min.Y),
-				float32(s.Bound.Max.X), float32(s.Bound.Max.Y),
-				float64(s.Width), float64(s.Height))
-		}
-	}
+// Draw submits all sorted orderable sprites and sprite meshes to the BatchRenderer.
+func (s *OrderedSpriteSystem) Draw(w *teishoku.World, rdr *BatchRenderer) {
+	s.worldVertices = drawSpriteEntries(
+		s.entries,
+		s.tsBuilder,
+		s.meshBuilder,
+		s.particleBuilder,
+		s.tmHandle.Get(),
+		s.transform,
+		s.worldVertices,
+		rdr,
+	)
 }

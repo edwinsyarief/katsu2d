@@ -33,6 +33,9 @@ var _srcBicubic []byte
 //go:embed internal_assets/shaders/src_bilinear.kage
 var _srcBilinear []byte
 
+//go:embed internal_assets/shaders/crt_lottes.kage
+var _srcCrtLottes []byte
+
 var (
 	shaderSources     [scalingFilterEndSentinel][]byte
 	shaders           [scalingFilterEndSentinel]*ebiten.Shader
@@ -42,18 +45,19 @@ var (
 )
 
 func init() {
-	shaderSources[_Nearest] = _nearest
-	shaderSources[_AASamplingSoft] = _aaSamplingSoft
-	shaderSources[_AASamplingSharp] = _aaSamplingSharp
-	shaderSources[_Hermite] = _hermite
-	shaderSources[_Bicubic] = _bicubic
-	shaderSources[_Bilinear] = _bilinear
+	shaderSources[SF_Nearest] = _nearest
+	shaderSources[SF_AASamplingSoft] = _aaSamplingSoft
+	shaderSources[SF_AASamplingSharp] = _aaSamplingSharp
+	shaderSources[SF_Hermite] = _hermite
+	shaderSources[SF_Bicubic] = _bicubic
+	shaderSources[SF_Bilinear] = _bilinear
 	shaderSources[_SrcHermite] = _srcHermite
 	shaderSources[_SrcBicubic] = _srcBicubic
 	shaderSources[_SrcBilinear] = _srcBilinear
+	shaderSources[SF_CrtLottes] = _srcCrtLottes
 }
 
-func compileShader(filter scalingFilter) {
+func compileShader(filter ScalingFilter) {
 	var err error
 	shaders[filter], err = ebiten.NewShader(shaderSources[filter])
 	if err != nil {

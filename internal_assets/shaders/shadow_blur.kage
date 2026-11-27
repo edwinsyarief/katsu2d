@@ -1,0 +1,31 @@
+//kage:unit pixels
+package main
+
+var Direction vec2
+var Radius float
+var Tint vec4
+
+const w0 = 0.20416368871516755
+const w1 = 0.18017382291138087
+const w2 = 0.1238315368057753
+const w3 = 0.0662822452863612
+const w4 = 0.02763055063889883
+
+func Fragment(_ vec4, sourceCoords vec2, _ vec4) vec4 {
+	origin := imageSrc0Origin()
+	minCoords := origin
+	maxCoords := max(minCoords, origin+imageSrc0Size()-vec2(1.0))
+	step := Direction * (Radius * 0.25)
+
+	acc := imageSrc0UnsafeAt(clamp(sourceCoords, minCoords, maxCoords)) * w0
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords+step*1.0, minCoords, maxCoords)) * w1
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords-step*1.0, minCoords, maxCoords)) * w1
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords+step*2.0, minCoords, maxCoords)) * w2
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords-step*2.0, minCoords, maxCoords)) * w2
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords+step*3.0, minCoords, maxCoords)) * w3
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords-step*3.0, minCoords, maxCoords)) * w3
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords+step*4.0, minCoords, maxCoords)) * w4
+	acc += imageSrc0UnsafeAt(clamp(sourceCoords-step*4.0, minCoords, maxCoords)) * w4
+
+	return acc * Tint
+}
